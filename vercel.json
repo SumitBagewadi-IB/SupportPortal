@@ -1,12 +1,17 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/faq", "destination": "/faq.html" },
-    { "source": "/contact", "destination": "/contact.html" },
-    { "source": "/my-tickets", "destination": "/my-tickets.html" },
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/admin-inbox", "destination": "/admin-inbox.html" },
-    { "source": "/verify-2fa", "destination": "/verify-2fa.html" }
+  "version": 2,
+  "builds": [
+    { "src": "**/*", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/faq", "dest": "/faq.html" },
+    { "src": "/contact", "dest": "/contact.html" },
+    { "src": "/my-tickets", "dest": "/my-tickets.html" },
+    { "src": "/login", "dest": "/login.html" },
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/admin-inbox", "dest": "/admin-inbox.html" },
+    { "src": "/verify-2fa", "dest": "/verify-2fa.html" },
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }
