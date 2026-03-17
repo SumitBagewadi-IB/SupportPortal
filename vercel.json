@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/faq", "destination": "/faq.html" },
+    { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/my-tickets", "destination": "/my-tickets.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin-inbox", "destination": "/admin-inbox.html" },
+    { "source": "/verify-2fa", "destination": "/verify-2fa.html" }
+  ]
+}
