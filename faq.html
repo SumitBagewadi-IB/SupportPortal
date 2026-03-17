@@ -1,0 +1,2521 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function () {
+            const theme = localStorage.getItem('theme') || 'light';
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Base | Indiabulls Securities Support</title>
+    <meta name="description" content="Step-by-step guides and answers for the Indiabulls Securities trading platform.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- NAV -->
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">
+                <img src="logo.svg" alt="Indiabulls Securities" class="logo-light">
+                <img src="logo-dark.svg" alt="Indiabulls Securities" class="logo-dark">
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="faq.html" class="active">Knowledge Base</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+            </ul>
+            <a href="#" class="btn-signin">Sign In</a>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- KB LAYOUT -->
+    <div class="kb-layout">
+
+        <!-- SIDEBAR -->
+        <aside class="kb-sidebar">
+            <p class="kb-sidebar-title">Topics</p>
+            <div class="kb-sidebar-nav" id="kbSidebar">
+                <button class="kb-nav-link active" data-cat="all"><i class="fas fa-border-all" style="width:14px;"></i>
+                    All Topics <span class="nav-count" id="count-all"></span></button>
+                <button class="kb-nav-link" data-cat="getting-started"><i class="fas fa-rocket" style="width:14px;"></i>
+                    Getting Started <span class="nav-count" id="count-gs"></span></button>
+                <button class="kb-nav-link" data-cat="account-opening"><i class="fas fa-id-card"
+                        style="width:14px;"></i>
+                    Account Opening <span class="nav-count" id="count-ao"></span></button>
+                <button class="kb-nav-link" data-cat="trading"><i class="fas fa-chart-line" style="width:14px;"></i>
+                    Trading <span class="nav-count" id="count-tr"></span></button>
+                <button class="kb-nav-link" data-cat="portfolio"><i class="fas fa-briefcase" style="width:14px;"></i>
+                    Portfolio <span class="nav-count" id="count-pf"></span></button>
+                <button class="kb-nav-link" data-cat="funds"><i class="fas fa-wallet" style="width:14px;"></i> Funds
+                    <span class="nav-count" id="count-fn"></span></button>
+                <button class="kb-nav-link" data-cat="ipo"><i class="fas fa-rocket" style="width:14px;"></i> IPO
+                    <span class="nav-count" id="count-ipo"></span></button>
+                <button class="kb-nav-link" data-cat="fo"><i class="fas fa-bolt" style="width:14px;"></i> F&amp;O
+                    <span class="nav-count" id="count-fo"></span></button>
+                <button class="kb-nav-link" data-cat="pledging"><i class="fas fa-link" style="width:14px;"></i> Pledging
+                    <span class="nav-count" id="count-pledge"></span></button>
+                <button class="kb-nav-link" data-cat="account"><i class="fas fa-user-circle" style="width:14px;"></i>
+                    Account <span class="nav-count" id="count-acc"></span></button>
+                <button class="kb-nav-link" data-cat="reports"><i class="fas fa-file-invoice" style="width:14px;"></i>
+                    Reports <span class="nav-count" id="count-rp"></span></button>
+                <button class="kb-nav-link" data-cat="contact-faq"><i class="fas fa-headset" style="width:14px;"></i>
+                    Contact &amp; Escalation <span class="nav-count" id="count-cf"></span></button>
+                <button class="kb-nav-link" data-cat="mtf"><i class="fas fa-layer-group" style="width:14px;"></i>
+                    MTF <span class="nav-count" id="count-mtf"></span></button>
+                <button class="kb-nav-link" data-cat="tender-offers"><i class="fas fa-hand-holding-dollar"
+                        style="width:14px;"></i>
+                    Tender Offers <span class="nav-count" id="count-tender"></span></button>
+
+                <p class="kb-sidebar-title" style="margin-top:0.75rem;">New Topics</p>
+                <button class="kb-nav-link" data-cat="charges"><i class="fas fa-tags" style="width:14px;"></i>
+                    Charges &amp; Brokerage <span class="nav-count" id="count-ch"></span></button>
+                <button class="kb-nav-link" data-cat="compliance"><i class="fas fa-shield-halved"
+                        style="width:14px;"></i>
+                    Compliance &amp; Safety <span class="nav-count" id="count-comp"></span></button>
+                <button class="kb-nav-link" data-cat="mutual-funds"><i class="fas fa-seedling" style="width:14px;"></i>
+                    Mutual Funds <span class="nav-count" id="count-mf"></span></button>
+                <button class="kb-nav-link" data-cat="nri"><i class="fas fa-globe" style="width:14px;"></i>
+                    NRI / HUF Accounts <span class="nav-count" id="count-nri"></span></button>
+
+                <p class="kb-sidebar-title pro-title">Elite Tools</p>
+                <button class="kb-nav-link" data-cat="pro-market"><i class="fas fa-chart-pie" style="width:14px;"></i>
+                    Advanced Market <span class="nav-count" id="count-pro-m"></span></button>
+                <button class="kb-nav-link" data-cat="pro-charts"><i class="fas fa-wave-square" style="width:14px;"></i>
+                    Pro Charts <span class="nav-count" id="count-pro-c"></span></button>
+                <button class="kb-nav-link" data-cat="pro-algo"><i class="fas fa-terminal" style="width:14px;"></i>
+                    Algo &amp; API <span class="nav-count" id="count-pro-a"></span></button>
+            </div>
+
+            <div
+                style="margin-top:2rem; padding: 1rem; background: var(--bg-subtle); border:1px solid var(--border); border-radius:10px;">
+                <p style="font-size:0.8rem; font-weight:600; color:var(--text-dark); margin-bottom:0.4rem;">Still stuck?
+                </p>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.75rem;">Our team replies within 2
+                    hours.</p>
+                <a href="contact.html" class="btn-primary"
+                    style="width:100%; justify-content:center; font-size:0.8rem;"><i class="fas fa-comment-dots"></i>
+                    Contact Support</a>
+            </div>
+
+            <div style="margin-top:1.25rem; padding: 1rem; border:1px solid var(--border); border-radius:10px;">
+                <p
+                    style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.6rem;">
+                    Regulatory Links</p>
+                <a href="https://www.sebi.gov.in" target="_blank" rel="noopener"
+                    style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-mid);padding:0.3rem 0;text-decoration:none;"
+                    onmouseover="this.style.color='var(--text-dark)'" onmouseout="this.style.color='var(--text-mid)'"><i
+                        class="fas fa-external-link-alt" style="font-size:0.6rem;"></i> SEBI</a>
+                <a href="https://www.nseindia.com" target="_blank" rel="noopener"
+                    style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-mid);padding:0.3rem 0;text-decoration:none;"
+                    onmouseover="this.style.color='var(--text-dark)'" onmouseout="this.style.color='var(--text-mid)'"><i
+                        class="fas fa-external-link-alt" style="font-size:0.6rem;"></i> NSE India</a>
+                <a href="https://www.bseindia.com" target="_blank" rel="noopener"
+                    style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-mid);padding:0.3rem 0;text-decoration:none;"
+                    onmouseover="this.style.color='var(--text-dark)'" onmouseout="this.style.color='var(--text-mid)'"><i
+                        class="fas fa-external-link-alt" style="font-size:0.6rem;"></i> BSE India</a>
+                <a href="https://www.cdslindia.com" target="_blank" rel="noopener"
+                    style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-mid);padding:0.3rem 0;text-decoration:none;"
+                    onmouseover="this.style.color='var(--text-dark)'" onmouseout="this.style.color='var(--text-mid)'"><i
+                        class="fas fa-external-link-alt" style="font-size:0.6rem;"></i> CDSL</a>
+                <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener"
+                    style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-mid);padding:0.3rem 0;text-decoration:none;"
+                    onmouseover="this.style.color='var(--text-dark)'" onmouseout="this.style.color='var(--text-mid)'"><i
+                        class="fas fa-external-link-alt" style="font-size:0.6rem;"></i> SCORES Grievance</a>
+            </div>
+        </aside>
+
+        <!-- MAIN ARTICLES -->
+        <main class="kb-main">
+            <div class="notice-banner">
+                <i class="fas fa-shield-halved"></i>
+                <span><strong>Verified content:</strong> All articles are cross-referenced with official Indiabulls
+                    Securities policies.</span>
+            </div>
+
+            <div class="kb-header">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <h1 id="kbHeading">All Topics</h1>
+                        <p id="kbSubheading">Browse all support articles or filter by topic from the sidebar.</p>
+                    </div>
+                    <div class="search-wrapper" style="width: 100%; max-width: 400px; margin: 0;">
+                        <i class="fas fa-search search-icon"></i>
+                        <input id="faqSearch" type="text" class="search-input" placeholder="Search Knowledge Base..."
+                            autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <div id="articleContainer">
+
+                <!-- ── GETTING STARTED ── -->
+                <div class="article-group" data-cat="getting-started">
+                    <p class="article-group-title">Getting Started</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-basic">Basic</span>How do I place my first trade?
+                                    </h3>
+                                    <p>Search → Select → Order form → Confirm.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Use the <strong>search bar</strong> at the top to find a
+                                        stock (e.g., RELIANCE).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Click on the stock and press <strong>Buy</strong> or
+                                        <strong>Sell</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Enter quantity, select order type (Market / Limit), and
+                                        choose product (CNC / MIS).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Review the summary and tap <strong>Place Order</strong>.
+                                    </div>
+                                </div>
+                            </div>
+                            <p style="margin-top:0.5rem; font-size:0.8rem; color:var(--text-muted);">Use
+                                <strong>CNC</strong> for delivery trades (held overnight). Use <strong>MIS</strong> for
+                                intraday trades (squared off by 3:15 PM).
+                            </p>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ACCOUNT OPENING ── -->
+                <div class="article-group" data-cat="account-opening">
+                    <p class="article-group-title">Account Opening</p>
+
+                    <div class="article-card" id="acc-send-docs">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Will Indiabulls Securities send any documents to my address?</h3>
+                                    <p>100% Digital process with electronic communication.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>No, Indiabulls Securities Ltd does not send any physical documents to your address. As
+                                the account opening process is entirely digital, all necessary documents and
+                                communication will be conducted electronically.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-platforms">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What kind of trading platforms are offered by Indiabulls Securities?</h3>
+                                    <p>Available on both web and mobile: iOS & Android.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities Ltd trading platform is available on both web and mobile:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li><strong>Web:</strong> Visit <a href="https://ibullssecurities.com/"
+                                        target="_blank">ibullssecurities.com</a> to access the platform.</li>
+                                <li><strong>Mobile:</strong> Download the Indiabulls app from the App Store or Google
+                                    Play Store.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-call-trade">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Can orders be placed by calling Indiabulls Securities?</h3>
+                                    <p>Call & Trade facility at ₹150 + GST per order.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Yes, Indiabulls Securities Ltd offers a Call & Trade facility. You can reach us at
+                                <strong>022-61446300</strong> to buy or sell securities.
+                            </p>
+                            <p style="margin-top:0.5rem; color:var(--text-muted); font-size:0.8rem;">Note: Call and
+                                trade charge of ₹150 + 18% GST is associated with this service (placing, modifying,
+                                cancelling orders).</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-no-demat">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Can a trading account be opened without a demat account?</h3>
+                                    <p>Demat is essential for settlement and F&O delivery.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>No, a demat account is necessary because:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li>It settles open equity intraday positions.</li>
+                                <li>It is required for physical settlement of stock F&O contracts.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-map-demat">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Can a demat account with other brokers be mapped to Indiabulls Securities?</h3>
+                                    <p>Currently, external demat mapping is not supported.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>No, a demat account maintained with other brokers cannot be mapped to an Indiabulls
+                                Securities Ltd trading account as of now.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-how-many">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>How many Demat accounts can be opened with Indiabulls Securities?</h3>
+                                    <p>One account per PAN and registered mobile number.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>You can open one Demat account with Indiabulls Securities Ltd using a single PAN card.
+                                You may open additional counts with other DPs.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-how-to-open">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>How to Open Demat account in Indiabulls Securities?</h3>
+                                    <p>8-step guide to digital account opening.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Enter mobile number and verify via OTP.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Verify email ID.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Provide PAN details.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Add bank account details.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">5</div>
+                                    <div class="step-content">Complete the KYC process.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">6</div>
+                                    <div class="step-content">Upload a live selfie.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">7</div>
+                                    <div class="step-content">Upload your signature.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">8</div>
+                                    <div class="step-content">E-sign the account opening form.</div>
+                                </div>
+                            </div>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-time">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>How much time does it take to open a new account?</h3>
+                                    <p>Activation typically takes 24 to 48 hours.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>The process typically takes 24 to 48 hours upon successful KYC document submission.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-charges">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What are the charges for opening an account?</h3>
+                                    <p>Free account opening with low brokerage fees.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls offers free demat accounts with no AMC. Brokerage fees:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li><strong>Equity Delivery:</strong> ₹20 per order + GST</li>
+                                <li><strong>Intraday and F&O:</strong> ₹20 per order + GST</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-ap">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What is an "Authorised Person" (AP)?</h3>
+                                    <p>Agent of the broker providing exchange access.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>An AP is an individual or entity appointed by a stockbroker to provide access to a stock
+                                exchange's trading platform. They must be registered with the exchange and have a formal
+                                agreement with the broker.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-amc">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What are the Annual Maintenance Charges (AMC)?</h3>
+                                    <p>Individual: ₹300/yr | Corporate: ₹1000/yr.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <ul style="margin: 0; padding-left: 1.25rem; line-height: 2;">
+                                <li><strong>Individual:</strong> ₹300 per year + GST</li>
+                                <li><strong>Corporate:</strong> ₹1000 per year + GST</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-docs-req">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What documents are required for account opening?</h3>
+                                    <p>PAN, Aadhaar, Bank proof, and Income proof for F&O.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Required docs:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li>PAN Card & Aadhaar/Passport/DL</li>
+                                <li>Bank Details (Acc No + IFSC)</li>
+                                <li>Income Proof (for F&O segment)</li>
+                                <li>Live Selfie & Signature</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-who-can">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Who can open an account with Indiabulls?</h3>
+                                    <p>Individual Indians (18+), HUF, LLP, Corporate, Trusts.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Any Indian citizen over 18 can open an account. We also support non-individual entities
+                                like HUFs, LLPs, and Corporates.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-nri">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Are NRIs allowed to open an account?</h3>
+                                    <p>Yes, NRIs can open Demat and Trading accounts.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Yes, NRI is currently allowed to open a Demat and Trading account with Indiabulls
+                                Securities Ltd.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-products">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Which investment products are available?</h3>
+                                    <p>Equity, F&O, Commodities, Currency, IPOs, Mutual Funds.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls has the following segments available: Equity (Shares), Derivatives (F&O),
+                                Commodities, Currency, IPOs, and Mutual Funds.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-corporate">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Can a Corporate open an account with Indiabulls Securities?</h3>
+                                    <p>Yes, non-individual accounts are supported.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Yes, we offer account opening for HUFs, LLPs, Partnerships, Corporate Accounts, and
+                                Trusts.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-fo-status">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>My F&O Income Proof is uploaded. What is the status?</h3>
+                                    <p>Activation takes 5-7 days after exchange registration.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Your F&O segment will be activated as soon as your registration on the exchanges is
+                                completed. This may take anywhere between 5-7 days.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-fo-docs">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What documents are required to activate F&O?</h3>
+                                    <p>Bank statement, Pay slip, Form 16, or ITR.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Accepted Income Proofs:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2.2;">
+                                <li><strong>Bank statement:</strong> 6 months, balance ≥ ₹5000.</li>
+                                <li><strong>Pay Slip:</strong> Latest copy, salary ≥ ₹10,000.</li>
+                                <li><strong>Form 16 / ITR:</strong> Latest year, income ≥ ₹1.2 Lakh.</li>
+                                <li><strong>Holding Statement:</strong> Minimum holding of ₹10,000.</li>
+                            </ul>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-pan-fail">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Why was my PAN verification failed?</h3>
+                                    <p>NSDL mismatch in name or date of birth.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>PAN verification may fail if the name or date of birth entered does not match records
+                                available with NSDL, or if the PAN number is incorrect.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-sig-reject">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Why was my Signature rejected?</h3>
+                                    <p>Blurry images or non-matching signatures.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Rejected if the signature is not clear or blurred. Please ensure you upload a sharp image
+                                on plain white paper.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-fees">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>What are the account opening fees?</h3>
+                                    <p>Zero Account Opening Charges. Absolutely Free!</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities offers free account opening with no hidden charges for the basic
+                                plan.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-name-mismatch">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#00C805;"></span>
+                                <div>
+                                    <h3>Why is there a mismatch in my name during KYC?</h3>
+                                    <p>Mismatch in First, Middle, or Last names.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Please ensure you enter your Full Name as per document records. First Name is mandatory.
+                                Middle and Last names should be filled where applicable.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TRADING ── -->
+                <div class="article-group" data-cat="trading">
+                    <p class="article-group-title">Trading</p>
+
+                    <div class="article-card" id="gtt">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>How to place a GTT (Good Till
+                                        Trigger) order?</h3>
+                                    <p>Set price alerts that automatically place orders.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A GTT order stays active for up to 365 days and fires automatically when the market price
+                                hits your trigger price.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Open the stock you want from your
+                                        <strong>Watchlist</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Click the <strong>GTT</strong> button (clock icon) next to
+                                        Buy/Sell.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Enter your <strong>trigger price</strong> and
+                                        <strong>limit price</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Confirm. The GTT order is now active. You can view it
+                                        under <strong>Orders → GTT</strong>.</div>
+                                </div>
+                            </div>
+                            <button class="btn-demo" data-title="GTT Orders"
+                                data-demo="file:///Users/sumit.bagewadi/.gemini/antigravity/brain/a07f6367-635f-49d8-bcf8-6b2b0294f7bf/gtt_creation_v4_attempt_1772005546283.webp"><i
+                                    class="fas fa-play-circle"></i> Watch Demo</button>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="basket">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>How to execute a Basket Order?</h3>
+                                    <p>Buy or sell multiple stocks in one click.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Basket orders let you group up to 10 stocks across Equity and F&amp;O and execute them
+                                simultaneously.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Basket Orders</strong> from the left sidebar
+                                        menu.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Click <strong>Create Basket</strong> and add stocks using
+                                        the search.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Set quantity and side (Buy/Sell) for each stock.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Click <strong>Execute Basket</strong> to place all orders
+                                        at once.</div>
+                                </div>
+                            </div>
+                            <button class="btn-demo" data-title="Basket Orders"
+                                data-demo="file:///Users/sumit.bagewadi/.gemini/antigravity/brain/a07f6367-635f-49d8-bcf8-6b2b0294f7bf/basket_order_real_v1_1772006738062.webp"><i
+                                    class="fas fa-play-circle"></i> Watch Demo</button>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3>What is Cover Order (CO) and Bracket Order (BO)?</h3>
+                                    <p>Leverage intraday orders with built-in stop-loss.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p><strong>Cover Order (CO)</strong>: Places a market order with a compulsory stop-loss.
+                                Offers higher intraday leverage.<br><br>
+                                <strong>Bracket Order (BO)</strong>: Combines an entry order with a stop-loss and a
+                                target price. The system exits automatically at whichever triggers first.<br><br>
+                                Both are available only during market hours and are squared off by 3:15 PM if not
+                                triggered.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="trading-mis-cnc">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3>Difference between MIS and CNC?</h3>
+                                    <p>Intraday vs Delivery based trading.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <ul class="article-list-ul">
+                                <li><strong>MIS (Margin Intraday Square-off):</strong> Used for intraday trading. Orders
+                                    are squared off on the same day. Offers leverage.</li>
+                                <li><strong>CNC (Cash and Carry):</strong> Used for delivery trading. You must pay 100%
+                                    of the trade value and hold shares in your demat for T+1 days.</li>
+                            </ul>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="trading-sl-types">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3>Difference between SL and SL-M?</h3>
+                                    <p>Protecting your capital with trigger prices.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <ul class="article-list-ul">
+                                <li><strong>SL (Stop Loss Limit):</strong> Requires both a <em>Trigger Price</em> and a
+                                    <em>Limit Price</em>. Once the trigger is hit, a limit order is sent.
+                                </li>
+                                <li><strong>SL-M (Stop Loss Market):</strong> Only requires a <em>Trigger Price</em>.
+                                    Once hit, a market order is sent, ensuring execution during high volatility.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="trading-iceberg">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:var(--blue);"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>How to place an Iceberg Order?</h3>
+                                    <p>Slicing large orders into smaller legs to minimize impact.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>An Iceberg order allows you to divide a large quantity order into smaller slices. Only
+                                the first slice is visible to the market, hiding the total depth.</p>
+                            <p><strong>Note:</strong> Minimum order value for Iceberg is ₹1,00,000 for Equity and
+                                ₹5,0,00,000 for F&O.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── PORTFOLIO & MARGIN ── -->
+                <div class="article-group" data-cat="portfolio">
+                    <p class="article-group-title">Portfolio & Margin</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-basic">Basic</span>Understanding Intraday Leverage
+                                    </h3>
+                                    <p>How much margin do you get for MIS orders?</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Intraday (MIS) orders allow you to trade with up to 5x leverage for Equity and 1x for
+                                F&O, as per SEBI mandates.</p>
+                            <p><strong>Note:</strong> MIS orders are automatically squared off by the system 15 minutes
+                                before market close.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>MTF (Margin Trading Facility) Guide
+                                    </h3>
+                                    <p>Buy stocks by paying only 25% and hold them long term.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>MTF allows you to carry forward your leveraged positions for more than 1 day by paying a
+                                nominal interest rate.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Select <strong>MTF</strong> as the product type in your
+                                        buy order.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Authorize the MTF pledge via <strong>CDSL e-DIS</strong>
+                                        before 9:00 PM on T-day.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Maintain the required maintenance margin to avoid
+                                        liquidation.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F97316;"></span>
+                                <div>
+                                    <h3>How to track real-time P&amp;L?</h3>
+                                    <p>Positions tab for intraday, Holdings for long-term.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities shows P&amp;L in two places:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li><strong>Positions</strong> → real-time MTM (Mark-to-Market) P&amp;L for open
+                                    intraday trades.</li>
+                                <li><strong>Holdings</strong> → unrealised P&amp;L for delivery stocks (CNC).</li>
+                            </ul>
+                            <p>MTM = (Current Price − Buy Price) × Quantity. It updates live during market hours.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F97316;"></span>
+                                <div>
+                                    <h3>How to pledge holdings for extra margin?</h3>
+                                    <p>Use your stocks as collateral for F&amp;O margin.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Portfolio → Holdings</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Select stocks eligible for pledge (green badge shown).
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Click <strong>Pledge</strong>. Approve the CDSL OTP sent
+                                        to your registered mobile.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Collateral margin is credited to your account within
+                                        seconds. A standard haircut is applied based on stock volatility.</div>
+                                </div>
+                            </div>
+                            <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">To unpledge, go to
+                                <strong>Portfolio → Pledged Holdings</strong> and click <strong>Unpledge</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── FUNDS ── -->
+                <div class="article-group" data-cat="funds">
+                    <p class="article-group-title">Funds</p>
+
+                    <div class="article-card" id="add-funds">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#A855F7;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-basic">Basic</span>How to add funds to my account?
+                                    </h3>
+                                    <p>UPI, Net Banking, or NEFT — instant credit.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Click <strong>Add Funds</strong> and enter the amount.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Choose your payment method: <strong>UPI, Net Banking,
+                                            NEFT/RTGS, or IMPS</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Approve the payment in your bank/UPI app. Funds reflect
+                                        instantly for UPI and Net Banking.</div>
+                                </div>
+                            </div>
+                            <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">NEFT/RTGS credits may
+                                take up to 2 hours on working days.</p>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="withdraw">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#A855F7;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-basic">Basic</span>How long does fund withdrawal
+                                        take?</h3>
+                                    <p>RTP withdrawals and settlement cycles.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities offers <strong>Real-Time Payment (RTP)</strong> withdrawals:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li>Requests before <strong>3:00 PM</strong>: processed within 30 minutes.</li>
+                                <li>Requests after 3:00 PM or on <strong>bank holidays</strong>: credited by
+                                    <strong>9:00 AM</strong> next working day.
+                                </li>
+                            </ul>
+                            <div class="steps-list" style="margin-top:0.75rem;">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Funds → Withdraw</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Enter the amount (must be ≤ your withdrawable balance).
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Confirm with your TPIN or OTP. Funds are transferred to
+                                        your primary bank account.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ADVANCED ── -->
+                <div class="article-group" data-cat="advanced">
+                    <p class="article-group-title">Advanced Features</p>
+
+                    <div class="article-card" id="algo">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>What is Indiabulls Securities Algo
+                                        and how to use it?
+                                    </h3>
+                                    <p>Automated rule-based trading with QuantMan integration.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>IB Algo lets you automate trades using pre-built or custom strategies without manual
+                                intervention.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Algo</strong> from the sidebar menu.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Browse <strong>Strategy Marketplace</strong> and pick a
+                                        strategy (e.g., Super Trend, Mean Reversion).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Configure risk parameters: capital allocation, max daily
+                                        loss, target.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Click <strong>Deploy</strong>. The system will now place
+                                        orders automatically based on signals.</div>
+                                </div>
+                            </div>
+                            <button class="btn-demo" data-title="Algo Trading"
+                                data-demo="file:///Users/sumit.bagewadi/.gemini/antigravity/brain/a07f6367-635f-49d8-bcf8-6b2b0294f7bf/algo_trading_real_v1_1772006509239.webp"><i
+                                    class="fas fa-play-circle"></i> Watch Demo</button>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="ipo">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>How to apply for an IPO?</h3>
+                                    <p>Select, bid, and pay via UPI in minutes.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Investments → IPO</strong> from the sidebar.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Select an <strong>Active IPO</strong> from the list.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Enter your bid quantity and price (must be within the
+                                        price band).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Enter your <strong>UPI ID</strong> and submit.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">5</div>
+                                    <div class="step-content">Approve the mandate in your UPI app within 30 minutes.
+                                    </div>
+                                </div>
+                            </div>
+                            <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">Allotment is basis
+                                subscription. Funds are unblocked automatically if shares are not allotted.</p>
+                            <button class="btn-demo" data-title="IPO Application"
+                                data-demo="file:///Users/sumit.bagewadi/.gemini/antigravity/brain/a07f6367-635f-49d8-bcf8-6b2b0294f7bf/ipo_apply_real_v1_1772007077108.webp"><i
+                                    class="fas fa-play-circle"></i> Watch Demo</button>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>How to invest in Mutual Funds?</h3>
+                                    <p>Direct plans, SIP, and lump sum — all in one place.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities offers direct Mutual Fund investments from your trading balance at
+                                zero
+                                commission.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Investments → Mutual Funds</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Browse or search by fund name, category (Large Cap, ELSS,
+                                        etc.) or AMC.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Click <strong>Invest</strong> and choose Lump Sum or
+                                        <strong>SIP</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Enter amount and confirm. Units are allotted at next-day
+                                        NAV.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ACCOUNT ── -->
+                <div class="article-group" data-cat="account">
+                    <p class="article-group-title">Account &amp; Settings</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#22C55E;"></span>
+                                <div>
+                                    <h3>How to activate F&amp;O or Currency trading?</h3>
+                                    <p>Segment activation requires income proof upload.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Settings → Segment Activation</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Select the segment: F&amp;O, Currency, or Commodity.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Upload income proof: ITR acknowledgement, 6-month bank
+                                        statement, or latest salary slip.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Activation is processed within 1 working day.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#22C55E;"></span>
+                                <div>
+                                    <h3>What are the Unlimited Trading Plans?</h3>
+                                    <p>Zero brokerage on all trades with the Shubh plan.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>The <strong>Shubh Unlimited Plan</strong> costs ₹1,000 + GST per month and includes:</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li>Zero brokerage on <strong>Equity Delivery</strong></li>
+                                <li>Zero brokerage on <strong>Intraday (NSE + BSE)</strong></li>
+                                <li>Zero brokerage on <strong>F&amp;O</strong></li>
+                                <li>Access to Algo Trading and IPO features</li>
+                            </ul>
+                            <p>Standard statutory charges (STT, exchange fees, GST) still apply.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#22C55E;"></span>
+                                <div>
+                                    <h3>How to add or update a Nominee?</h3>
+                                    <p>Manage up to 3 nominees from your profile settings.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Settings → Profile → Nominee</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Click <strong>Add Nominee</strong> and enter name,
+                                        relationship, date of birth, and percentage share.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">You can add up to 3 nominees. Total share must equal 100%.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Confirm via OTP. Changes reflect in your demat account
+                                        within 2 working days.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="article-card" id="acc-bank-update">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#22C55E;"></span>
+                                    <div>
+                                        <h3>How do I update/change my bank account?</h3>
+                                        <p>Online process via Profile settings.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p>To update your bank account:</p>
+                                <div class="steps-list">
+                                    <div class="step">
+                                        <div class="step-num">1</div>
+                                        <div class="step-content">Go to <strong>Profile → Bank Details</strong>.</div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">2</div>
+                                        <div class="step-content">Click <strong>Add New Bank</strong> and enter details.
+                                        </div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">3</div>
+                                        <div class="step-content">Upload a canceled cheque with your name and IFSC.
+                                        </div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">4</div>
+                                        <div class="step-content">E-sign the request via Aadhaar OTP.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="article-card" id="acc-close">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#22C55E;"></span>
+                                    <div>
+                                        <h3>How to close my Indiabulls Securities account?</h3>
+                                        <p>Demat account closure procedure.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p>To close your account, ensure there are no open positions, pending orders, or
+                                    negative balance. You can initiate closure via <strong>Settings → Account
+                                        Closure</strong>. If you have physical holdings, they must be sold or
+                                    transferred out first.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── REPORTS ── -->
+                <div class="article-group" data-cat="reports">
+                    <p class="article-group-title">Reports</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#64748B;"></span>
+                                <div>
+                                    <h3>Where can I download my Tax P&amp;L statement?</h3>
+                                    <p>Financial year-wise Excel/PDF available in Reports.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Reports → Tax P&amp;L</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Select the <strong>financial year</strong> (e.g., FY
+                                        2023–24).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Click <strong>Download</strong> to get the Excel or PDF
+                                        summary. This report is suitable for ITR filing.</div>
+                                </div>
+                            </div>
+                            <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">Contract notes are
+                                also available under <strong>Reports → Contract Notes</strong> for any specific trading
+                                day.</p>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ── ADVANCED MARKET (PRO) ── -->
+                <div class="article-group" data-cat="pro-market">
+                    <p class="article-group-title">Advanced Market Analysis</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#C2410C;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>How to use Market Heatmaps & Stats?
+                                    </h3>
+                                    <p>Visualise market breadth and identify gainers instantly.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Market Heatmaps provide a birds-eye view of indices (Nifty 50, Bank Nifty) or sectors,
+                                sized by market cap and colored by price change.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Navigate to <strong>Market Stats → Heatmaps</strong>.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Choose between <strong>Treemap</strong> or
+                                        <strong>Bubble</strong> view.
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Filter by <strong>Top Gainers, Volume Shockers</strong>,
+                                        or <strong>52-Week Highs</strong>.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#C2410C;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>Real-time Market Scanners</h3>
+                                    <p>Find stocks hitting intraday highs or breaking resistance.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities Pro includes built-in scanners that alert you to volatility and
+                                technical
+                                breakouts.</p>
+                            <ul style="margin: 0.5rem 0 0.75rem 1.25rem; line-height:2;">
+                                <li><strong>Volume Surge</strong>: Stocks trading >2x their average volume.</li>
+                                <li><strong>Opening High/Low</strong>: Stocks that haven't broken their opening price.
+                                </li>
+                                <li><strong>Price Action</strong>: Gap up/down and range breakouts.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── PRO CHARTS ── -->
+                <div class="article-group" data-cat="pro-charts">
+                    <p class="article-group-title">Professional Charting</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#C2410C;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>Multi-Chart Layouts & TradingView
+                                    </h3>
+                                    <p>View up to 8 charts simultaneously on a single screen.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>The Pro dashboard supports synchronized multi-chart windows for correlation analysis.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Open any stock chart and click the <strong>Layout</strong>
+                                        icon in the header.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Select your grid (2x2, 1x3, etc.).</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Click <strong>Sync Symbol</strong> to track the same
+                                        ticker across different timeframes.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── ALGO & API (PRO) ── -->
+                <div class="article-group" data-cat="pro-algo">
+                    <p class="article-group-title">Algo Trading & API access</p>
+
+                    <div class="article-card">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#C2410C;"></span>
+                                <div>
+                                    <h3><span class="tier-badge badge-pro">Pro</span>Trading Webhooks & External
+                                        Integration</h3>
+                                    <p>Connect TradingView alerts directly to Indiabulls Securities execution.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Automate your execution by sending Webhook alerts from platforms like TradingView or
+                                Amibroker.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Settings → API Keys</strong> and generate a
+                                        Webhook URL.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Paste this URL into your TradingView alert settings.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Define the JSON payload (ticker, side, qty) according to
+                                        the <strong>Developer Docs</strong>.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ── CHARGES & BROKERAGE ── -->
+                <div class="article-group" data-cat="charges">
+                    <p class="article-group-title">Charges & Brokerage</p>
+
+                    <div class="article-card" id="charge-brokerage">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#D97706;"></span>
+                                <div>
+                                    <h3>What are the brokerage charges at Indiabulls?</h3>
+                                    <p>Flat ₹20 per order across all segments.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls Securities follows a transparent, flat-fee model:</p>
+                            <ul class="article-list-ul">
+                                <li><strong>Equity Delivery:</strong> ₹20 per executed order + GST</li>
+                                <li><strong>Intraday & F&O:</strong> ₹20 per executed order + GST</li>
+                                <li><strong>Commodity & Currency:</strong> ₹20 per executed order + GST</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="charge-call-trade">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#D97706;"></span>
+                                <div>
+                                    <h3>What are Call & Trade charges?</h3>
+                                    <p>₹150 + GST per order via phone support.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Orders placed through our dealing desk at <strong>022-61446300</strong> attract a fee of
+                                <strong>₹150 + 18% GST</strong> per order. This applies to placement, modification, and
+                                cancellation.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="charge-netbanking">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#D97706;"></span>
+                                <div>
+                                    <h3>Why is there a ₹10 charge for Net Banking?</h3>
+                                    <p>Gateway charges for net banking transfers.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A ₹10 fee is levied for funds added via Net Banking as payment gateway charges. To avoid
+                                this, use <strong>UPI, IMPS, or NEFT</strong>, which are 100% free.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── COMPLIANCE & SAFETY ── -->
+                <div class="article-group" data-cat="compliance">
+                    <p class="article-group-title">Compliance & Safety</p>
+
+                    <div class="article-card" id="kyc-timeline">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>How long does KYC approval take?</h3>
+                                    <p>Typically 1-2 working days for full verification.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>While the journey takes minutes, verification by exchanges/KRA takes <strong>1-2 working
+                                    days</strong>. Ensure PAN, Aadhaar, and Bank proofs are clear for faster approval.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="kyc-bank-verify">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>How is my bank account verified?</h3>
+                                    <p>Automatic penny-drop verification.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>We use a <strong>Penny Drop</strong> check (depositing ₹1) to verify the account holder
+                                name and IFSC. If this fails, you'll need to upload a canceled cheque or passbook copy.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="compliance-tpin">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>What is the CDSL TPIN?</h3>
+                                    <p>The secure way to authorize share selling.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>TPIN is a 6-digit secure PIN used to authorize the debit of shares from your demat
+                                account during sell orders. This replaces the physical Power of Attorney (PoA)
+                                requirement.</p>
+                            <p><strong>Note:</strong> You can generate or reset your TPIN directly via the 'Generate
+                                TPIN' link in your profile.</p>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="compliance-edis">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>What is eDIS authorization?</h3>
+                                    <p>Electronic Delivery Instruction Slip process.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>eDIS is the electronic process of authorizing the sale of shares using your TPIN and an
+                                OTP. It is required every time you sell shares unless you have submitted a physical POA.
+                            </p>
+                            <ul class="article-list-ul">
+                                <li><strong>Validity:</strong> 1 trading day</li>
+                                <li><strong>Required for:</strong> CNC Sell orders, MTF Unpledging</li>
+                            </ul>
+                            <div class="article-feedback">
+                                <span>Was this helpful?</span>
+                                <div class="feedback-buttons">
+                                    <button class="feedback-btn" data-type="yes"><i class="far fa-thumbs-up"></i>
+                                        Yes</button>
+                                    <button class="feedback-btn" data-type="no"><i class="far fa-thumbs-down"></i>
+                                        No</button>
+                                </div>
+                                <div class="feedback-thanks">Thank you for your feedback!</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="compliance-nominee">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                <div>
+                                    <h3>How to add a Nominee?</h3>
+                                    <p>Securing your legacy digitally.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>As per SEBI guidelines, adding a nominee is mandatory. You can add up to 3 nominees to
+                                your account.</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content">Go to <strong>Profile → Account Details</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content">Click on <strong>Add Nominee</strong>.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-content">Enter nominee details and upload proof (Aadhaar/PAN).
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">4</div>
+                                    <div class="step-content">Complete <strong>eSign</strong> via Aadhaar OTP.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── MUTUAL FUNDS ── -->
+                <div class="article-group" data-cat="mutual-funds">
+                    <p class="article-group-title">Mutual Funds</p>
+
+                    <div class="article-card" id="mf-how-to">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#10B981;"></span>
+                                <div>
+                                    <h3>How do I invest in a Mutual Fund?</h3>
+                                    <p>Lump sum or SIP (Systematic Investment Plan).</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Once KYC is complete, log in to the Indiabulls Securities app, tap the <strong>Mutual
+                                    Funds</strong>
+                                tile, search for your scheme, and choose between Lump Sum or SIP.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="mf-cutoff">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#10B981;"></span>
+                                <div>
+                                    <h3>What is the NAV cut-off time?</h3>
+                                    <p>Timelines for same-day NAV allocation.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>To receive the same business day's NAV, your transaction must be completed before:</p>
+                            <ul class="article-list-ul">
+                                <li><strong>Equity/Hybrid Schemes:</strong> 2:30 PM</li>
+                                <li><strong>Liquid/Debt Schemes:</strong> 1:30 PM</li>
+                            </ul>
+                            <p>Transactions after these times will be processed at the next working day's NAV.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="mf-sip-mandate">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#10B981;"></span>
+                                <div>
+                                    <h3>What is a SIP Mandate?</h3>
+                                    <p>Automatic debit instructions for your bank.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A SIP mandate is a pre-approved digital instruction to your bank to automatically debit
+                                the SIP amount on your chosen date. This ensures your investments are disciplined
+                                without manual intervention.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="mf-redeem">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#10B981;"></span>
+                                <div>
+                                    <h3>How to redeem Mutual Fund units?</h3>
+                                    <p>Process to withdraw your MF investments.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Go to your <strong>Portfolio</strong>, select the Mutual Fund, and tap
+                                <strong>Redeem</strong>. You can choose full or partial redemption. Funds are credited
+                                to your bank account within T+2 to T+5 days depending on the fund type.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── NRI & HUF ACCOUNTS ── -->
+                <div class="article-group" data-cat="nri">
+                    <p class="article-group-title">NRI / HUF Accounts</p>
+
+                    <div class="article-card" id="acc-nri-transfer">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#7C3AED;"></span>
+                                <div>
+                                    <h3>How can NRIs transfer shares to an NRI Indiabulls Securities account?</h3>
+                                    <p>Step-by-step guide for off-market and online transfers.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>NRIs can transfer shares from their existing resident Demat account to their NRI
+                                (NRO/NRE) Demat account with Indiabulls Securities via two methods:</p>
+                            <div class="steps-list">
+                                <div class="step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-content"><strong>Off-Market via DIS:</strong> Submit a signed
+                                        physical Delivery Instruction Slip to your current DP with Indiabulls Securities
+                                        BO ID and
+                                        purpose.</div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-content"><strong>CDSL Easiest:</strong> Register on CDSL portal and
+                                        initiate an inter-depository transfer online.</div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info">Important: Shares transferred from resident to NRO may attract
+                                capital gains tax.</div>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-trust-docs">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#7C3AED;"></span>
+                                <div>
+                                    <h3>Procedure for opening a Trust account?</h3>
+                                    <p>Offline process and document checklist for Trusts.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Opening a Trust account is an <strong>offline process</strong>. Requirements include:</p>
+                            <ul class="article-list-ul">
+                                <li>Attested PAN, Address, and Bank proofs for the Trust.</li>
+                                <li>Self-attested KYC of all Trustees.</li>
+                                <li>Certified copy of Trust Deed and Board Resolution.</li>
+                                <li>Balance sheets for the last 2 financial years.</li>
+                                <li>List of Authorized Signatories on letterhead.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-nro-open">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#7C3AED;"></span>
+                                <div>
+                                    <h3>How to open an NRO account with Indiabulls?</h3>
+                                    <p>Checklist for NRO (Non-Resident Ordinary) accounts.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>NRO accounts are opened offline. Required documents include:</p>
+                            <ul class="article-list-ul">
+                                <li>Valid Passport and Visa (Work/Student/Resident).</li>
+                                <li>PIO/OCI card (for foreign passports).</li>
+                                <li>Overseas and Indian address proofs.</li>
+                                <li>In-person verification stamps.</li>
+                                <li>Financial proof (Income proof).</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-huf-open">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#7C3AED;"></span>
+                                <div>
+                                    <h3>How to open a HUF account?</h3>
+                                    <p>Offline registration for Hindu Undivided Families.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>HUF accounts can only be opened through <strong>offline mode</strong> at Indiabulls
+                                Securities.</p>
+                            <ul class="article-list-ul">
+                                <li>PAN card copy of HUF and Karta.</li>
+                                <li>Bank proof in the name of HUF.</li>
+                                <li>HUF Declaration Deed.</li>
+                                <li>Self-attested address proofs of Karta and all coparceners.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="acc-corporate-full">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#7C3AED;"></span>
+                                <div>
+                                    <h3>Documents for opening a Corporate Account?</h3>
+                                    <p>Comprehensive list for Company/Corporate registration.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Corporate accounts require extensive physical documentation:</p>
+                            <ul class="article-list-ul">
+                                <li>PAN of Corporate and COI/MOA/AOA.</li>
+                                <li>Board Resolution in specified format.</li>
+                                <li>KYC of Directors and Authorized Signatories.</li>
+                                <li>Latest Shareholding Pattern and Net Worth details.</li>
+                                <li>Balance sheets for last 2 FYs.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── CONTACT & ESCALATION ── -->
+                <div class="article-group" data-cat="contact-faq">
+                    <p class="article-group-title">Contact & Escalation</p>
+
+                    <div class="article-card" id="contact-address">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>What is the Registered Address?</h3>
+                                    <p>Correspondence and Head Office details.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p><strong>Correspondence Office:</strong><br>
+                                Plot No. 108, 5th Floor, IT Park, Udyog Vihar, Phase - I, Gurugram - 122016, Haryana.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="contact-support">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>How to reach the Support Team?</h3>
+                                    <p>Primary contact channels for quick assistance.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>You can reach us through:</p>
+                            <ul class="article-list-ul">
+                                <li><strong>Email:</strong> helpdesk@indiabullssecurities.com</li>
+                                <li><strong>Call:</strong> 022-61446300 (9 AM - 6 PM, Mon-Sat)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="contact-call-trade">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>What is the Call & Trade number?</h3>
+                                    <p>Facility to place orders over the phone.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Call <strong>022-61446300</strong> to buy or sell securities. Note that a charge of
+                                <strong>₹150 + 18% GST</strong> applies per order placed, modified, or cancelled via
+                                phone.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="contact-complaint">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>How do I share feedback or report an issue?</h3>
+                                    <p>Help us improve our website and mobile app.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Report technical issues or share feedback via:</p>
+                            <ul class="article-list-ul">
+                                <li><strong>Email:</strong> helpdesk@indiabullssecurities.com</li>
+                                <li><strong>In-App:</strong> Side Menu → Feedback</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="contact-timings">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>Support Working Hours?</h3>
+                                    <p>Availability of our customer care team.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Our team is available from <strong>9:00 AM to 6:00 PM</strong>, Monday to Saturday.
+                                Responses via email are typically rapid, though high volumes may cause slight delays.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="contact-escalation">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#6366F1;"></span>
+                                <div>
+                                    <h3>Grievance Redressal & Escalation Matrix?</h3>
+                                    <p>Steps to escalate your issue if unresolved.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>If your query is not resolved within 24 hours, you can escalate it through the following
+                                levels:</p>
+                            <ul class="article-list-ul">
+                                <li><strong>Level 1 (Customer Care):</strong> helpdesk@indiabullssecurities.com</li>
+                                <li><strong>Level 2 (Head of Customer Care):</strong> head.care@indiabullssecurities.com
+                                </li>
+                                <li><strong>Level 3 (Compliance Officer):</strong>
+                                    compliance.officer@indiabullssecurities.com</li>
+                            </ul>
+                            <p>Please mention your Ticket ID in all escalation emails.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── PLEDGING ── -->
+                <div class="article-group" data-cat="pledging">
+                    <p class="article-group-title">Pledging & Collateral</p>
+
+                    <div class="article-card" id="pledge-what-is">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0F172A;"></span>
+                                <div>
+                                    <h3>What is Pledging?</h3>
+                                    <p>Using shares as collateral for additional margin.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Pledging is the process of marking a lien on your shares with the depository (CDSL) to
+                                receive collateral margin for F&O or MTF trading. Shares remain in your Demat account,
+                                and you continue to receive dividends.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="pledge-charges">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0F172A;"></span>
+                                <div>
+                                    <h3>Charges for Pledging & Unpledging?</h3>
+                                    <p>Fees associated with collateral management.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Indiabulls charges <strong>₹35 per scrip (per ISIN) + GST</strong> for both pledging and
+                                unpledging, irrespective of the quantity. Margin is credited within 15 minutes during
+                                market hours.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="pledge-haircut">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0F172A;"></span>
+                                <div>
+                                    <h3>What is a "Haircut" in Pledge?</h3>
+                                    <p>The discount applied to the market value of pledged shares.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A haircut is a risk-based discount. For example, if you pledge shares worth ₹1,0,000 with
+                                a <strong>30% haircut</strong>, your usable margin will be ₹70,000. Haircuts are set by
+                                the exchange based on volatility.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="pledge-unpledge">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0F172A;"></span>
+                                <div>
+                                    <h3>How to unpledge shares?</h3>
+                                    <p>Releasing your collateral back to free holdings.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>You can unpledge your shares by visiting the <strong>Portfolio → Pledged
+                                    Holdings</strong> section. Select the stock and click <strong>Unpledge</strong>. The
+                                shares will be available for selling or transfer after T+1 day.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TENDER OFFERS ── -->
+                <div class="article-group" data-cat="tender-offers">
+                    <p class="article-group-title">Tender Offers (Buybacks & OFS)</p>
+
+                    <div class="article-card" id="tender-what-is">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0284C7;"></span>
+                                <div>
+                                    <h3>What is a Tender Offer?</h3>
+                                    <p>Buybacks, OFS, and Delisting invitations.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A Tender Offer is a formal invitation by a company to shareholders to sell their shares
+                                at a specified price (usually a premium) for actions like Buybacks or Offer for Sale
+                                (OFS).</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="tender-apply">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#0284C7;"></span>
+                                <div>
+                                    <h3>How to participate via Indiabulls?</h3>
+                                    <p>Steps to bid for active tender offers.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>Go to the <strong>IPO / Tender Offer</strong> section in the app, view active lists, and
+                                enter your bid quantity. Your shares will be blocked until the settlement process is
+                                complete.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── FUTURES & OPTIONS ── -->
+                <div class="article-group" data-cat="fo">
+                    <p class="article-group-title">Futures & Options</p>
+
+                    <div class="article-card" id="fo-what-is">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3>What are CE and PE?</h3>
+                                    <p>Understanding Call and Put options.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p><strong>CE (Call Option):</strong> Gives you the right to buy an asset at a strike price.
+                                Buy CE if you expect the market to rise.<br>
+                                <strong>PE (Put Option):</strong> Gives you the right to sell an asset at a strike
+                                price. Buy PE if you expect the market to fall.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="fo-lot-size">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3>Lot Size, Expiry & Strike Price?</h3>
+                                    <p>Key terms for derivative trading.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <ul class="article-list-ul">
+                                <li><strong>Lot Size:</strong> Minimum quantity per contract (e.g., Nifty = 75).</li>
+                                <li><strong>Expiry:</strong> Date when the contract settles (Weekly/Monthly).</li>
+                                <li><strong>Strike Price:</strong> The price at which you can exercise the option.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="fo-ban-period">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3>What is the F&O Ban Period?</h3>
+                                    <p>When stock positions cross 95% of market-wide limits.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>A stock enters the ban period when its open interest exceeds 95% of the aggregate limit.
+                                During this time, you can only square off existing positions; no new ones are allowed.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="fo-activation">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                <div>
+                                    <h3>How to activate F&O segment?</h3>
+                                    <p>Income proof and activation process.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>To trade in Futures & Options, you need to enable the segment by uploading one of the
+                                following income proofs:</p>
+                            <ul class="article-list-ul">
+                                <li>Last 6 months Bank Statement</li>
+                                <li>Latest Salary Slip</li>
+                                <li>ITR Acknowledgement</li>
+                                <li>Demat Holding Statement (value > ₹10,000)</li>
+                            </ul>
+                            <p>Once submitted, activation takes 24-48 working hours.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── MTF PLEDGE ── -->
+                <div class="article-group" data-cat="mtf">
+                    <p class="article-group-title">Margin Trading Facility (MTF)</p>
+
+                    <div class="article-card" id="mtf-what-is">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#8B5CF6;"></span>
+                                <div>
+                                    <h3>What is MTF Pledge?</h3>
+                                    <p>Funding for your stock purchases.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>MTF allows you to buy shares by paying only a fraction of the total cost (the margin),
+                                while Indiabulls funds the rest. These shares are automatically pledged as security for
+                                the funding.</p>
+                        </div>
+                    </div>
+
+                    <div class="article-card" id="mtf-eligibility">
+                        <button class="article-trigger">
+                            <div class="article-trigger-left">
+                                <span class="article-cat-dot" style="background:#8B5CF6;"></span>
+                                <div>
+                                    <h3>Who is eligible for MTF?</h3>
+                                    <p>Resident individual accounts and criteria.</p>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down article-chevron"></i>
+                        </button>
+                        <div class="article-body">
+                            <p>MTF is available to all resident individual investors with active trading accounts. NRI,
+                                Minor, and Corporate accounts are currently not eligible for MTF funding.</p>
+                        </div>
+                    </div>
+                    <!-- ── IPO SECTION ── -->
+                    <div class="article-group" data-cat="ipo">
+                        <p class="article-group-title">Initial Public Offerings (IPO)</p>
+
+                        <div class="article-card" id="ipo-what-is">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                    <div>
+                                        <h3>What is an IPO?</h3>
+                                        <p>The process of a private company going public.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p>An IPO (Initial Public Offering) is when a company sells its shares to the public for
+                                    the first time. This transition allows the company to raise capital from public
+                                    investors while providing them with an ownership stake.</p>
+                            </div>
+                        </div>
+
+                        <div class="article-card" id="ipo-apply">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                    <div>
+                                        <h3>How to apply for an IPO?</h3>
+                                        <p>UPI-based ASBA application process.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <div class="steps-list">
+                                    <div class="step">
+                                        <div class="step-num">1</div>
+                                        <div class="step-content">Go to the <strong>IPO</strong> section in the
+                                            Indiabulls Securities
+                                            app.</div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">2</div>
+                                        <div class="step-content">Select an active IPO and enter your bid (qty and
+                                            price).</div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">3</div>
+                                        <div class="step-content">Enter your <strong>UPI ID</strong> and submit.</div>
+                                    </div>
+                                    <div class="step">
+                                        <div class="step-num">4</div>
+                                        <div class="step-content">Approve the mandate on your UPI app (GPay/PhonePe)
+                                            within 30 mins.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="article-card" id="ipo-allotment">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                    <div>
+                                        <h3>How to check IPO Allotment?</h3>
+                                        <p>Verification through the registrar's portal.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p>Allotment status is typically finalized by the registrar (e.g., KFintech, Link
+                                    Intime) within 3-4 days of the issue closing. Visit the registrar's website, enter
+                                    your PAN, and check the status.</p>
+                            </div>
+                        </div>
+
+                        <div class="article-card" id="ipo-max-limit">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F43F5E;"></span>
+                                    <div>
+                                        <h3>Maximum amount for Retail IPO?</h3>
+                                        <p>Investment limits for individual investors.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p>For the Retail Individual Investor (RII) category, the maximum application amount is
+                                    <strong>₹2,00,000 per PAN</strong>. Applications above this are reclassified as
+                                    Non-Institutional (NII/HNI).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── FUTURES & OPTIONS (EXTENDED) ── -->
+                    <div class="article-group" data-cat="fo">
+                        <p class="article-group-title">Futures & Options Advanced</p>
+
+                        <div class="article-card" id="fo-margin-req">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                    <div>
+                                        <h3>Money required to trade Options?</h3>
+                                        <p>Buying vs Selling (Writing) capital needs.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <ul class="article-list-ul">
+                                    <li><strong>Buying Options:</strong> You only pay the <em>Premium × Lot Size</em>.
+                                        (e.g., ₹5,000 - ₹10,000).</li>
+                                    <li><strong>Selling Options:</strong> You must deposit full SPAN + Exposure margin
+                                        set by the exchange (typically ₹1,00,000+ per lot).</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="article-card" id="fo-liquidity">
+                            <button class="article-trigger">
+                                <div class="article-trigger-left">
+                                    <span class="article-cat-dot" style="background:#F59E0B;"></span>
+                                    <div>
+                                        <h3>What are Open Interest (OI) and Volume?</h3>
+                                        <p>Indicators of market liquidity and sentiment.</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down article-chevron"></i>
+                            </button>
+                            <div class="article-body">
+                                <p><strong>Open Interest:</strong> Total outstanding contracts not yet settled. High OI
+                                    + High Volume typically means better liquidity and easier entry/exit.</p>
+                            </div>
+                        </div>
+                    </div>
+        </main>
+    </div><!-- /kb-layout -->
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-col">
+                    <p class="footer-col-title">Support</p>
+                    <a href="index.html">Help Center</a>
+                    <a href="contact.html">Contact Us</a>
+                    <a href="my-tickets.html">My Tickets</a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Legal</p>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Disclosures</a>
+                    <a href="#">Risk Disclosure</a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Regulatory</p>
+                    <a href="https://www.sebi.gov.in" target="_blank" rel="noopener">SEBI</a>
+                    <a href="https://www.nseindia.com" target="_blank" rel="noopener">NSE</a>
+                    <a href="https://www.bseindia.com" target="_blank" rel="noopener">BSE</a>
+                    <a href="https://www.cdslindia.com" target="_blank" rel="noopener">CDSL</a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Investor Services</p>
+                    <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener">SCORES Grievance</a>
+                    <a href="#">Grievance Redressal</a>
+                    <a href="#">Investor Education</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Indiabulls Securities Limited. All rights reserved. | SEBI Reg. No.: INZ000002809 | CDSL:
+                    IN-DP-CDSL-30-99</p>
+                <p style="margin-top:0.4rem;font-size:0.75rem;color:var(--text-muted);">Investments in securities market
+                    are subject to market risks. Read all related documents carefully before investing.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- DEMO MODAL -->
+    <div class="demo-modal" id="demoModal">
+        <div class="modal-box">
+            <div class="modal-bar">
+                <h4 id="modalTitle">Feature Demo</h4>
+                <button class="modal-close-btn" id="closeModal"><i class="fas fa-times"></i></button>
+            </div>
+            <img id="demoMedia" src="" alt="Demo">
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="chatbot.js"></script>
+</body>
+
+</html>

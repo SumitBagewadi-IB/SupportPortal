@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Inbox | Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .admin-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh;
+            background: #0d1117;
+        }
+
+        .admin-sidebar {
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .admin-nav {
+            margin-top: 2rem;
+            flex-grow: 1;
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #8b949e;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .admin-nav-item:hover,
+        .admin-nav-item.active {
+            background: #21262d;
+            color: #f0f6fc;
+        }
+
+        .admin-main {
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .inbox-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .inbox-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-select {
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: #f0f6fc;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .ticket-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .ticket-table th,
+        .ticket-table td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .ticket-table th {
+            background: #21262d;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #8b949e;
+        }
+
+        .ticket-table tr:hover {
+            background: #1c2128;
+            cursor: pointer;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .badge-open {
+            background: rgba(52, 199, 89, 0.1);
+            color: #34c759;
+        }
+
+        .badge-closed {
+            background: rgba(139, 148, 158, 0.1);
+            color: #8b949e;
+        }
+
+        .badge-high {
+            background: rgba(255, 69, 58, 0.1);
+            color: #ff453a;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            width: 90%;
+            max-width: 700px;
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <a href="index.html" class="logo">
+                <img src="logo-dark.svg" alt="Indiabulls Securities" style="height: 32px;">
+            </a>
+            <nav class="admin-nav">
+                <a href="admin.html" class="admin-nav-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+                <a href="admin-inbox.html" class="admin-nav-item active"><i class="fas fa-inbox"></i> Unified Inbox</a>
+                <a href="#" class="admin-nav-item"><i class="fas fa-users"></i> Customers</a>
+                <a href="#" class="admin-nav-item"><i class="fas fa-book"></i> KB Editor</a>
+            </nav>
+        </aside>
+
+        <main class="admin-main">
+            <div class="inbox-header">
+                <h1>Support Inbox</h1>
+                <div class="stats" id="inbox-stats" style="color: #8b949e; font-size: 0.9rem;"></div>
+            </div>
+
+            <div class="inbox-controls">
+                <select id="filter-status" class="filter-select">
+                    <option value="all">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="Closed">Closed</option>
+                </select>
+                <select id="filter-category" class="filter-select">
+                    <option value="all">All Categories</option>
+                    <option value="trading">Trading</option>
+                    <option value="funds">Funds</option>
+                    <option value="account">Account</option>
+                </select>
+            </div>
+
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Subject</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="inbox-body">
+                    <!-- Tickets will load here -->
+                </tbody>
+            </table>
+        </main>
+    </div>
+
+    <!-- Ticket Detail Modal -->
+    <div id="admin-ticket-modal" class="modal">
+        <div class="modal-content">
+            <button id="close-modal"
+                style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; color: #8b949e; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            <div id="modal-body"></div>
+            <div
+                style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #30363d; display: flex; justify-content: flex-end; gap: 1rem;">
+                <button id="resolve-btn" class="btn-primary"
+                    style="background: #238636; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">Mark
+                    as Resolved</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inboxBody = document.getElementById('inbox-body');
+            const statsEl = document.getElementById('inbox-stats');
+            const modal = document.getElementById('admin-ticket-modal');
+            const modalBody = document.getElementById('modal-body');
+            const resolveBtn = document.getElementById('resolve-btn');
+            const statusFilter = document.getElementById('filter-status');
+            const catFilter = document.getElementById('filter-category');
+
+            let tickets = JSON.parse(localStorage.getItem('is_tickets')) || [];
+            let currentTicketId = null;
+
+            function renderInbox() {
+                const sFilter = statusFilter.value;
+                const cFilter = catFilter.value;
+
+                const filtered = tickets.filter(t => {
+                    return (sFilter === 'all' || t.status === sFilter) &&
+                        (cFilter === 'all' || t.category === cFilter);
+                });
+
+                statsEl.innerText = `${filtered.length} tickets matching filters`;
+
+                if (filtered.length === 0) {
+                    inboxBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 3rem; color: #8b949e;">No tickets found.</td></tr>';
+                    return;
+                }
+
+                inboxBody.innerHTML = filtered.map(t => `
+                    <tr onclick="openTicket('${t.id}')">
+                        <td style="font-family: monospace; color: #58a6ff;">${t.id}</td>
+                        <td>
+                            <div style="font-weight: 600;">${t.name}</div>
+                            <div style="font-size: 0.75rem; color: #8b949e;">${t.email}</div>
+                        </td>
+                        <td>${t.subject}</td>
+                        <td>${t.category}</td>
+                        <td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td>
+                        <td style="color: #8b949e; font-size: 0.8rem;">${new Date(t.timestamp).toLocaleDateString()}</td>
+                    </tr>
+                `).join('');
+            }
+
+            window.openTicket = (id) => {
+                const t = tickets.find(ticket => ticket.id === id);
+                if (!t) return;
+                currentTicketId = id;
+
+                modalBody.innerHTML = `
+                    <div style="margin-bottom: 1.5rem;">
+                        <span style="font-size: 0.75rem; color: #8b949e;">${t.id}</span>
+                        <h2 style="margin-top: 0.25rem;">${t.subject}</h2>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; background: #0d1117; padding: 1rem; border-radius: 8px;">
+                        <div>
+                            <span style="display: block; font-size: 0.7rem; color: #8b949e; text-transform: uppercase;">User</span>
+                            <strong>${t.name}</strong> (${t.email})
+                        </div>
+                        <div>
+                            <span style="display: block; font-size: 0.7rem; color: #8b949e; text-transform: uppercase;">Status</span>
+                            <span class="badge badge-${t.status.toLowerCase()}">${t.status}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span style="display: block; font-size: 0.7rem; color: #8b949e; text-transform: uppercase; margin-bottom: 0.5rem;">Description</span>
+                        <p style="line-height: 1.6; color: #c9d1d9; white-space: pre-line;">${t.description}</p>
+                    </div>
+                `;
+
+                resolveBtn.style.display = t.status === 'Open' ? 'block' : 'none';
+                modal.style.display = 'flex';
+            };
+
+            resolveBtn.onclick = () => {
+                const idx = tickets.findIndex(t => t.id === currentTicketId);
+                if (idx !== -1) {
+                    tickets[idx].status = 'Closed';
+                    localStorage.setItem('is_tickets', JSON.stringify(tickets));
+                    modal.style.display = 'none';
+                    renderInbox();
+                }
+            };
+
+            document.getElementById('close-modal').onclick = () => modal.style.display = 'none';
+            statusFilter.onchange = renderInbox;
+            catFilter.onchange = renderInbox;
+
+            renderInbox();
+        });
+    </script>
+</body>
+
+</html>
