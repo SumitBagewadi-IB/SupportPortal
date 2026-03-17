@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function () {
+            const theme = localStorage.getItem('theme') || 'light';
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indiabulls Securities Support | Help Center</title>
+    <meta name="description"
+        content="Find answers, guides and support for Indiabulls Securities trading platform — accounts, trading, funds, reports and more.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- NAV -->
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">
+                <img src="logo.svg" alt="Indiabulls Securities" class="logo-light">
+                <img src="logo-dark.svg" alt="Indiabulls Securities" class="logo-dark">
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="faq.html">Knowledge Base</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+            </ul>
+            <a href="#" class="btn-signin">Sign In</a>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </nav>
+
+
+    <!-- HERO -->
+    <div class="hero">
+        <h1>How can we help you?</h1>
+        <div class="search-wrapper">
+            <i class="fas fa-search search-icon"></i>
+            <input id="globalSearch" type="text" class="search-input"
+                placeholder="Search for orders, GTT, funds, IPO, charges…" autocomplete="off">
+            <div id="searchResults" class="search-results-dropdown"></div>
+        </div>
+        <p class="hero-meta">Popular: <a href="faq.html?cat=trading">GTT Orders</a> · <a href="faq.html?cat=funds">Add
+                Funds</a> · <a href="faq.html?cat=getting-started">Open Account</a> · <a
+                href="faq.html?cat=charges">Brokerage</a> · <a href="faq.html?cat=compliance">TPIN / eDIS</a> · <a
+                href="faq.html?cat=mutual-funds">SIP Setup</a></p>
+    </div>
+
+
+    <!-- MAIN -->
+    <main class="container">
+
+        <!-- CATEGORIES -->
+        <div class="section">
+            <p class="section-title">Browse by topic</p>
+            <div class="category-grid">
+                <a href="faq.html?cat=getting-started" class="cat-card" id="cat-getting-started">
+                    <div class="cat-icon" style="background:#E6FAE6; color:#00C805;"><i class="fas fa-rocket"></i></div>
+                    <div>
+                        <h3>Getting Started</h3>
+                        <p>Account, KYC, first trade</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=account-opening" class="cat-card" id="cat-account-opening">
+                    <div class="cat-icon" style="background:#E6FAE6; color:#00C805;"><i class="fas fa-id-card"></i>
+                    </div>
+                    <div>
+                        <h3>Account Opening</h3>
+                        <p>KYC, documents, activation</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=trading" class="cat-card" id="cat-trading">
+                    <div class="cat-icon" style="background:#EFF6FF; color:#3B82F6;"><i class="fas fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <h3>Trading</h3>
+                        <p>Orders, GTT, Basket, AMO</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=portfolio" class="cat-card" id="cat-portfolio">
+                    <div class="cat-icon" style="background:#FFF7ED; color:#F97316;"><i class="fas fa-briefcase"></i>
+                    </div>
+                    <div>
+                        <h3>Portfolio & Margin</h3>
+                        <p>P&L, Holdings, Pledge, MTF</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=funds" class="cat-card" id="cat-funds">
+                    <div class="cat-icon" style="background:#FAF5FF; color:#A855F7;"><i class="fas fa-wallet"></i></div>
+                    <div>
+                        <h3>Funds</h3>
+                        <p>Add, withdraw, ledger</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=charges" class="cat-card" id="cat-charges">
+                    <div class="cat-icon" style="background:#FEF3C7; color:#D97706;"><i class="fas fa-tags"></i></div>
+                    <div>
+                        <h3>Charges & Brokerage <span class="badge-new-cat">New</span></h3>
+                        <p>STT, GST, DP, brokerage plans</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=compliance" class="cat-card" id="cat-compliance">
+                    <div class="cat-icon" style="background:#FFF1F2; color:#F43F5E;"><i
+                            class="fas fa-shield-halved"></i></div>
+                    <div>
+                        <h3>Compliance & Safety <span class="badge-new-cat">New</span></h3>
+                        <p>TPIN, eDIS, ASM/GSM, 2FA</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=mutual-funds" class="cat-card" id="cat-mf">
+                    <div class="cat-icon" style="background:#ECFDF5; color:#10B981;"><i class="fas fa-seedling"></i>
+                    </div>
+                    <div>
+                        <h3>Mutual Funds <span class="badge-new-cat">New</span></h3>
+                        <p>SIP, lump sum, ELSS, redemption</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=ipo" class="cat-card" id="cat-ipo">
+                    <div class="cat-icon" style="background:#FFF1F2; color:#F43F5E;"><i class="fas fa-rocket"></i></div>
+                    <div>
+                        <h3>IPO <span class="badge-new-cat">New</span></h3>
+                        <p>Apply for IPOs, allotment status, listing</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=fo" class="cat-card" id="cat-fo">
+                    <div class="cat-icon" style="background:#FFFBEB; color:#F59E0B;"><i class="fas fa-bolt"></i></div>
+                    <div>
+                        <h3>F&amp;O <span class="badge-new-cat">New</span></h3>
+                        <p>Futures, options, margins, expiry</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=pledging" class="cat-card" id="cat-pledge">
+                    <div class="cat-icon" style="background:#F1F5F9; color:#0F172A;"><i class="fas fa-link"></i></div>
+                    <div>
+                        <h3>Pledging <span class="badge-new-cat">New</span></h3>
+                        <p>Collateral margin, shares pledge, haircut</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=mtf" class="cat-card" id="cat-mtf">
+                    <div class="cat-icon" style="background:#F5F3FF; color:#8B5CF6;"><i class="fas fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <h3>MTF <span class="badge-new-cat">New</span></h3>
+                        <p>Margin Trading Facility, leverage funding</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=tender-offers" class="cat-card" id="cat-tender">
+                    <div class="cat-icon" style="background:#F0F9FF; color:#0284C7;"><i
+                            class="fas fa-hand-holding-dollar"></i></div>
+                    <div>
+                        <h3>Tender Offers <span class="badge-new-cat">New</span></h3>
+                        <p>Buybacks, OFS, delisting participation</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=contact-faq" class="cat-card" id="cat-contact">
+                    <div class="cat-icon" style="background:#EEF2FF; color:#6366F1;"><i class="fas fa-headset"></i>
+                    </div>
+                    <div>
+                        <h3>Contact & Help <span class="badge-new-cat">New</span></h3>
+                        <p>Support desk, office address, escalation</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=advanced" class="cat-card" id="cat-advanced">
+                    <div class="cat-icon" style="background:#F0F9FF; color:#0284C7;"><i class="fas fa-robot"></i></div>
+                    <div>
+                        <h3>Advanced</h3>
+                        <p>Algo, MTF, Smallcase, Webhooks</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=account" class="cat-card" id="cat-account">
+                    <div class="cat-icon" style="background:#F0FDF4; color:#22C55E;"><i class="fas fa-user-circle"></i>
+                    </div>
+                    <div>
+                        <h3>Account</h3>
+                        <p>Profile, security, segments</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=reports" class="cat-card" id="cat-reports">
+                    <div class="cat-icon" style="background:#F8FAFC; color:#64748B;"><i class="fas fa-file-invoice"></i>
+                    </div>
+                    <div>
+                        <h3>Reports</h3>
+                        <p>Tax P&L, contract notes, ledger</p>
+                    </div>
+                </a>
+                <a href="faq.html?cat=nri" class="cat-card" id="cat-nri">
+                    <div class="cat-icon" style="background:#F5F3FF; color:#7C3AED;"><i class="fas fa-globe"></i></div>
+                    <div>
+                        <h3>NRI / HUF Accounts <span class="badge-new-cat">New</span></h3>
+                        <p>NRE/NRO, PIS, repatriation</p>
+                    </div>
+                </a>
+                <a href="contact.html" class="cat-card" id="cat-contact">
+                    <div class="cat-icon" style="background:#FFF9C4; color:#CA8A04;"><i class="fas fa-headset"></i>
+                    </div>
+                    <div>
+                        <h3>Contact Us</h3>
+                        <p>Chat, call, raise ticket</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- POPULAR ARTICLES -->
+        <div class="section">
+            <p class="section-title">Popular articles</p>
+            <div class="article-list">
+                <a href="faq.html?cat=account-opening#acc-how-to-open" class="article-row" id="pop-acc-open">
+                    <div class="article-row-text">
+                        <h4>How to Open Demat account in Indiabulls Securities?</h4>
+                        <span>Account Opening · 5 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 15.2k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=trading#gtt" class="article-row" id="pop-gtt">
+                    <div class="article-row-text">
+                        <h4>How to place a GTT (Good Till Trigger) order?</h4>
+                        <span>Trading · 3 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 12.4k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=funds#add-funds" class="article-row" id="pop-add-funds">
+                    <div class="article-row-text">
+                        <h4>How to add funds to my trading account?</h4>
+                        <span>Funds · 2 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 9.7k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=compliance#tpin" class="article-row" id="pop-tpin">
+                    <div class="article-row-text">
+                        <h4>How to generate and use CDSL TPIN for selling shares?</h4>
+                        <span>Compliance · 3 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 8.1k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=charges#brokerage" class="article-row" id="pop-brokerage">
+                    <div class="article-row-text">
+                        <h4>What are Indiabulls Securities brokerage charges and pricing plans?</h4>
+                        <span>Charges · 4 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 7.9k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=ipo#ipo-apply" class="article-row" id="pop-ipo">
+                    <div class="article-row-text">
+                        <h4>How to apply for an IPO via UPI mandate?</h4>
+                        <span>IPO · 3 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 6.8k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=fo#fo-ban-period" class="article-row" id="pop-fo-ban">
+                    <div class="article-row-text">
+                        <h4>What is the F&amp;O Ban Period and why does it happen?</h4>
+                        <span>F&amp;O · 4 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 4.5k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=trading#basket" class="article-row" id="pop-basket">
+                    <div class="article-row-text">
+                        <h4>How to execute a Basket Order?</h4>
+                        <span>Trading · 2 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 5.2k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=reports#tax-pl" class="article-row" id="pop-tax">
+                    <div class="article-row-text">
+                        <h4>How to download my Tax P&L statement for ITR filing?</h4>
+                        <span>Reports · 3 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 4.8k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=advanced#algo" class="article-row" id="pop-algo">
+                    <div class="article-row-text">
+                        <h4>What is Indiabulls Securities Algo and how to use it?</h4>
+                        <span>Advanced · 4 min read</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=mutual-funds#sip" class="article-row" id="pop-sip">
+                    <div class="article-row-text">
+                        <h4>How to set up a SIP in Mutual Funds?</h4>
+                        <span>Mutual Funds · 2 min read <span class="badge-new-inline">New</span></span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=funds#withdraw" class="article-row" id="pop-withdraw">
+                    <div class="article-row-text">
+                        <h4>How long does fund withdrawal take?</h4>
+                        <span>Funds · 1 min read · <i class="fas fa-eye" style="font-size:0.7rem;"></i> 3.4k
+                            views</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="faq.html?cat=advanced#ipo" class="article-row" id="pop-ipo">
+                    <div class="article-row-text">
+                        <h4>How to apply for an IPO through Indiabulls Securities?</h4>
+                        <span>Advanced · 3 min read</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- CONTACT STRIP -->
+        <div class="contact-strip">
+            <div>
+                <h3>Still need help?</h3>
+                <p>Support team available <strong>Mon–Sat, 8 AM – 8 PM IST</strong> across chat, phone and email.</p>
+            </div>
+            <div class="contact-actions">
+                <a href="contact.html" class="btn-primary"><i class="fas fa-comment-dots"></i> Start a Chat</a>
+                <a href="tel:+911141224444" class="btn-secondary"><i class="fas fa-phone"></i> Call Us</a>
+                <a href="my-tickets.html" class="btn-secondary"><i class="fas fa-ticket"></i> My Tickets</a>
+            </div>
+        </div>
+
+        <!-- TRUST & SECURITY -->
+        <div class="section" style="border-top: 1px solid var(--border); margin-top: 3rem; padding: 4rem 0;">
+            <div style="text-align: center; max-width: 800px; margin: 0 auto 3rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-dark); margin-bottom: 0.75rem;">
+                    Trusted by 5 Million+ Traders</h2>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Experience institutional-grade security and
+                    transparency across every trade you execute on Indiabulls Securities.</p>
+            </div>
+            <div class="trust-grid">
+                <div class="trust-item">
+                    <i class="fas fa-shield-check" style="color: #10B981;"></i>
+                    <div class="trust-item-content">
+                        <h4>SEBI Registered</h4>
+                        <p>Compliant with all regulatory frameworks for safe investing.</p>
+                    </div>
+                </div>
+                <div class="trust-item">
+                    <i class="fas fa-lock-keyhole" style="color: #3B82F6;"></i>
+                    <div class="trust-item-content">
+                        <h4>Bank-grade Security</h4>
+                        <p>Enforced with 256-bit encryption and two-factor authentication.</p>
+                    </div>
+                </div>
+                <div class="trust-item">
+                    <i class="fas fa-building-columns" style="color: #F59E0B;"></i>
+                    <div class="trust-item-content">
+                        <h4>CDSL/NSE/BSE Member</h4>
+                        <p>Direct connectivity to India's major financial exchanges.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-col">
+                    <p class="footer-col-title">Support</p>
+                    <a href="faq.html">Knowledge Base</a>
+                    <a href="contact.html">Contact Us</a>
+                    <a href="my-tickets.html">My Tickets</a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Legal</p>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Disclosures</a>
+                    <a href="#">Risk Disclosure</a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Regulatory</p>
+                    <a href="https://www.sebi.gov.in" target="_blank" rel="noopener">SEBI <i
+                            class="fas fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i></a>
+                    <a href="https://www.nseindia.com" target="_blank" rel="noopener">NSE <i
+                            class="fas fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i></a>
+                    <a href="https://www.bseindia.com" target="_blank" rel="noopener">BSE <i
+                            class="fas fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i></a>
+                    <a href="https://www.cdslindia.com" target="_blank" rel="noopener">CDSL <i
+                            class="fas fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i></a>
+                </div>
+                <div class="footer-col">
+                    <p class="footer-col-title">Investor Services</p>
+                    <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener">SCORES Grievance <i
+                            class="fas fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i></a>
+                    <a href="#">Grievance Redressal</a>
+                    <a href="#">Investor Education</a>
+                    <a href="#">Advisory Notice</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Indiabulls Securities Limited. All rights reserved. | SEBI Reg. No.: INZ000002809 | CDSL:
+                    IN-DP-CDSL-30-99</p>
+                <p style="margin-top:0.5rem; font-size:0.75rem; color:var(--text-muted);">Investments in securities
+                    market are subject to market risks. Read all the related documents carefully before investing.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- DEMO MODAL -->
+    <div class="demo-modal" id="demoModal">
+        <div class="modal-box">
+            <div class="modal-bar">
+                <h4 id="modalTitle">Feature Demo</h4>
+                <button class="modal-close-btn" id="closeModal"><i class="fas fa-times"></i></button>
+            </div>
+            <img id="demoMedia" src="" alt="Demo">
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="chatbot.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Support Dashboard | Indiabulls Securities</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: #F4F7FE;
+        }
+
+        .admin-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            height: 100vh;
+        }
+
+        .admin-sidebar {
+            background: #1A202C;
+            color: white;
+            padding: 2rem 1.5rem;
+        }
+
+        .admin-main {
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            color: #A0AEC0;
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .admin-nav-item.active {
+            background: #2D3748;
+            color: white;
+        }
+
+        .admin-nav-item:hover:not(.active) {
+            color: white;
+            background: #2D3748;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .ticket-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+
+        .ticket-table th {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 2px solid #EDF2F7;
+            color: #718096;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .ticket-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #EDF2F7;
+            font-size: 0.875rem;
+        }
+
+        .ticket-row:hover {
+            background: #F7FAFC;
+            cursor: pointer;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .triage-pane {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -10px 0 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .triage-pane.open {
+            transform: translateX(0);
+        }
+
+        .team-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #EDF2F7;
+            color: #4A5568;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <div style="margin-bottom: 2.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <img src="logo-dark.svg" alt="Indiabulls Securities" style="height: 24px;">
+            </div>
+            <nav id="admin-sidebar-nav">
+                <a href="admin-inbox.html" class="admin-nav-item" data-view="all">
+                    <i class="fas fa-inbox"></i> Unified Inbox
+                </a>
+                <a href="#" class="admin-nav-item" data-view="funds">
+                    <i class="fas fa-money-bill-wave"></i> Finance & Funds
+                </a>
+                <a href="#" class="admin-nav-item" data-view="kyc">
+                    <i class="fas fa-id-card"></i> KYC & Onboarding
+                </a>
+                <a href="#" class="admin-nav-item" data-view="trading">
+                    <i class="fas fa-chart-line"></i> Trading Ops
+                </a>
+                <a href="#" class="admin-nav-item" data-view="users">
+                    <i class="fas fa-users-cog"></i> User Management
+                </a>
+            </nav>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <div>
+                    <h1 style="font-size: 1.5rem; font-weight: 800;">Support Management</h1>
+                    <p style="color: #718096; font-size: 0.875rem;">Internal Ticket Assignment & Resolution</p>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem;">Refresh Queue</button>
+                    <div
+                        style="width: 40px; height: 40px; border-radius: 50%; background: #CBD5E0; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #4A5568;">
+                        SB</div>
+                </div>
+            </header>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div style="color: #718096; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Total
+                        Open</div>
+                    <div id="stat-total" style="font-size: 1.5rem; font-weight: 800; color: #2D3748;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div style="color: #718096; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Open
+                        Tickets</div>
+                    <div id="stat-open" style="font-size: 1.5rem; font-weight: 800; color: #38A169;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div style="color: #718096; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">
+                        Closed</div>
+                    <div id="stat-closed" style="font-size: 1.5rem; font-weight: 800; color: #718096;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div style="color: #718096; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Avg
+                        Resolution</div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #3182CE;">2.4h</div>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="font-size: 1.125rem; font-weight: 800;">Recent Support Tickets</h2>
+                    <a href="admin-inbox.html"
+                        style="font-size: 0.875rem; color: var(--blue); font-weight: 600; text-decoration: none;">View
+                        All Inbox</a>
+                </div>
+                <table class="ticket-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Customer</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-recent-tickets">
+                        <!-- Rows will load here -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tickets = JSON.parse(localStorage.getItem('is_tickets')) || [];
+
+            // Update Stats
+            document.getElementById('stat-total').textContent = tickets.length;
+            document.getElementById('stat-open').textContent = tickets.filter(t => t.status === 'Open').length;
+            document.getElementById('stat-closed').textContent = tickets.filter(t => t.status === 'Closed').length;
+
+            // Load Recent Tickets
+            const recentContainer = document.getElementById('admin-recent-tickets');
+            if (recentContainer) {
+                if (tickets.length === 0) {
+                    recentContainer.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #718096;">No tickets found.</td></tr>';
+                } else {
+                    recentContainer.innerHTML = tickets.slice(0, 5).map(t => `
+                        <tr class="ticket-row" onclick="location.href='admin-inbox.html'">
+                            <td style="font-family: monospace; font-weight: 600;">${t.id}</td>
+                            <td>${t.name}</td>
+                            <td>${t.subject}</td>
+                            <td>
+                                <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; background: ${t.status === 'Open' ? '#E6FAE6' : '#EDF2F7'}; color: ${t.status === 'Open' ? '#00A805' : '#4A5568'};">
+                                    ${t.status}
+                                </span>
+                            </td>
+                            <td style="color: #718096;">${new Date(t.timestamp).toLocaleDateString()}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
