@@ -78,6 +78,8 @@
                 <button class="kb-nav-link" data-cat="tender-offers"><i class="fas fa-hand-holding-dollar"
                         style="width:14px;"></i>
                     Tender Offers <span class="nav-count" id="count-tender"></span></button>
+                <button class="kb-nav-link" data-cat="kyc"><i class="fas fa-fingerprint" style="width:14px;"></i>
+                    KYC Process <span class="nav-count" id="count-kyc"></span></button>
 
                 <p class="kb-sidebar-title" style="margin-top:0.75rem;">New Topics</p>
                 <button class="kb-nav-link" data-cat="charges"><i class="fas fa-tags" style="width:14px;"></i>
@@ -166,12 +168,12 @@
                 <div class="article-group" data-cat="getting-started">
                     <p class="article-group-title">Getting Started</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="gs-first-trade" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
                                 <div>
-                                    <h3><span class="tier-badge badge-basic">Basic</span>How do I place my first trade?
+                                    <h3><span class="tier-badge badge-basic">Basic</span> How do I place my first trade?
                                     </h3>
                                     <p>Search → Select → Order form → Confirm.</p>
                                 </div>
@@ -224,7 +226,7 @@
                 <div class="article-group" data-cat="account-opening">
                     <p class="article-group-title">Account Opening</p>
 
-                    <div class="article-card" id="acc-send-docs">
+                    <div class="article-card" id="acc-send-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -242,7 +244,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-platforms">
+                    <div class="article-card" id="acc-platforms" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -264,7 +266,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-call-trade">
+                    <div class="article-card" id="acc-call-trade" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -285,7 +287,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-no-demat">
+                    <div class="article-card" id="acc-no-demat" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -305,7 +307,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-map-demat">
+                    <div class="article-card" id="acc-map-demat" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -322,7 +324,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-how-many">
+                    <div class="article-card" id="acc-how-many" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -339,7 +341,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-how-to-open">
+                    <div class="article-card" id="acc-how-to-open" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -398,7 +400,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-time">
+                    <div class="article-card" id="acc-time" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -414,7 +416,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-charges">
+                    <div class="article-card" id="acc-charges" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -434,7 +436,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-ap">
+                    <div class="article-card" id="acc-ap" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -452,7 +454,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-amc">
+                    <div class="article-card" id="acc-amc" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -471,7 +473,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-docs-req">
+                    <div class="article-card" id="acc-docs-req" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -493,7 +495,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-who-can">
+                    <div class="article-card" id="acc-who-can" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -510,7 +512,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-nri">
+                    <div class="article-card" id="acc-nri" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -527,7 +529,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-products">
+                    <div class="article-card" id="acc-products" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -544,7 +546,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-corporate">
+                    <div class="article-card" id="acc-corporate" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -561,7 +563,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-fo-status">
+                    <div class="article-card" id="acc-fo-status" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -578,7 +580,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-fo-docs">
+                    <div class="article-card" id="acc-fo-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -610,7 +612,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-pan-fail">
+                    <div class="article-card" id="acc-pan-fail" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -627,7 +629,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-sig-reject">
+                    <div class="article-card" id="acc-sig-reject" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -644,7 +646,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-fees">
+                    <div class="article-card" id="acc-fees" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -661,7 +663,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-name-mismatch">
+                    <div class="article-card" id="acc-name-mismatch" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -678,7 +680,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-physical-docs">
+                    <div class="article-card" id="acc-physical-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -702,7 +704,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-od-bank">
+                    <div class="article-card" id="acc-od-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -726,7 +728,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-relative-bank">
+                    <div class="article-card" id="acc-relative-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -750,7 +752,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-app-failed">
+                    <div class="article-card" id="acc-app-failed" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -783,7 +785,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-current-bank">
+                    <div class="article-card" id="acc-current-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -807,7 +809,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-link-bank-opening">
+                    <div class="article-card" id="acc-link-bank-opening" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -831,7 +833,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-joint-bank">
+                    <div class="article-card" id="acc-joint-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -855,7 +857,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-primary-bank">
+                    <div class="article-card" id="acc-primary-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -879,7 +881,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-bank-types">
+                    <div class="article-card" id="acc-bank-types" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -903,7 +905,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-secondary-bank">
+                    <div class="article-card" id="acc-secondary-bank" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -927,7 +929,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-min-balance">
+                    <div class="article-card" id="acc-min-balance" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -951,7 +953,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-aadhaar-mobile">
+                    <div class="article-card" id="acc-aadhaar-mobile" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -975,7 +977,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-longer-48hrs">
+                    <div class="article-card" id="acc-longer-48hrs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -999,7 +1001,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-offline-docs">
+                    <div class="article-card" id="acc-offline-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -1044,7 +1046,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-offline-time">
+                    <div class="article-card" id="acc-offline-time" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -1068,7 +1070,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-contact-new">
+                    <div class="article-card" id="acc-contact-new" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#00C805;"></span>
@@ -1098,7 +1100,7 @@
                 <div class="article-group" data-cat="trading">
                     <p class="article-group-title">Trading</p>
 
-                    <div class="article-card" id="gtt">
+                    <div class="article-card" id="gtt" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1143,7 +1145,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="basket">
+                    <div class="article-card" id="basket" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1184,7 +1186,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-1" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1206,7 +1208,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="trading-mis-cnc">
+                    <div class="article-card" id="trading-mis-cnc" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1237,7 +1239,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="trading-sl-types">
+                    <div class="article-card" id="trading-sl-types" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1259,7 +1261,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="trading-iceberg">
+                    <div class="article-card" id="trading-iceberg" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:var(--blue);"></span>
@@ -1283,7 +1285,7 @@
                 <div class="article-group" data-cat="portfolio">
                     <p class="article-group-title">Portfolio & Margin</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-2" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -1303,7 +1305,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-3" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -1338,7 +1340,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-4" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F97316;"></span>
@@ -1360,7 +1362,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-5" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F97316;"></span>
@@ -1404,7 +1406,7 @@
                 <div class="article-group" data-cat="funds">
                     <p class="article-group-title">Funds</p>
 
-                    <div class="article-card" id="add-funds">
+                    <div class="article-card" id="add-funds" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#A855F7;"></span>
@@ -1449,7 +1451,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="withdraw">
+                    <div class="article-card" id="withdraw" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#A855F7;"></span>
@@ -1493,7 +1495,7 @@
                 <div class="article-group" data-cat="advanced">
                     <p class="article-group-title">Advanced Features</p>
 
-                    <div class="article-card" id="algo">
+                    <div class="article-card" id="algo" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -1536,7 +1538,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="ipo">
+                    <div class="article-card" id="ipo" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -1581,7 +1583,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-6" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -1626,7 +1628,7 @@
                 <div class="article-group" data-cat="account">
                     <p class="article-group-title">Account &amp; Settings</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-7" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#22C55E;"></span>
@@ -1661,7 +1663,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-8" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#22C55E;"></span>
@@ -1684,7 +1686,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-9" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#22C55E;"></span>
@@ -1718,7 +1720,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="article-card" id="acc-bank-update">
+                        <div class="article-card" id="acc-bank-update" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#22C55E;"></span>
@@ -1754,7 +1756,7 @@
                             </div>
                         </div>
 
-                        <div class="article-card" id="acc-close">
+                        <div class="article-card" id="acc-close" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#22C55E;"></span>
@@ -1779,7 +1781,7 @@
                 <div class="article-group" data-cat="reports">
                     <p class="article-group-title">Reports</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-10" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#64748B;"></span>
@@ -1819,7 +1821,7 @@
                 <div class="article-group" data-cat="pro-market">
                     <p class="article-group-title">Advanced Market Analysis</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-11" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#C2410C;"></span>
@@ -1855,7 +1857,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-12" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#C2410C;"></span>
@@ -1884,7 +1886,7 @@
                 <div class="article-group" data-cat="pro-charts">
                     <p class="article-group-title">Professional Charting</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-13" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#C2410C;"></span>
@@ -1922,7 +1924,7 @@
                 <div class="article-group" data-cat="pro-algo">
                     <p class="article-group-title">Algo Trading & API access</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-14" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#C2410C;"></span>
@@ -1960,7 +1962,7 @@
                 <div class="article-group" data-cat="charges">
                     <p class="article-group-title">Charges & Brokerage</p>
 
-                    <div class="article-card" id="charge-brokerage">
+                    <div class="article-card" id="charge-brokerage" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -1981,7 +1983,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-call-trade">
+                    <div class="article-card" id="charge-call-trade" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2000,7 +2002,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-netbanking">
+                    <div class="article-card" id="charge-netbanking" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2017,7 +2019,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-nri">
+                    <div class="article-card" id="charge-nri" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2053,7 +2055,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-corporate">
+                    <div class="article-card" id="charge-corporate" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2080,7 +2082,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-stt-options">
+                    <div class="article-card" id="charge-stt-options" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2104,7 +2106,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="charge-huf">
+                    <div class="article-card" id="charge-huf" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#D97706;"></span>
@@ -2145,7 +2147,7 @@
                 <div class="article-group" data-cat="compliance">
                     <p class="article-group-title">Compliance & Safety</p>
 
-                    <div class="article-card" id="kyc-timeline">
+                    <div class="article-card" id="kyc-timeline" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -2163,7 +2165,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="kyc-bank-verify">
+                    <div class="article-card" id="kyc-bank-verify" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -2181,7 +2183,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="compliance-tpin">
+                    <div class="article-card" id="compliance-tpin" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -2211,7 +2213,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="compliance-edis">
+                    <div class="article-card" id="compliance-edis" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -2243,7 +2245,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="compliance-nominee">
+                    <div class="article-card" id="compliance-nominee" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -2284,7 +2286,7 @@
                 <div class="article-group" data-cat="mutual-funds">
                     <p class="article-group-title">Mutual Funds</p>
 
-                    <div class="article-card" id="mf-how-to">
+                    <div class="article-card" id="mf-how-to" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#10B981;"></span>
@@ -2302,7 +2304,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="mf-cutoff">
+                    <div class="article-card" id="mf-cutoff" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#10B981;"></span>
@@ -2323,7 +2325,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="mf-sip-mandate">
+                    <div class="article-card" id="mf-sip-mandate" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#10B981;"></span>
@@ -2341,7 +2343,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="mf-redeem">
+                    <div class="article-card" id="mf-redeem" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#10B981;"></span>
@@ -2365,7 +2367,7 @@
                 <div class="article-group" data-cat="nri">
                     <p class="article-group-title">NRI / HUF Accounts</p>
 
-                    <div class="article-card" id="acc-nri-transfer">
+                    <div class="article-card" id="acc-nri-transfer" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2398,7 +2400,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-trust-docs">
+                    <div class="article-card" id="acc-trust-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2421,7 +2423,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-nro-open">
+                    <div class="article-card" id="acc-nro-open" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2444,7 +2446,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-huf-open">
+                    <div class="article-card" id="acc-huf-open" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2467,7 +2469,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="acc-corporate-full">
+                    <div class="article-card" id="acc-corporate-full" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2490,7 +2492,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-commodity-no-equity">
+                    <div class="article-card" id="nri-commodity-no-equity" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2514,7 +2516,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-to-resident">
+                    <div class="article-card" id="nri-to-resident" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2556,7 +2558,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-online-opening">
+                    <div class="article-card" id="nri-online-opening" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2580,7 +2582,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-how-to-open">
+                    <div class="article-card" id="nri-how-to-open" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2642,7 +2644,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-minor-demat">
+                    <div class="article-card" id="nri-minor-demat" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2693,7 +2695,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-joint-demat">
+                    <div class="article-card" id="nri-joint-demat" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2739,7 +2741,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="nri-demo-account">
+                    <div class="article-card" id="nri-demo-account" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#7C3AED;"></span>
@@ -2763,7 +2765,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-15" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2787,7 +2789,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-16" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2811,7 +2813,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-17" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2854,7 +2856,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-18" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2878,7 +2880,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-19" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2919,7 +2921,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="article-auto-20" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -2965,7 +2967,7 @@
                 <div class="article-group" data-cat="contact-faq">
                     <p class="article-group-title">Contact & Escalation</p>
 
-                    <div class="article-card" id="contact-address">
+                    <div class="article-card" id="contact-address" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -2983,7 +2985,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="contact-support">
+                    <div class="article-card" id="contact-support" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -3003,7 +3005,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="contact-call-trade">
+                    <div class="article-card" id="contact-call-trade" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -3022,7 +3024,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="contact-complaint">
+                    <div class="article-card" id="contact-complaint" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -3042,7 +3044,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="contact-timings">
+                    <div class="article-card" id="contact-timings" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -3060,7 +3062,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="contact-escalation">
+                    <div class="article-card" id="contact-escalation" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#6366F1;"></span>
@@ -3090,7 +3092,7 @@
                 <div class="article-group" data-cat="pledging">
                     <p class="article-group-title">Pledging & Collateral</p>
 
-                    <div class="article-card" id="pledge-what-is">
+                    <div class="article-card" id="pledge-what-is" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0F172A;"></span>
@@ -3108,7 +3110,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="pledge-charges">
+                    <div class="article-card" id="pledge-charges" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0F172A;"></span>
@@ -3126,7 +3128,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="pledge-haircut">
+                    <div class="article-card" id="pledge-haircut" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0F172A;"></span>
@@ -3144,7 +3146,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="pledge-unpledge">
+                    <div class="article-card" id="pledge-unpledge" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0F172A;"></span>
@@ -3167,7 +3169,7 @@
                 <div class="article-group" data-cat="tender-offers">
                     <p class="article-group-title">Tender Offers (Buybacks & OFS)</p>
 
-                    <div class="article-card" id="tender-what-is">
+                    <div class="article-card" id="tender-what-is" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0284C7;"></span>
@@ -3185,7 +3187,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="tender-apply">
+                    <div class="article-card" id="tender-apply" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#0284C7;"></span>
@@ -3208,7 +3210,7 @@
                 <div class="article-group" data-cat="fo">
                     <p class="article-group-title">Futures & Options</p>
 
-                    <div class="article-card" id="fo-what-is">
+                    <div class="article-card" id="fo-what-is" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3228,7 +3230,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="fo-lot-size">
+                    <div class="article-card" id="fo-lot-size" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3248,7 +3250,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="fo-ban-period">
+                    <div class="article-card" id="fo-ban-period" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3266,7 +3268,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="fo-activation">
+                    <div class="article-card" id="fo-activation" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3295,7 +3297,7 @@
                 <div class="article-group" data-cat="mtf">
                     <p class="article-group-title">Margin Trading Facility (MTF)</p>
 
-                    <div class="article-card" id="mtf-what-is">
+                    <div class="article-card" id="mtf-what-is" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#8B5CF6;"></span>
@@ -3313,7 +3315,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card" id="mtf-eligibility">
+                    <div class="article-card" id="mtf-eligibility" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot" style="background:#8B5CF6;"></span>
@@ -3333,7 +3335,7 @@
                     <div class="article-group" data-cat="ipo">
                         <p class="article-group-title">Initial Public Offerings (IPO)</p>
 
-                        <div class="article-card" id="ipo-what-is">
+                        <div class="article-card" id="ipo-what-is" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -3351,7 +3353,7 @@
                             </div>
                         </div>
 
-                        <div class="article-card" id="ipo-apply">
+                        <div class="article-card" id="ipo-apply" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -3388,7 +3390,7 @@
                             </div>
                         </div>
 
-                        <div class="article-card" id="ipo-allotment">
+                        <div class="article-card" id="ipo-allotment" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -3406,7 +3408,7 @@
                             </div>
                         </div>
 
-                        <div class="article-card" id="ipo-max-limit">
+                        <div class="article-card" id="ipo-max-limit" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F43F5E;"></span>
@@ -3430,7 +3432,7 @@
                     <div class="article-group" data-cat="fo">
                         <p class="article-group-title">Futures & Options Advanced</p>
 
-                        <div class="article-card" id="fo-margin-req">
+                        <div class="article-card" id="fo-margin-req" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3451,7 +3453,7 @@
                             </div>
                         </div>
 
-                        <div class="article-card" id="fo-liquidity">
+                        <div class="article-card" id="fo-liquidity" data-status="approved">
                             <button class="article-trigger">
                                 <div class="article-trigger-left">
                                     <span class="article-cat-dot" style="background:#F59E0B;"></span>
@@ -3470,10 +3472,10 @@
                     </div>
 
                 <!-- ── KYC PROCESS ── -->
-                <div class="article-group" data-cat="account-opening">
+                <div class="article-group" data-cat="kyc">
                     <p class="article-group-title">KYC Process</p>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-approval-time" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3497,7 +3499,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-submit-docs" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3521,7 +3523,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-rejected" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3545,7 +3547,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-why-required" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3569,7 +3571,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-bank-verify-penny" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3593,7 +3595,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-no-aadhaar" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3617,7 +3619,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-whatsapp-email" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3641,7 +3643,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-offline-process" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>
@@ -3665,7 +3667,7 @@
                         </div>
                     </div>
 
-                    <div class="article-card">
+                    <div class="article-card" id="kyc-applicability" data-status="approved">
                         <button class="article-trigger">
                             <div class="article-trigger-left">
                                 <span class="article-cat-dot"></span>

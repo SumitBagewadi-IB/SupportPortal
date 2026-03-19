@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'fo': { label: 'Futures & Options', sub: 'Master F&O trading, margins, lot sizes, and contract expiry details.' },
         'pledging': { label: 'Pledging & Collateral', sub: 'Pledge your holdings for collateral margin and understand haircut rules.' },
         'contact-faq': { label: 'Contact & Escalation', sub: 'Ways to reach our support team, registered addresses, and escalation matrix.' },
+        'kyc': { label: 'KYC Process', sub: 'Everything about Know Your Customer requirements, document submission, and verification timelines.' },
     };
 
     function filterByCategory(cat) {
@@ -279,7 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'all': articles.length,
             'getting-started': 0, 'account-opening': 0, 'trading': 0, 'portfolio': 0, 'funds': 0,
             'advanced': 0, 'account': 0, 'reports': 0, 'charges': 0, 'compliance': 0,
-            'mutual-funds': 0, 'nri': 0, 'ipo': 0, 'fo': 0, 'pledging': 0, 'contact-faq': 0, 'tender-offers': 0, 'mtf': 0
+            'mutual-funds': 0, 'nri': 0, 'ipo': 0, 'fo': 0, 'pledging': 0, 'contact-faq': 0, 'tender-offers': 0, 'mtf': 0,
+            'kyc': 0
         };
 
         articles.forEach(a => { if (counts[a.cat] !== undefined) counts[a.cat]++; });
@@ -291,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'pro-market': 'count-pro-m', 'pro-charts': 'count-pro-c', 'pro-algo': 'count-pro-a',
             'compliance': 'count-comp', 'mutual-funds': 'count-mf', 'nri': 'count-nri', 'charges': 'count-ch',
             'ipo': 'count-ipo', 'fo': 'count-fo', 'pledging': 'count-pledge', 'contact-faq': 'count-cf',
-            'mtf': 'count-mtf', 'tender-offers': 'count-tender'
+            'mtf': 'count-mtf', 'tender-offers': 'count-tender', 'kyc': 'count-kyc'
         };
 
         Object.keys(idMap).forEach(cat => {
@@ -301,6 +303,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateSidebarCounts();
+
+    /* ─────────────────────────────────────────
+       CMS STATUS: Hide pending articles on public faq.html
+    ───────────────────────────────────────── */
+    (function applyPublicCmsVisibility() {
+        // Only run on the public FAQ page (not admin)
+        if (!document.getElementById('articleContainer')) return;
+
+        const disabledCategories = JSON.parse(localStorage.getItem('cms_categories') || '{}');
+
+        document.querySelectorAll('.article-card').forEach(card => {
+            const cardId = card.id;
+            if (!cardId) return; // skip if no ID somehow
+
+            // Check category-level disable
+            const group = card.closest('.article-group');
+            if (group) {
+                const cat = group.dataset.cat;
+                if (disabledCategories[cat] === false) {
+                    card.style.display = 'none';
+                    return;
+                }
+            }
+
+            // Check article-level status override from CMS
+            const storedStatus = localStorage.getItem('cms_status_' + cardId);
+            const defaultStatus = card.dataset.status || 'approved';
+
+            const effectiveStatus = storedStatus || defaultStatus;
+
+            if (effectiveStatus === 'pending') {
+                card.style.display = 'none';
+            }
+        });
+
+        // Also inject any new articles from CMS into the page (read-only display)
+        // New articles added in admin are not shown on public page until they have approved status
+        const newArticles = JSON.parse(localStorage.getItem('cms_new_articles') || '[]');
+        newArticles.forEach(article => {
+            if (!article.id) return;
+            const storedStatus = localStorage.getItem('cms_status_' + article.id) || article.status || 'pending';
+            if (storedStatus !== 'approved') return;
+
+            // Find the target group
+            const groups = document.querySelectorAll('.article-group');
+            let targetGroup = null;
+            groups.forEach(g => { if (g.dataset.cat === article.category) targetGroup = g; });
+            if (!targetGroup) return;
+
+            const cardHtml = `
+            <div class="article-card" id="${article.id}" data-status="approved">
+                <button class="article-trigger">
+                    <div class="article-trigger-left">
+                        <span class="article-cat-dot"></span>
+                        <div>
+                            <h3>${article.question}</h3>
+                            <p>${article.summary || ''}</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-down article-chevron"></i>
+                </button>
+                <div class="article-body">
+                    <p>${article.answer}</p>
+                </div>
+            </div>`;
+            targetGroup.insertAdjacentHTML('beforeend', cardHtml);
+
+            // Bind accordion for this new card
+            const newCard = targetGroup.querySelector('#' + article.id);
+            if (newCard) {
+                const trigger = newCard.querySelector('.article-trigger');
+                if (trigger) {
+                    trigger.addEventListener('click', () => {
+                        const body = trigger.nextElementSibling;
+                        const isOpen = trigger.classList.contains('open');
+                        document.querySelectorAll('.article-trigger.open').forEach(t => {
+                            t.classList.remove('open');
+                            if (t.nextElementSibling) t.nextElementSibling.classList.remove('open');
+                        });
+                        if (!isOpen) {
+                            trigger.classList.add('open');
+                            if (body) body.classList.add('open');
+                        }
+                    });
+                }
+            }
+        });
+    })();
 
     /* ─────────────────────────────────────────
        5. HOME PAGE SEARCH (index.html)
