@@ -3747,46 +3747,6 @@
 
     <script src="app.js"></script>
     <script src="chatbot.js"></script>
-
-    <!-- Admin content status filtering -->
-    <script>
-      (function applyContentStatus() {
-        function hideFilteredArticles() {
-          var statuses = {};
-          try { statuses = JSON.parse(localStorage.getItem('ib_content_status')) || {}; } catch (e) {}
-          var cards = document.querySelectorAll('.article-card[id]');
-          cards.forEach(function(card) {
-            var id = card.id;
-            if (statuses.hasOwnProperty(id)) {
-              var st = statuses[id];
-              if (st !== 'published' && st !== 'approved') {
-                card.style.display = 'none';
-              } else {
-                card.style.display = '';
-              }
-            }
-          });
-          // Hide empty article groups
-          document.querySelectorAll('.article-group').forEach(function(group) {
-            var visible = group.querySelectorAll('.article-card[id]:not([style*="display: none"]):not([style*="display:none"])');
-            group.style.display = visible.length === 0 ? 'none' : '';
-          });
-        }
-
-        // Apply on load
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', hideFilteredArticles);
-        } else {
-          hideFilteredArticles();
-        }
-
-        // React to admin status changes (if admin panel is open in same browser)
-        window.addEventListener('faqStatusUpdated', hideFilteredArticles);
-        window.addEventListener('storage', function(e) {
-          if (e.key === 'ib_content_status') hideFilteredArticles();
-        });
-      })();
-    </script>
 </body>
 
 </html>
