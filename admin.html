@@ -1,1874 +1,1923 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Content Management | Indiabulls Securities Admin</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* ── RESET & BASE ── */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #F4F7FE;
-            color: #1A202C;
-            height: 100vh;
-            overflow: hidden;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Indiabulls Securities</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #f0f6fc;
+      height: 100vh;
+      overflow: hidden;
+    }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+    select, input, textarea { font-family: inherit; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
-        /* ── LOGIN SCREEN ── */
-        #loginScreen {
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-        #loginScreen.hidden { display: none; }
-        .login-card {
-            background: white;
-            border-radius: 16px;
-            padding: 3rem 2.5rem;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
-            text-align: center;
-        }
-        .login-logo {
-            margin-bottom: 2rem;
-        }
-        .login-logo img { height: 36px; }
-        .login-title {
-            font-size: 1.375rem;
-            font-weight: 800;
-            color: #1A202C;
-            margin-bottom: 0.375rem;
-        }
-        .login-subtitle {
-            font-size: 0.875rem;
-            color: #718096;
-            margin-bottom: 2rem;
-        }
-        .login-field {
-            position: relative;
-            margin-bottom: 1rem;
-        }
-        .login-field input {
-            width: 100%;
-            padding: 0.875rem 1rem 0.875rem 3rem;
-            border: 2px solid #E2E8F0;
-            border-radius: 10px;
-            font-size: 0.9375rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .login-field input:focus { border-color: #3B82F6; }
-        .login-field .field-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #A0AEC0;
-            font-size: 0.875rem;
-        }
-        .login-btn {
-            width: 100%;
-            padding: 0.875rem;
-            background: #1A202C;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 0.9375rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 0.5rem;
-        }
-        .login-btn:hover { background: #2D3748; }
-        .login-error {
-            background: #FFF5F5;
-            border: 1px solid #FEB2B2;
-            color: #C53030;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            margin-top: 0.75rem;
-            display: none;
-        }
-        .login-error.visible { display: block; }
-        .login-badge {
-            margin-top: 2rem;
-            font-size: 0.75rem;
-            color: #A0AEC0;
-        }
+    /* ── LOGIN SCREEN ── */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #090d13 0%, #0d1117 50%, #111820 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
+    }
+    #loginScreen.hidden { opacity: 0; pointer-events: none; display: none; }
+    .login-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      padding: 3rem 2.5rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+    .login-logo { margin-bottom: 2rem; }
+    .login-logo img { height: 36px; }
+    .login-logo-text {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #00C805;
+      letter-spacing: -0.5px;
+    }
+    .login-title {
+      font-size: 1.375rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 0.4rem;
+    }
+    .login-subtitle {
+      font-size: 0.875rem;
+      color: #8b949e;
+      margin-bottom: 2rem;
+    }
+    .login-field {
+      text-align: left;
+      margin-bottom: 1.25rem;
+    }
+    .login-field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #8b949e;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .login-field input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #f0f6fc;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .login-field input:focus { border-color: #00C805; }
+    .login-error {
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      color: #f85149;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .login-error.visible { display: block; }
+    .login-btn {
+      width: 100%;
+      background: #00C805;
+      color: #0d1117;
+      border: none;
+      padding: 0.85rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .login-btn:hover { background: #00b004; }
+    .login-btn:active { transform: scale(0.99); }
+    .login-badge {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: #484f58;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
 
-        /* ── MAIN DASHBOARD LAYOUT ── */
-        #dashboardScreen {
-            display: grid;
-            grid-template-columns: 240px 1fr;
-            height: 100vh;
-        }
-        #dashboardScreen.hidden { display: none; }
+    /* ── APP LAYOUT ── */
+    #appLayout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #appLayout.hidden { display: none; }
 
-        /* ── SIDEBAR ── */
-        .cms-sidebar {
-            background: #1A202C;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .sidebar-logo {
-            padding: 1.5rem 1.25rem 1.25rem;
-            border-bottom: 1px solid #2D3748;
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-        }
-        .sidebar-logo img { height: 22px; }
-        .sidebar-label {
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #4A5568;
-            padding: 1.25rem 1.25rem 0.5rem;
-        }
-        .sidebar-nav {
-            padding: 0.5rem 0.75rem;
-            flex: 1;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.625rem 0.875rem;
-            border-radius: 8px;
-            color: #A0AEC0;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 500;
-            transition: all 0.15s;
-            margin-bottom: 0.125rem;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        .nav-item:hover { background: #2D3748; color: white; }
-        .nav-item.active { background: #2D3748; color: white; }
-        .nav-item .nav-icon { width: 16px; text-align: center; font-size: 0.8125rem; }
-        .sidebar-bottom {
-            padding: 1rem 0.75rem;
-            border-top: 1px solid #2D3748;
-        }
-        .sidebar-bottom .nav-item { color: #FC8181; }
-        .sidebar-bottom .nav-item:hover { background: #2D3748; color: #FEB2B2; }
-        .sidebar-version {
-            font-size: 0.65rem;
-            color: #4A5568;
-            text-align: center;
-            padding: 0.5rem;
-        }
+    /* ── SIDEBAR ── */
+    .sidebar {
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem;
+      transition: transform 0.3s ease;
+    }
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.5rem 1.5rem;
+      border-bottom: 1px solid #21262d;
+      margin-bottom: 1.5rem;
+    }
+    .sidebar-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: #00C805;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #0d1117;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .sidebar-logo-text { font-size: 0.9rem; font-weight: 700; color: #f0f6fc; line-height: 1.2; }
+    .sidebar-logo-sub { font-size: 0.7rem; color: #8b949e; }
+    .sidebar-section-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #484f58;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0 0.5rem;
+      margin-bottom: 0.5rem;
+      margin-top: 1rem;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0.75rem;
+      color: #8b949e;
+      border-radius: 6px;
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+    .nav-item:hover { background: #21262d; color: #f0f6fc; }
+    .nav-item.active {
+      background: rgba(0, 200, 5, 0.1);
+      color: #00C805;
+      border-color: rgba(0, 200, 5, 0.2);
+    }
+    .nav-item i { width: 16px; text-align: center; font-size: 0.85rem; }
+    .nav-badge {
+      margin-left: auto;
+      background: #f85149;
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 99px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 1.5rem;
+      border-top: 1px solid #21262d;
+    }
+    .logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0.75rem;
+      color: #8b949e;
+      border-radius: 6px;
+      width: 100%;
+      background: none;
+      border: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .logout-btn:hover { background: rgba(248,81,73,0.1); color: #f85149; }
 
-        /* ── MAIN CONTENT ── */
-        .cms-main {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .cms-topbar {
-            background: white;
-            border-bottom: 1px solid #E2E8F0;
-            padding: 1rem 1.75rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        .topbar-title {
-            font-size: 1.125rem;
-            font-weight: 800;
-            color: #1A202C;
-        }
-        .topbar-breadcrumb {
-            font-size: 0.75rem;
-            color: #A0AEC0;
-            margin-top: 0.125rem;
-        }
-        .topbar-actions { display: flex; gap: 0.75rem; align-items: center; }
-        .btn {
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all 0.15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .btn-outline {
-            background: white;
-            border: 1.5px solid #E2E8F0;
-            color: #4A5568;
-        }
-        .btn-outline:hover { border-color: #CBD5E0; background: #F7FAFC; }
-        .btn-primary {
-            background: #1A202C;
-            color: white;
-        }
-        .btn-primary:hover { background: #2D3748; }
-        .btn-success {
-            background: #38A169;
-            color: white;
-        }
-        .btn-success:hover { background: #2F855A; }
-        .btn-danger {
-            background: #E53E3E;
-            color: white;
-        }
-        .btn-danger:hover { background: #C53030; }
-        .btn-sm {
-            padding: 0.3125rem 0.625rem;
-            font-size: 0.75rem;
-        }
-        .cms-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1.75rem;
-        }
+    /* ── MAIN CONTENT ── */
+    .main-content {
+      overflow-y: auto;
+      height: 100vh;
+      background: #0d1117;
+    }
 
-        /* ── VIEWS ── */
-        .view { display: none; }
-        .view.active { display: block; }
+    /* ── PAGES ── */
+    .page { display: none; padding: 2rem; }
+    .page.active { display: block; }
 
-        /* ── STATS BAR ── */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            padding: 1.125rem 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        .stat-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.125rem;
-            flex-shrink: 0;
-        }
-        .stat-icon.blue { background: #EFF6FF; color: #3B82F6; }
-        .stat-icon.green { background: #F0FFF4; color: #38A169; }
-        .stat-icon.amber { background: #FFFBEB; color: #D97706; }
-        .stat-icon.purple { background: #FAF5FF; color: #7C3AED; }
-        .stat-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #718096;
-            margin-bottom: 0.25rem;
-        }
-        .stat-value {
-            font-size: 1.625rem;
-            font-weight: 800;
-            color: #1A202C;
-            line-height: 1;
-        }
+    /* ── PAGE HEADER ── */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f0f6fc;
+    }
+    .page-header p {
+      font-size: 0.875rem;
+      color: #8b949e;
+      margin-top: 0.2rem;
+    }
 
-        /* ── FILTER BAR ── */
-        .filter-bar {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            padding: 1rem 1.25rem;
-            margin-bottom: 1rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .filter-search {
-            flex: 1;
-            min-width: 200px;
-            position: relative;
-        }
-        .filter-search input {
-            width: 100%;
-            padding: 0.5rem 0.875rem 0.5rem 2.25rem;
-            border: 1.5px solid #E2E8F0;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .filter-search input:focus { border-color: #3B82F6; }
-        .filter-search .search-icon {
-            position: absolute;
-            left: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #A0AEC0;
-            font-size: 0.75rem;
-        }
-        .filter-select {
-            padding: 0.5rem 0.75rem;
-            border: 1.5px solid #E2E8F0;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            outline: none;
-            background: white;
-            color: #1A202C;
-            cursor: pointer;
-        }
-        .filter-select:focus { border-color: #3B82F6; }
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #00C805; color: #0d1117; border-color: #00C805; }
+    .btn-primary:hover { background: #00b004; border-color: #00b004; }
+    .btn-secondary { background: #21262d; color: #f0f6fc; border-color: #30363d; }
+    .btn-secondary:hover { background: #2d333b; border-color: #484f58; }
+    .btn-danger { background: rgba(248,81,73,0.1); color: #f85149; border-color: rgba(248,81,73,0.3); }
+    .btn-danger:hover { background: rgba(248,81,73,0.2); }
+    .btn-warning { background: rgba(227,179,65,0.1); color: #e3b341; border-color: rgba(227,179,65,0.3); }
+    .btn-warning:hover { background: rgba(227,179,65,0.2); }
+    .btn-success { background: rgba(63,185,80,0.1); color: #3fb950; border-color: rgba(63,185,80,0.3); }
+    .btn-success:hover { background: rgba(63,185,80,0.2); }
+    .btn-blue { background: rgba(88,166,255,0.1); color: #58a6ff; border-color: rgba(88,166,255,0.3); }
+    .btn-blue:hover { background: rgba(88,166,255,0.2); }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
+    .btn-icon { padding: 0.4rem 0.5rem; }
 
-        /* ── PENDING BANNER ── */
-        .pending-banner {
-            background: #FFFBEB;
-            border: 1px solid #F6E05E;
-            border-radius: 10px;
-            padding: 0.875rem 1.25rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        .pending-banner.hidden { display: none; }
-        .pending-banner-text {
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #744210;
-        }
-        .pending-banner-text i { color: #D69E2E; }
+    /* ── STAT CARDS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.25rem;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: #484f58; }
+    .stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .stat-label { font-size: 0.75rem; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+    .stat-icon.green { background: rgba(0,200,5,0.15); color: #00C805; }
+    .stat-icon.orange { background: rgba(227,179,65,0.15); color: #e3b341; }
+    .stat-icon.blue { background: rgba(88,166,255,0.15); color: #58a6ff; }
+    .stat-icon.red { background: rgba(248,81,73,0.15); color: #f85149; }
+    .stat-icon.purple { background: rgba(163,113,247,0.15); color: #a371f7; }
+    .stat-value { font-size: 2rem; font-weight: 800; color: #f0f6fc; line-height: 1; }
+    .stat-delta { font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem; }
 
-        /* ── ARTICLES TABLE ── */
-        .table-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            overflow: hidden;
-        }
-        .table-header {
-            padding: 1.125rem 1.25rem;
-            border-bottom: 1px solid #EDF2F7;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .table-header h2 {
-            font-size: 0.9375rem;
-            font-weight: 800;
-            color: #1A202C;
-        }
-        .table-count {
-            font-size: 0.75rem;
-            color: #718096;
-            font-weight: 500;
-        }
-        .articles-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .articles-table th {
-            text-align: left;
-            padding: 0.75rem 1.25rem;
-            border-bottom: 2px solid #EDF2F7;
-            color: #718096;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            font-weight: 700;
-            background: #FAFAFA;
-        }
-        .articles-table td {
-            padding: 0.875rem 1.25rem;
-            border-bottom: 1px solid #EDF2F7;
-            font-size: 0.8125rem;
-            vertical-align: middle;
-        }
-        .articles-table tr:last-child td { border-bottom: none; }
-        .articles-table tbody tr:hover { background: #FAFAFA; }
-        .col-num { width: 48px; color: #A0AEC0; font-weight: 600; }
-        .col-question { max-width: 380px; }
-        .question-text {
-            font-weight: 600;
-            color: #1A202C;
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            line-clamp: 1;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        .question-id {
-            font-size: 0.7rem;
-            color: #A0AEC0;
-            font-family: monospace;
-            margin-top: 0.125rem;
-        }
-        .col-cat { width: 160px; }
-        .col-status { width: 140px; }
-        .col-actions { width: 100px; text-align: right; }
+    /* ── CARDS ── */
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title { font-size: 0.9rem; font-weight: 700; color: #f0f6fc; }
+    .card-body { padding: 1.25rem; }
 
-        /* ── CATEGORY PILL ── */
-        .cat-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.2rem 0.6rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            white-space: nowrap;
-        }
+    /* ── ACTIVITY FEED ── */
+    .activity-list { display: flex; flex-direction: column; gap: 0; }
+    .activity-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid #21262d;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 0.4rem;
+      flex-shrink: 0;
+    }
+    .activity-dot.green { background: #00C805; }
+    .activity-dot.orange { background: #e3b341; }
+    .activity-dot.blue { background: #58a6ff; }
+    .activity-dot.red { background: #f85149; }
+    .activity-text { font-size: 0.85rem; color: #c9d1d9; flex: 1; line-height: 1.4; }
+    .activity-time { font-size: 0.75rem; color: #484f58; flex-shrink: 0; }
 
-        /* ── NEW BADGE ── */
-        .new-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.15rem 0.45rem;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            background: #EBF8FF;
-            color: #2B6CB0;
-            margin-left: 0.375rem;
-            vertical-align: middle;
-        }
+    /* ── QUICK ACTIONS ── */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+    .quick-action-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.85rem 1rem;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #8b949e;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .quick-action-btn:hover { border-color: #00C805; color: #00C805; background: rgba(0,200,5,0.05); }
+    .quick-action-btn i { font-size: 1rem; }
 
-        /* ── TOGGLE SWITCH ── */
-        .toggle-wrap {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .toggle {
-            position: relative;
-            width: 40px;
-            height: 22px;
-            flex-shrink: 0;
-        }
-        .toggle input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-            position: absolute;
-        }
-        .toggle-slider {
-            position: absolute;
-            inset: 0;
-            background: #CBD5E0;
-            border-radius: 22px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .toggle-slider::before {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            background: white;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: transform 0.2s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        .toggle input:checked + .toggle-slider { background: #38A169; }
-        .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
-        .toggle-label {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #718096;
-        }
-        .toggle input:checked ~ .toggle-label-approved { color: #38A169; display: inline; }
-        .toggle-label-approved { display: none; }
-        .toggle-label-pending { display: inline; }
-        .toggle input:checked ~ .toggle-label-pending { display: none; }
-        .toggle-status-approved { color: #38A169; font-size: 0.75rem; font-weight: 600; display: none; }
-        .toggle-status-pending { color: #E53E3E; font-size: 0.75rem; font-weight: 600; display: block; }
+    /* ── DASHBOARD GRID ── */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1.5rem;
+    }
+    @media (max-width: 1100px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
 
-        /* ── ACTION BUTTONS ── */
-        .action-btns { display: flex; gap: 0.375rem; justify-content: flex-end; }
-        .action-btn {
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
-            border: 1.5px solid #E2E8F0;
-            background: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            color: #718096;
-            transition: all 0.15s;
-        }
-        .action-btn:hover { border-color: #CBD5E0; background: #F7FAFC; color: #1A202C; }
-        .action-btn.edit:hover { border-color: #90CDF4; background: #EBF8FF; color: #3B82F6; }
-        .action-btn.preview:hover { border-color: #9AE6B4; background: #F0FFF4; color: #38A169; }
-        .action-btn.delete:hover { border-color: #FEB2B2; background: #FFF5F5; color: #E53E3E; }
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+      align-items: center;
+    }
+    .filter-bar select, .filter-bar input {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #f0f6fc;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-bar select:focus, .filter-bar input:focus { border-color: #58a6ff; }
+    .filter-bar input { min-width: 220px; }
+    .filter-bar input::placeholder { color: #484f58; }
 
-        /* ── EMPTY STATE ── */
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: #A0AEC0;
-        }
-        .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
-        .empty-state p { font-size: 0.875rem; }
+    /* ── TABLE ── */
+    .table-wrapper {
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .data-table th {
+      background: #21262d;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.85rem;
+      color: #c9d1d9;
+      vertical-align: middle;
+    }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: #1c2128; }
+    .data-table tbody tr.selected { background: rgba(0,200,5,0.05); }
+    .data-table .col-check { width: 40px; }
+    .data-table .col-num { width: 40px; color: #484f58; }
+    .data-table .col-actions { width: 180px; white-space: nowrap; }
+    .empty-state {
+      padding: 4rem 2rem;
+      text-align: center;
+      color: #484f58;
+    }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
+    .empty-state p { font-size: 0.9rem; }
 
-        /* ── ADD ARTICLE FORM ── */
-        .form-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            padding: 1.75rem;
-        }
-        .form-row { margin-bottom: 1.25rem; }
-        .form-row label {
-            display: block;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: #4A5568;
-            margin-bottom: 0.375rem;
-        }
-        .form-row input,
-        .form-row select,
-        .form-row textarea {
-            width: 100%;
-            padding: 0.625rem 0.875rem;
-            border: 1.5px solid #E2E8F0;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            outline: none;
-            transition: border-color 0.2s;
-            font-family: inherit;
-            color: #1A202C;
-        }
-        .form-row input:focus,
-        .form-row select:focus,
-        .form-row textarea:focus { border-color: #3B82F6; }
-        .form-row textarea { resize: vertical; min-height: 100px; }
-        .form-hint { font-size: 0.75rem; color: #A0AEC0; margin-top: 0.25rem; }
-        .radio-group { display: flex; gap: 1rem; margin-top: 0.375rem; }
-        .radio-option {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        .radio-option input { width: auto; }
-        .form-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #EDF2F7;
-        }
-        .form-success {
-            display: none;
-            background: #F0FFF4;
-            border: 1px solid #9AE6B4;
-            color: #276749;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-top: 1rem;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .form-success.visible { display: flex; }
+    /* ── STATUS BADGES ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: capitalize;
+      white-space: nowrap;
+    }
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .badge-draft { background: rgba(139,148,158,0.15); color: #8b949e; }
+    .badge-draft::before { background: #8b949e; }
+    .badge-pending { background: rgba(227,179,65,0.15); color: #e3b341; }
+    .badge-pending::before { background: #e3b341; }
+    .badge-approved { background: rgba(88,166,255,0.15); color: #58a6ff; }
+    .badge-approved::before { background: #58a6ff; }
+    .badge-published { background: rgba(0,200,5,0.15); color: #00C805; }
+    .badge-published::before { background: #00C805; }
+    .badge-rejected { background: rgba(248,81,73,0.15); color: #f85149; }
+    .badge-rejected::before { background: #f85149; }
+    .badge-open { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .badge-open::before { background: #3fb950; }
+    .badge-closed { background: rgba(139,148,158,0.15); color: #8b949e; }
+    .badge-closed::before { background: #8b949e; }
+    .badge-high { background: rgba(248,81,73,0.15); color: #f85149; }
+    .badge-high::before { background: #f85149; }
+    .badge-medium { background: rgba(227,179,65,0.15); color: #e3b341; }
+    .badge-medium::before { background: #e3b341; }
+    .badge-low { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .badge-low::before { background: #3fb950; }
+    .badge-escalated { background: rgba(163,113,247,0.15); color: #a371f7; }
+    .badge-escalated::before { background: #a371f7; }
 
-        /* ── CATEGORIES VIEW ── */
-        .categories-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-        }
-        .cat-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.875rem;
-        }
-        .cat-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-        .cat-card-name {
-            font-size: 0.9375rem;
-            font-weight: 700;
-            color: #1A202C;
-        }
-        .cat-card-meta {
-            font-size: 0.75rem;
-            color: #718096;
-            margin-top: 0.25rem;
-        }
-        .cat-card-count {
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: #3B82F6;
-        }
-        .cat-card-count span {
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: #A0AEC0;
-        }
-        .cat-enabled-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            padding: 0.25rem 0.625rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 700;
-        }
-        .cat-enabled-badge.enabled { background: #F0FFF4; color: #276749; }
-        .cat-enabled-badge.disabled { background: #FFF5F5; color: #9B2C2C; }
+    /* ── BULK ACTIONS ── */
+    .bulk-bar {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: rgba(0,200,5,0.08);
+      border: 1px solid rgba(0,200,5,0.2);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    .bulk-bar.visible { display: flex; }
+    .bulk-bar-count { font-size: 0.85rem; color: #00C805; font-weight: 600; }
 
-        /* ── SETTINGS VIEW ── */
-        .settings-section {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #E2E8F0;
-            padding: 1.5rem;
-            margin-bottom: 1.25rem;
-        }
-        .settings-section h3 {
-            font-size: 1rem;
-            font-weight: 800;
-            color: #1A202C;
-            margin-bottom: 0.375rem;
-        }
-        .settings-section .settings-desc {
-            font-size: 0.8125rem;
-            color: #718096;
-            margin-bottom: 1.25rem;
-        }
-        .settings-row {
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-end;
-        }
-        .settings-row .form-row { flex: 1; margin-bottom: 0; }
-        .about-section p {
-            font-size: 0.875rem;
-            color: #4A5568;
-            line-height: 1.7;
-            margin-bottom: 0.5rem;
-        }
-        .about-section strong { color: #1A202C; }
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-header h3 { font-size: 1rem; font-weight: 700; color: #f0f6fc; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 1.2rem;
+      padding: 0.25rem;
+      transition: color 0.15s;
+    }
+    .modal-close:hover { color: #f0f6fc; }
+    .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #30363d;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
 
-        /* ── MODAL ── */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-overlay.open { display: flex; }
-        .modal-box {
-            background: white;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
-        }
-        .modal-header {
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid #EDF2F7;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .modal-header h3 { font-size: 1rem; font-weight: 800; }
-        .modal-body { padding: 1.5rem; }
-        .modal-footer {
-            padding: 1.25rem 1.5rem;
-            border-top: 1px solid #EDF2F7;
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #718096;
-            font-size: 1.125rem;
-            padding: 0.25rem;
-            border-radius: 4px;
-        }
-        .modal-close:hover { color: #1A202C; background: #EDF2F7; }
+    /* ── FORM FIELDS ── */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .form-control {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #f0f6fc;
+      padding: 0.65rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-control:focus { border-color: #00C805; }
+    textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.5; }
+    select.form-control option { background: #161b22; }
 
-        /* ── SCROLLBAR ── */
-        .cms-content::-webkit-scrollbar { width: 6px; }
-        .cms-content::-webkit-scrollbar-track { background: transparent; }
-        .cms-content::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 3px; }
+    /* ── TOAST ── */
+    .toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 2000;
+    }
+    .toast {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 260px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      animation: slideIn 0.3s ease;
+    }
+    .toast.success { border-left: 3px solid #00C805; }
+    .toast.error { border-left: 3px solid #f85149; }
+    .toast.warning { border-left: 3px solid #e3b341; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-        /* ── CATEGORY COLOR MAP ── */
-        [data-catcolor="getting-started"] { background: #EFF6FF; color: #1D4ED8; }
-        [data-catcolor="account-opening"] { background: #F0FFF4; color: #276749; }
-        [data-catcolor="trading"] { background: #EFF6FF; color: #1D4ED8; }
-        [data-catcolor="portfolio"] { background: #FFFBEB; color: #92400E; }
-        [data-catcolor="funds"] { background: #FAF5FF; color: #5B21B6; }
-        [data-catcolor="advanced"] { background: #FFF1F2; color: #9F1239; }
-        [data-catcolor="account"] { background: #F0FDF4; color: #14532D; }
-        [data-catcolor="reports"] { background: #EEF2FF; color: #3730A3; }
-        [data-catcolor="charges"] { background: #FFFBEB; color: #78350F; }
-        [data-catcolor="compliance"] { background: #FFF1F2; color: #881337; }
-        [data-catcolor="mutual-funds"] { background: #ECFDF5; color: #065F46; }
-        [data-catcolor="nri"] { background: #F5F3FF; color: #4C1D95; }
-        [data-catcolor="ipo"] { background: #FFF1F2; color: #9F1239; }
-        [data-catcolor="fo"] { background: #FFFBEB; color: #78350F; }
-        [data-catcolor="pledging"] { background: #F1F5F9; color: #1E293B; }
-        [data-catcolor="contact-faq"] { background: #EEF2FF; color: #3730A3; }
-        [data-catcolor="mtf"] { background: #FFFBEB; color: #78350F; }
-        [data-catcolor="tender-offers"] { background: #F0F9FF; color: #0C4A6E; }
-        [data-catcolor="kyc"] { background: #FFF7ED; color: #9A3412; }
-        [data-catcolor="pro-market"] { background: #FFF7ED; color: #9A3412; }
-        [data-catcolor="pro-charts"] { background: #FFF7ED; color: #9A3412; }
-        [data-catcolor="pro-algo"] { background: #FFF7ED; color: #9A3412; }
-        [data-catcolor="new"] { background: #EBF8FF; color: #2B6CB0; }
+    /* ── SETTINGS ── */
+    .settings-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+    .settings-section-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .settings-section-header h3 { font-size: 0.95rem; font-weight: 700; color: #f0f6fc; }
+    .settings-section-header i { color: #8b949e; font-size: 0.9rem; }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #21262d;
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row-info { flex: 1; }
+    .settings-row-label { font-size: 0.9rem; color: #f0f6fc; font-weight: 500; }
+    .settings-row-desc { font-size: 0.78rem; color: #8b949e; margin-top: 0.15rem; }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #30363d;
+      border-radius: 22px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #00C805; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
 
-        /* ── TOAST NOTIFICATION ── */
-        .toast {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            background: #1A202C;
-            color: white;
-            padding: 0.75rem 1.25rem;
-            border-radius: 10px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.25);
-            transform: translateY(80px);
-            opacity: 0;
-            transition: all 0.3s;
-            z-index: 5000;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .toast.show { transform: translateY(0); opacity: 1; }
-        .toast.success i { color: #68D391; }
-        .toast.error i { color: #FC8181; }
-    </style>
+    /* ── MOBILE ── */
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 1.25rem;
+      padding: 0.5rem;
+    }
+    @media (max-width: 768px) {
+      #appLayout { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 500;
+        transform: translateX(-100%);
+        width: 260px;
+      }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.5); }
+      .mobile-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 499;
+      }
+      .mobile-overlay.open { display: block; }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        background: #161b22;
+        border-bottom: 1px solid #30363d;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .mobile-menu-btn { display: block; }
+      .page { padding: 1rem 1.25rem; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-bar input { min-width: unset; }
+      .bulk-bar { flex-wrap: wrap; }
+      .col-actions { display: none; }
+    }
+
+    /* ── CATEGORY PILL ── */
+    .cat-pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: #21262d;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+
+    /* ── TICKET ROW ── */
+    .ticket-row { cursor: pointer; }
+    .user-cell-name { font-weight: 600; color: #f0f6fc; }
+    .user-cell-email { font-size: 0.75rem; color: #8b949e; }
+    .ticket-id { font-family: monospace; color: #58a6ff; font-size: 0.8rem; }
+  </style>
 </head>
-
 <body>
 
-<!-- ════════════════════════════════════════
-     LOGIN SCREEN
-════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════ LOGIN ══════════════════════════════════════ -->
 <div id="loginScreen">
-    <div class="login-card">
-        <div class="login-logo">
-            <img src="logo.svg" alt="Indiabulls Securities" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-            <span style="display:none; font-size:1.25rem; font-weight:800; color:#1A202C;">Indiabulls Securities</span>
-        </div>
-        <h1 class="login-title">Content Admin Portal</h1>
-        <p class="login-subtitle">Sign in to manage the Knowledge Base content</p>
-        <div class="login-field">
-            <i class="fas fa-lock field-icon"></i>
-            <input type="password" id="loginPassword" placeholder="Enter admin password" autocomplete="current-password">
-        </div>
-        <button class="login-btn" id="loginBtn">
-            <i class="fas fa-sign-in-alt"></i> Sign In
-        </button>
-        <div class="login-error" id="loginError">
-            <i class="fas fa-exclamation-triangle"></i> Incorrect password. Please try again.
-        </div>
-        <p class="login-badge"><i class="fas fa-shield-halved"></i> Indiabulls Securities Internal System · Authorized Access Only</p>
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="font-size:1.8rem; font-weight:900; color:#00C805; letter-spacing:-1px;">IB<span style="color:#f0f6fc;">Admin</span></div>
+      <div style="font-size:0.8rem; color:#8b949e; margin-top:0.25rem;">Indiabulls Securities</div>
     </div>
+    <h2 class="login-title">Welcome back</h2>
+    <p class="login-subtitle">Sign in to the admin dashboard</p>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="loginUsername" value="admin" placeholder="admin">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password">
+    </div>
+    <div class="login-error" id="loginError">
+      <i class="fas fa-exclamation-circle"></i> Incorrect password. Please try again.
+    </div>
+    <button class="login-btn" id="loginBtn">Sign In <i class="fas fa-arrow-right" style="margin-left:0.4rem;"></i></button>
+    <div class="login-badge">
+      <i class="fas fa-lock"></i> Secured admin access
+    </div>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════
-     DASHBOARD SCREEN
-════════════════════════════════════════ -->
-<div id="dashboardScreen" class="hidden">
+<!-- ══════════════════════════════════════ APP ══════════════════════════════════════ -->
+<div id="appLayout" class="hidden">
+  <!-- Mobile overlay -->
+  <div class="mobile-overlay" id="mobileOverlay"></div>
 
-    <!-- SIDEBAR -->
-    <aside class="cms-sidebar">
-        <div class="sidebar-logo">
-            <img src="logo-dark.svg" alt="Indiabulls Securities" onerror="this.style.display='none'">
-            <span style="font-size:0.75rem; font-weight:700; color:#CBD5E0; letter-spacing:0.02em;">Admin CMS</span>
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">IB</div>
+      <div>
+        <div class="sidebar-logo-text">Indiabulls</div>
+        <div class="sidebar-logo-sub">Admin Dashboard</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Main</div>
+    <a class="nav-item active" data-page="dashboard" href="#">
+      <i class="fas fa-chart-pie"></i> Dashboard
+    </a>
+    <a class="nav-item" data-page="content" href="#">
+      <i class="fas fa-file-alt"></i> Content Manager
+    </a>
+    <a class="nav-item" data-page="inbox" href="#">
+      <i class="fas fa-inbox"></i> Support Inbox
+      <span class="nav-badge" id="inboxBadge" style="display:none;">0</span>
+    </a>
+
+    <div class="sidebar-section-label">Configuration</div>
+    <a class="nav-item" data-page="settings" href="#">
+      <i class="fas fa-cog"></i> Settings
+    </a>
+
+    <div class="sidebar-footer">
+      <div style="padding: 0 0.75rem; margin-bottom:1rem;">
+        <div style="font-size:0.75rem; color:#8b949e;">Logged in as</div>
+        <div style="font-size:0.85rem; font-weight:600; color:#f0f6fc; margin-top:0.15rem;">Administrator</div>
+      </div>
+      <button class="logout-btn" id="logoutBtn">
+        <i class="fas fa-sign-out-alt"></i> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-content" id="mainContent">
+
+    <!-- Mobile topbar -->
+    <div class="mobile-topbar" id="mobileTopbar" style="display:none;">
+      <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+      <div style="font-weight:700; color:#f0f6fc; font-size:0.95rem;">IB Admin</div>
+    </div>
+
+    <!-- ─── DASHBOARD PAGE ─── -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Overview of your support portal activity</p>
+        </div>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="navigate('content')"><i class="fas fa-file-alt"></i> Content Manager</button>
+          <button class="btn btn-primary" onclick="navigate('inbox')"><i class="fas fa-inbox"></i> Support Inbox</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class="fas fa-clock" style="color:#e3b341;margin-right:0.5rem;"></i>Recent Activity</span>
+          </div>
+          <div class="card-body">
+            <div class="activity-list" id="activityFeed"></div>
+          </div>
         </div>
 
-        <p class="sidebar-label">Navigation</p>
-        <nav class="sidebar-nav">
-            <button class="nav-item active" data-view="content-manager">
-                <span class="nav-icon"><i class="fas fa-table-list"></i></span>
-                Content Manager
-            </button>
-            <button class="nav-item" data-view="add-article">
-                <span class="nav-icon"><i class="fas fa-plus-circle"></i></span>
-                Add Article
-            </button>
-            <button class="nav-item" data-view="categories">
-                <span class="nav-icon"><i class="fas fa-folder-tree"></i></span>
-                Categories
-            </button>
-            <button class="nav-item" data-view="settings">
-                <span class="nav-icon"><i class="fas fa-gear"></i></span>
-                Settings
-            </button>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <button class="nav-item" id="logoutBtn">
-                <span class="nav-icon"><i class="fas fa-right-from-bracket"></i></span>
-                Logout
-            </button>
-            <p class="sidebar-version">CMS v2.0 · Indiabulls Securities</p>
-        </div>
-    </aside>
-
-    <!-- MAIN CONTENT -->
-    <div class="cms-main">
-        <!-- TOPBAR -->
-        <div class="cms-topbar">
-            <div>
-                <div class="topbar-title" id="topbarTitle">Content Manager</div>
-                <div class="topbar-breadcrumb" id="topbarBreadcrumb">Manage all Knowledge Base articles</div>
+        <div>
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="card-header">
+              <span class="card-title">Quick Actions</span>
             </div>
-            <div class="topbar-actions">
-                <button class="btn btn-outline" id="exportBtn">
-                    <i class="fas fa-download"></i> Export Config
+            <div class="card-body">
+              <div class="quick-actions">
+                <button class="quick-action-btn" onclick="navigate('content'); openArticleModal()">
+                  <i class="fas fa-plus"></i> New Article
                 </button>
-                <a href="faq.html" target="_blank" class="btn btn-primary">
-                    <i class="fas fa-eye"></i> Preview Site
-                </a>
+                <button class="quick-action-btn" onclick="navigate('content'); applyFilter('pending')">
+                  <i class="fas fa-hourglass-half"></i> Review Pending
+                </button>
+                <button class="quick-action-btn" onclick="navigate('inbox')">
+                  <i class="fas fa-ticket-alt"></i> Open Tickets
+                </button>
+                <button class="quick-action-btn" onclick="navigate('settings')">
+                  <i class="fas fa-toggle-on"></i> Category Visibility
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Status Breakdown</span>
+            </div>
+            <div class="card-body" id="statusBreakdown">
+              <!-- filled by JS -->
+            </div>
+          </div>
         </div>
-
-        <!-- CONTENT AREA -->
-        <div class="cms-content">
-
-            <!-- ── VIEW: CONTENT MANAGER ── -->
-            <div class="view active" id="view-content-manager">
-
-                <!-- Stats -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon blue"><i class="fas fa-file-alt"></i></div>
-                        <div>
-                            <div class="stat-label">Total Articles</div>
-                            <div class="stat-value" id="stat-total">–</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-                        <div>
-                            <div class="stat-label">Approved</div>
-                            <div class="stat-value" id="stat-approved">–</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon amber"><i class="fas fa-clock"></i></div>
-                        <div>
-                            <div class="stat-label">Pending</div>
-                            <div class="stat-value" id="stat-pending">–</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon purple"><i class="fas fa-folder-open"></i></div>
-                        <div>
-                            <div class="stat-label">Categories</div>
-                            <div class="stat-value" id="stat-cats">–</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pending Banner -->
-                <div class="pending-banner hidden" id="pendingBanner">
-                    <div class="pending-banner-text">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span id="pendingBannerText">Some articles have unsaved status changes from their original values.</span>
-                    </div>
-                    <div style="display:flex; gap:0.5rem;">
-                        <button class="btn btn-sm btn-outline" id="resetChangesBtn">Reset All</button>
-                        <button class="btn btn-sm btn-success" id="exportConfigBtn2">Export Config</button>
-                    </div>
-                </div>
-
-                <!-- Filter Bar -->
-                <div class="filter-bar">
-                    <div class="filter-search">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="tableSearch" placeholder="Search articles by question or ID...">
-                    </div>
-                    <select class="filter-select" id="statusFilter">
-                        <option value="all">All Status</option>
-                        <option value="approved">Approved</option>
-                        <option value="pending">Pending</option>
-                    </select>
-                    <select class="filter-select" id="catFilter">
-                        <option value="all">All Categories</option>
-                    </select>
-                </div>
-
-                <!-- Articles Table -->
-                <div class="table-card">
-                    <div class="table-header">
-                        <h2>All Articles</h2>
-                        <span class="table-count" id="tableCount"></span>
-                    </div>
-                    <div style="overflow-x:auto;">
-                        <table class="articles-table">
-                            <thead>
-                                <tr>
-                                    <th class="col-num">#</th>
-                                    <th class="col-question">Question</th>
-                                    <th class="col-cat">Category</th>
-                                    <th class="col-status">Status</th>
-                                    <th class="col-actions">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="articlesTableBody">
-                                <tr>
-                                    <td colspan="5">
-                                        <div class="empty-state">
-                                            <i class="fas fa-spinner fa-spin"></i>
-                                            <p>Loading articles from faq.html…</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── VIEW: ADD ARTICLE ── -->
-            <div class="view" id="view-add-article">
-                <div class="form-card">
-                    <h2 style="font-size:1.0625rem; font-weight:800; margin-bottom:1.5rem;">Add New Article</h2>
-
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
-                        <div class="form-row">
-                            <label>Category <span style="color:#E53E3E;">*</span></label>
-                            <select id="newArticleCat">
-                                <option value="">— Select Category —</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Status</label>
-                            <div class="radio-group">
-                                <label class="radio-option">
-                                    <input type="radio" name="newArticleStatus" value="approved"> Approved
-                                </label>
-                                <label class="radio-option">
-                                    <input type="radio" name="newArticleStatus" value="pending" checked> Pending (Draft)
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <label>Question / Title <span style="color:#E53E3E;">*</span></label>
-                        <input type="text" id="newArticleQuestion" placeholder="e.g. How do I reset my password?">
-                    </div>
-
-                    <div class="form-row">
-                        <label>Short Summary</label>
-                        <input type="text" id="newArticleSummary" placeholder="One-line description shown in collapsed state">
-                        <p class="form-hint">Keep under 80 characters for best display.</p>
-                    </div>
-
-                    <div class="form-row">
-                        <label>Answer / Content <span style="color:#E53E3E;">*</span></label>
-                        <textarea id="newArticleAnswer" rows="6" placeholder="Write the full article content here. HTML is supported."></textarea>
-                        <p class="form-hint">Basic HTML tags like &lt;strong&gt;, &lt;ul&gt;, &lt;li&gt; are supported.</p>
-                    </div>
-
-                    <div class="form-actions">
-                        <button class="btn btn-primary" id="saveArticleBtn">
-                            <i class="fas fa-save"></i> Save Article
-                        </button>
-                        <button class="btn btn-outline" id="clearFormBtn">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
-                    </div>
-
-                    <div class="form-success" id="formSuccess">
-                        <i class="fas fa-check-circle"></i>
-                        Article saved successfully! It will appear in Content Manager.
-                    </div>
-                </div>
-
-                <!-- Saved New Articles Preview -->
-                <div style="margin-top:1.5rem;" id="newArticlesSection">
-                    <div class="table-card">
-                        <div class="table-header">
-                            <h2>Newly Added Articles</h2>
-                            <span class="table-count" id="newArticlesCount">0 articles</span>
-                        </div>
-                        <div id="newArticlesList" style="padding:1rem;">
-                            <div class="empty-state">
-                                <i class="fas fa-file-circle-plus"></i>
-                                <p>No new articles added yet.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── VIEW: CATEGORIES ── -->
-            <div class="view" id="view-categories">
-                <div class="categories-grid" id="categoriesGrid">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <!-- ── VIEW: SETTINGS ── -->
-            <div class="view" id="view-settings">
-
-                <div class="settings-section">
-                    <h3><i class="fas fa-lock" style="color:#3B82F6; margin-right:0.5rem;"></i>Change Admin Password</h3>
-                    <p class="settings-desc">Update the password used to access this admin dashboard.</p>
-                    <div class="settings-row">
-                        <div class="form-row">
-                            <label>New Password</label>
-                            <input type="password" id="newPassword" placeholder="Enter new password">
-                        </div>
-                        <div class="form-row">
-                            <label>Confirm Password</label>
-                            <input type="password" id="confirmPassword" placeholder="Repeat new password">
-                        </div>
-                        <button class="btn btn-primary" id="changePassBtn" style="flex-shrink:0; margin-bottom:0;">
-                            <i class="fas fa-key"></i> Update
-                        </button>
-                    </div>
-                    <div id="passMsg" style="font-size:0.8125rem; margin-top:0.75rem;"></div>
-                </div>
-
-                <div class="settings-section">
-                    <h3><i class="fas fa-rotate-left" style="color:#E53E3E; margin-right:0.5rem;"></i>Reset All Content</h3>
-                    <p class="settings-desc">This will clear all status overrides, newly added articles, and category settings — restoring everything to defaults. This action cannot be undone.</p>
-                    <button class="btn btn-danger" id="resetAllBtn">
-                        <i class="fas fa-trash-alt"></i> Reset All CMS Data
-                    </button>
-                </div>
-
-                <div class="settings-section">
-                    <h3><i class="fas fa-circle-info" style="color:#718096; margin-right:0.5rem;"></i>About</h3>
-                    <div class="about-section">
-                        <p><strong>Content Management System</strong> — Indiabulls Securities Support Portal</p>
-                        <p>Version 2.0.0 · Built for the Support Admin Team</p>
-                        <p>This dashboard reads all articles directly from <strong>faq.html</strong> and persists status changes in <strong>localStorage</strong>. To permanently publish changes, use the Export Config feature and update the source files.</p>
-                        <p style="margin-top:1rem; font-size:0.75rem; color:#A0AEC0;">localStorage keys: <code>cms_status_{id}</code>, <code>cms_categories</code>, <code>cms_new_articles</code>, <code>ibulls_admin_auth</code>, <code>ibulls_admin_pass</code></p>
-                    </div>
-                </div>
-
-            </div>
-
-        </div><!-- /cms-content -->
-    </div><!-- /cms-main -->
-
-</div><!-- /dashboardScreen -->
-
-<!-- ── EDIT ARTICLE MODAL ── -->
-<div class="modal-overlay" id="editModal">
-    <div class="modal-box">
-        <div class="modal-header">
-            <h3><i class="fas fa-pencil" style="color:#3B82F6; margin-right:0.5rem;"></i>Edit Article</h3>
-            <button class="modal-close" id="editModalClose"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="editArticleId">
-            <div class="form-row">
-                <label>Article ID</label>
-                <input type="text" id="editArticleIdDisplay" disabled style="background:#F7FAFC; color:#718096;">
-            </div>
-            <div class="form-row">
-                <label>Category</label>
-                <input type="text" id="editArticleCat" disabled style="background:#F7FAFC; color:#718096;">
-            </div>
-            <div class="form-row">
-                <label>Question / Title <span style="color:#E53E3E;">*</span></label>
-                <input type="text" id="editArticleQuestion">
-            </div>
-            <div class="form-row">
-                <label>Status</label>
-                <div class="radio-group">
-                    <label class="radio-option">
-                        <input type="radio" name="editStatus" value="approved"> Approved
-                    </label>
-                    <label class="radio-option">
-                        <input type="radio" name="editStatus" value="pending"> Pending
-                    </label>
-                </div>
-            </div>
-            <p style="font-size:0.8rem; color:#A0AEC0; margin-top:0.5rem;"><i class="fas fa-info-circle"></i> Full content editing is available by editing faq.html directly. Changes here update only the title and status in this session.</p>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" id="editModalCancel">Cancel</button>
-            <button class="btn btn-primary" id="editModalSave"><i class="fas fa-save"></i> Save Changes</button>
-        </div>
+      </div>
     </div>
+
+    <!-- ─── CONTENT MANAGER PAGE ─── -->
+    <div class="page" id="page-content">
+      <div class="page-header">
+        <div>
+          <h1>Content Manager</h1>
+          <p>Manage FAQ articles — approve, publish, or reject content</p>
+        </div>
+        <button class="btn btn-primary" onclick="openArticleModal()">
+          <i class="fas fa-plus"></i> Add New Article
+        </button>
+      </div>
+
+      <!-- Bulk action bar -->
+      <div class="bulk-bar" id="bulkBar">
+        <span class="bulk-bar-count" id="bulkCount">0 selected</span>
+        <button class="btn btn-success btn-sm" onclick="bulkAction('approved')"><i class="fas fa-check"></i> Approve</button>
+        <button class="btn btn-primary btn-sm" onclick="bulkAction('published')"><i class="fas fa-globe"></i> Publish</button>
+        <button class="btn btn-danger btn-sm" onclick="bulkAction('rejected')"><i class="fas fa-times"></i> Reject</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="clearSelection()"><i class="fas fa-times"></i> Deselect All</button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <select id="filterStatus" onchange="renderContentTable()">
+          <option value="all">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="published">Published</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select id="filterCat" onchange="renderContentTable()">
+          <option value="all">All Categories</option>
+          <option value="getting-started">Getting Started</option>
+          <option value="account-opening">Account Opening</option>
+          <option value="trading">Trading</option>
+          <option value="funds">Funds</option>
+          <option value="charges">Charges</option>
+          <option value="nri">NRI Accounts</option>
+          <option value="mutual-funds">Mutual Funds</option>
+          <option value="kyc">KYC</option>
+        </select>
+        <input type="text" id="filterSearch" placeholder="Search articles..." oninput="renderContentTable()">
+        <button class="btn btn-secondary btn-sm" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
+        <span id="contentCount" style="font-size:0.8rem; color:#8b949e; margin-left:auto;"></span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table" id="contentTable">
+          <thead>
+            <tr>
+              <th class="col-check"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+              <th class="col-num">#</th>
+              <th>Category</th>
+              <th>Sub-category</th>
+              <th>Question</th>
+              <th>Status</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="contentBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── SUPPORT INBOX PAGE ─── -->
+    <div class="page" id="page-inbox">
+      <div class="page-header">
+        <div>
+          <h1>Support Inbox</h1>
+          <p>Manage and respond to customer support tickets</p>
+        </div>
+        <span id="inboxStats" style="font-size:0.85rem; color:#8b949e;"></span>
+      </div>
+
+      <div class="filter-bar">
+        <select id="inboxFilterStatus" onchange="renderInbox()">
+          <option value="all">All Statuses</option>
+          <option value="Open">Open</option>
+          <option value="Closed">Closed</option>
+          <option value="Escalated">Escalated</option>
+        </select>
+        <select id="inboxFilterCat" onchange="renderInbox()">
+          <option value="all">All Categories</option>
+          <option value="trading">Trading</option>
+          <option value="funds">Funds</option>
+          <option value="account">Account</option>
+          <option value="kyc">KYC</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="inboxFilterPriority" onchange="renderInbox()">
+          <option value="all">All Priorities</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <input type="text" id="inboxSearch" placeholder="Search tickets..." oninput="renderInbox()">
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>User</th>
+              <th>Subject</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="inboxBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── SETTINGS PAGE ─── -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div>
+          <h1>Settings</h1>
+          <p>Configure portal settings and preferences</p>
+        </div>
+      </div>
+
+      <!-- Change Password -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <i class="fas fa-key"></i>
+          <h3>Change Admin Password</h3>
+        </div>
+        <div style="padding:1.25rem;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:1rem; max-width:600px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Current Password</label>
+              <input type="password" class="form-control" id="currentPwd" placeholder="Current password">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>New Password</label>
+              <input type="password" class="form-control" id="newPwd" placeholder="New password">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Confirm New Password</label>
+              <input type="password" class="form-control" id="confirmPwd" placeholder="Confirm new password">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:1rem;" onclick="changePassword()">
+            <i class="fas fa-save"></i> Update Password
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Visibility -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <i class="fas fa-eye"></i>
+          <h3>Category Visibility</h3>
+        </div>
+        <div id="categoryToggles">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Data Management -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <i class="fas fa-database"></i>
+          <h3>Data Management</h3>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Reset Content Status</div>
+            <div class="settings-row-desc">Reset all article statuses to their default values</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="resetContentStatus()">
+            <i class="fas fa-undo"></i> Reset
+          </button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Clear Support Tickets</div>
+            <div class="settings-row-desc">Remove all closed/resolved tickets from localStorage</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="clearClosedTickets()">
+            <i class="fas fa-trash"></i> Clear Closed
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /appLayout -->
+
+<!-- ══════════════════════════════════════ MODALS ══════════════════════════════════════ -->
+
+<!-- Article Edit Modal -->
+<div class="modal-overlay" id="articleModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="articleModalTitle">Add New Article</h3>
+      <button class="modal-close" onclick="closeArticleModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editArticleId">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div class="form-group">
+          <label>Category</label>
+          <select class="form-control" id="editCat">
+            <option value="getting-started">Getting Started</option>
+            <option value="account-opening">Account Opening</option>
+            <option value="trading">Trading</option>
+            <option value="funds">Funds</option>
+            <option value="charges">Charges</option>
+            <option value="nri">NRI Accounts</option>
+            <option value="mutual-funds">Mutual Funds</option>
+            <option value="kyc">KYC</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sub-category</label>
+          <input type="text" class="form-control" id="editSubcat" placeholder="e.g. Account Opening">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Question / Title</label>
+        <input type="text" class="form-control" id="editQuestion" placeholder="Enter the FAQ question">
+      </div>
+      <div class="form-group">
+        <label>Answer / Content</label>
+        <textarea class="form-control" id="editAnswer" rows="6" placeholder="Write the detailed answer here..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-control" id="editStatus">
+          <option value="draft">Draft</option>
+          <option value="pending">Pending Review</option>
+          <option value="approved">Approved</option>
+          <option value="published">Published</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeArticleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveArticle()"><i class="fas fa-save"></i> Save Article</button>
+    </div>
+  </div>
 </div>
 
-<!-- ── TOAST ── -->
-<div class="toast" id="toast">
-    <i class="fas fa-check-circle"></i>
-    <span id="toastMsg"></span>
+<!-- Ticket Detail Modal -->
+<div class="modal-overlay" id="ticketModal">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="modal-header">
+      <h3 id="ticketModalTitle">Ticket Details</h3>
+      <button class="modal-close" onclick="closeTicketModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="ticketModalBody"></div>
+    <div class="modal-footer" id="ticketModalFooter"></div>
+  </div>
 </div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
 
 <script>
-/* ════════════════════════════════════════════════════
-   INDIABULLS SECURITIES — CMS ADMIN DASHBOARD
-   admin.html · vanilla JS only
-════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_ARTICLES = [
+  { id: 'gs-first-trade',  cat: 'getting-started', subcat: 'Getting Started', question: 'How do I place my first trade?', answer: 'Use the search bar to find a stock, click Buy/Sell, enter quantity, select order type (Market/Limit), choose product (CNC/MIS), and tap Place Order.', status: 'published' },
+  { id: 'acc-send-docs',   cat: 'account-opening', subcat: 'Account Opening', question: 'Will Indiabulls Securities Ltd send any documents to my address?', answer: 'No, Indiabulls Securities does not send physical documents. The account opening process is entirely digital with electronic communication.', status: 'published' },
+  { id: 'acc-platforms',   cat: 'account-opening', subcat: 'Account Opening', question: 'What kind of trading platforms are offered?', answer: 'Trading platforms are available on web (ibullssecurities.com) and mobile (iOS & Android apps).', status: 'published' },
+  { id: 'acc-call-trade',  cat: 'account-opening', subcat: 'Account Opening', question: 'Can orders be placed by calling Indiabulls Securities Ltd?', answer: 'Yes, Call & Trade is available at 022-61446300. Charges: ₹150 + 18% GST per order.', status: 'published' },
+  { id: 'acc-no-demat',    cat: 'account-opening', subcat: 'Account Opening', question: 'Can a trading account be opened without opening a demat account?', answer: 'No, a demat account is mandatory for equity settlement and F&O physical delivery.', status: 'published' },
+  { id: 'acc-charges',     cat: 'account-opening', subcat: 'Account Opening', question: 'What are the charges for opening an account?', answer: 'Free demat account with no AMC. Brokerage: ₹20/order for equity delivery; ₹20/order for intraday and F&O.', status: 'published' },
+  { id: 'acc-amc',         cat: 'account-opening', subcat: 'Account Opening', question: 'What are Annual Maintenance Charges (AMC)?', answer: 'Individual: ₹300/year + GST. Corporate: ₹1000/year + GST.', status: 'published' },
+  { id: 'acc-fo-status',   cat: 'account-opening', subcat: 'Account Opening', question: 'My F&O Income Proof is uploaded. What is the status?', answer: 'F&O segment will be activated after exchange registration completes — typically 5–7 business days.', status: 'pending' },
+  { id: 'acc-pan-fail',    cat: 'account-opening', subcat: 'Account Opening', question: 'Why was my PAN verification failed?', answer: 'PAN verification fails if the name or date of birth does not match NSDL records, or if the PAN number is incorrect.', status: 'pending' },
+  { id: 'acc-kyc-time',    cat: 'account-opening', subcat: 'KYC', question: 'How long does KYC approval take?', answer: 'KYC approval typically takes 24–48 hours after successful document submission.', status: 'approved' },
+  { id: 'tr-order-types',  cat: 'trading', subcat: 'Trading', question: 'What are the different order types available?', answer: 'Market Order, Limit Order, Stop-Loss Market (SL-M), Stop-Loss Limit (SL), GTT (Good Till Triggered).', status: 'published' },
+  { id: 'tr-intraday',     cat: 'trading', subcat: 'Trading', question: 'What is intraday trading?', answer: 'Intraday trading means buying and selling shares on the same day. Use MIS product type; positions auto-square at 3:15 PM.', status: 'published' },
+  { id: 'tr-gtt',          cat: 'trading', subcat: 'Trading', question: 'How to place a GTT (Good Till Triggered) order?', answer: 'Navigate to the stock, click GTT, set trigger price and limit price. The order activates when trigger price is hit.', status: 'published' },
+  { id: 'fn-add-funds',    cat: 'funds', subcat: 'Funds', question: 'How to add funds to my account?', answer: 'Go to Funds > Add Funds, choose UPI, net banking, or NEFT/RTGS. UPI and net banking are instant.', status: 'published' },
+  { id: 'fn-withdraw',     cat: 'funds', subcat: 'Funds', question: 'How long does fund withdrawal take?', answer: 'Withdrawal requests are processed within 24 hours on business days. Funds are credited to your linked bank account.', status: 'published' },
+  { id: 'ch-stt',          cat: 'charges', subcat: 'Charges', question: 'What are STT charges if option positions get exercised?', answer: 'STT on exercised options is 0.125% of intrinsic value (for in-the-money contracts). This can be significant — always check before expiry.', status: 'pending' },
+  { id: 'ch-call-trade',   cat: 'charges', subcat: 'Charges', question: 'What are call and trade charges?', answer: '₹150 + 18% GST per order for placing, modifying, or cancelling via phone.', status: 'pending' },
+  { id: 'nri-transfer',    cat: 'nri', subcat: 'NRI Accounts', question: 'How can NRIs transfer shares to NRI demat account?', answer: 'NRIs can transfer shares through a DIS (Delivery Instruction Slip) or online via CDSL/NSDL portal to their NRI demat account.', status: 'draft' },
+  { id: 'nri-open',        cat: 'nri', subcat: 'NRI Accounts', question: 'How to open an NRI account with Indiabulls Securities Ltd?', answer: 'NRIs can open a trading and demat account online. Required docs: PAN, Passport, NRE/NRO bank account details, and overseas address proof.', status: 'draft' },
+  { id: 'mf-sip',          cat: 'mutual-funds', subcat: 'Mutual Funds', question: 'How to start a SIP on Indiabulls Securities?', answer: 'Go to Mutual Funds > SIP, search for a fund, enter monthly amount and duration, and confirm with your bank mandate.', status: 'draft' },
+];
 
-/* ── CONSTANTS ── */
+const CATEGORIES = [
+  { id: 'getting-started', label: 'Getting Started' },
+  { id: 'account-opening', label: 'Account Opening' },
+  { id: 'trading', label: 'Trading' },
+  { id: 'funds', label: 'Funds' },
+  { id: 'charges', label: 'Charges & Brokerage' },
+  { id: 'nri', label: 'NRI Accounts' },
+  { id: 'mutual-funds', label: 'Mutual Funds' },
+  { id: 'kyc', label: 'KYC Process' },
+  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'ipo', label: 'IPO' },
+  { id: 'fo', label: 'F&O' },
+  { id: 'pledging', label: 'Pledging' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'compliance', label: 'Compliance & Safety' },
+  { id: 'contact-faq', label: 'Contact & Escalation' },
+  { id: 'mtf', label: 'MTF' },
+  { id: 'pro-market', label: 'Advanced Market' },
+  { id: 'pro-charts', label: 'Pro Charts' },
+  { id: 'pro-algo', label: 'Algo & API' },
+];
+
+const CORRECT_PASSWORD_KEY = 'ib_admin_password';
 const DEFAULT_PASSWORD = 'IBAdmin2025';
-const LS_AUTH = 'ibulls_admin_auth';
-const LS_PASS = 'ibulls_admin_pass';
-const LS_STATUS_PREFIX = 'cms_status_';
-const LS_CATEGORIES = 'cms_categories';
-const LS_NEW_ARTICLES = 'cms_new_articles';
+const CONTENT_STATUS_KEY = 'ib_content_status';
+const CAT_VISIBILITY_KEY = 'ib_cat_visibility';
+const ACTIVITY_KEY = 'ib_admin_activity';
 
-/* ── STATE ── */
-let allArticles = []; // parsed from faq.html
-let filteredArticles = [];
-let categoryDisabled = {}; // { catKey: false } means disabled
-let newArticles = [];
-let originalStatuses = {}; // id -> default status from faq.html
-let unsavedChanges = 0;
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let articles = [];
+let selectedIds = new Set();
+let currentTicketId = null;
 
-/* ── CATEGORY METADATA ── */
-const CAT_META = {
-    'getting-started':  { label: 'Getting Started',           icon: 'fa-rocket' },
-    'account-opening':  { label: 'Account Opening',           icon: 'fa-id-card' },
-    'trading':          { label: 'Trading',                    icon: 'fa-chart-line' },
-    'portfolio':        { label: 'Portfolio & Margin',         icon: 'fa-briefcase' },
-    'funds':            { label: 'Funds',                      icon: 'fa-wallet' },
-    'advanced':         { label: 'Advanced Features',          icon: 'fa-robot' },
-    'account':          { label: 'Account & Settings',         icon: 'fa-user-circle' },
-    'reports':          { label: 'Reports',                    icon: 'fa-file-invoice' },
-    'charges':          { label: 'Charges & Brokerage',        icon: 'fa-tags' },
-    'compliance':       { label: 'Compliance & Safety',        icon: 'fa-shield-halved' },
-    'mutual-funds':     { label: 'Mutual Funds',               icon: 'fa-seedling' },
-    'nri':              { label: 'NRI / HUF Accounts',         icon: 'fa-globe' },
-    'ipo':              { label: 'IPO',                        icon: 'fa-rocket' },
-    'fo':               { label: 'Futures & Options',          icon: 'fa-bolt' },
-    'pledging':         { label: 'Pledging & Collateral',      icon: 'fa-link' },
-    'contact-faq':      { label: 'Contact & Escalation',       icon: 'fa-headset' },
-    'mtf':              { label: 'MTF',                        icon: 'fa-layer-group' },
-    'tender-offers':    { label: 'Tender Offers',              icon: 'fa-hand-holding-dollar' },
-    'kyc':              { label: 'KYC Process',                icon: 'fa-fingerprint' },
-    'pro-market':       { label: 'Advanced Market',            icon: 'fa-chart-pie' },
-    'pro-charts':       { label: 'Pro Charts',                 icon: 'fa-wave-square' },
-    'pro-algo':         { label: 'Algo & API',                 icon: 'fa-terminal' },
-};
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function getStoredStatuses() {
+  try { return JSON.parse(localStorage.getItem(CONTENT_STATUS_KEY)) || {}; } catch { return {}; }
+}
+function saveStoredStatuses(obj) {
+  localStorage.setItem(CONTENT_STATUS_KEY, JSON.stringify(obj));
+  // Dispatch event so faq.html can react
+  try { window.dispatchEvent(new CustomEvent('faqStatusUpdated', { detail: obj })); } catch {}
+}
+function getCatVisibility() {
+  try { return JSON.parse(localStorage.getItem(CAT_VISIBILITY_KEY)) || {}; } catch { return {}; }
+}
+function saveCatVisibility(obj) { localStorage.setItem(CAT_VISIBILITY_KEY, JSON.stringify(obj)); }
+function getTickets() { try { return JSON.parse(localStorage.getItem('is_tickets')) || []; } catch { return []; } }
+function saveTickets(t) { localStorage.setItem('is_tickets', JSON.stringify(t)); }
+function getAdminPassword() { return localStorage.getItem(CORRECT_PASSWORD_KEY) || DEFAULT_PASSWORD; }
 
-/* ════════════════════════════════
-   AUTH LOGIC
-════════════════════════════════ */
-function getPassword() {
-    return localStorage.getItem(LS_PASS) || DEFAULT_PASSWORD;
+function getActivity() { try { return JSON.parse(localStorage.getItem(ACTIVITY_KEY)) || []; } catch { return []; } }
+function logActivity(text, color = 'blue') {
+  const feed = getActivity();
+  feed.unshift({ text, color, time: Date.now() });
+  if (feed.length > 20) feed.pop();
+  localStorage.setItem(ACTIVITY_KEY, JSON.stringify(feed));
 }
 
-function checkAuth() {
-    if (localStorage.getItem(LS_AUTH) === 'authenticated') {
-        showDashboard();
-    } else {
-        showLogin();
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+function truncate(str, n = 60) { return str.length > n ? str.slice(0, n) + '…' : str; }
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return Math.floor(diff/86400000) + 'd ago';
+}
+
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const icon = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-triangle' }[type] || 'fa-info-circle';
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<i class="fas ${icon}" style="color:${type==='success'?'#00C805':type==='error'?'#f85149':'#e3b341'};"></i> ${msg}`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+function statusBadge(status) {
+  return `<span class="badge badge-${status}">${status}</span>`;
+}
+
+function loadArticles() {
+  const stored = getStoredStatuses();
+  articles = DEFAULT_ARTICLES.map(a => ({
+    ...a,
+    status: stored[a.id] !== undefined ? stored[a.id] : a.status,
+    answer: a.answer || ''
+  }));
+
+  // Load any extra articles added via the admin
+  const extras = JSON.parse(localStorage.getItem('ib_extra_articles') || '[]');
+  extras.forEach(ex => {
+    if (!articles.find(a => a.id === ex.id)) {
+      articles.push({ ...ex, status: stored[ex.id] !== undefined ? stored[ex.id] : ex.status });
     }
+  });
 }
 
-function showLogin() {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('dashboardScreen').classList.add('hidden');
+function saveArticleStatus(id, status) {
+  const stored = getStoredStatuses();
+  stored[id] = status;
+  saveStoredStatuses(stored);
 }
 
-function showDashboard() {
+// ═══════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════
+function checkSession() {
+  return sessionStorage.getItem('ib_admin_session') === '1';
+}
+
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+function doLogin() {
+  const pwd = document.getElementById('loginPassword').value;
+  const err = document.getElementById('loginError');
+  if (pwd === getAdminPassword()) {
+    sessionStorage.setItem('ib_admin_session', '1');
+    err.classList.remove('visible');
     document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('dashboardScreen').classList.remove('hidden');
-    initDashboard();
-}
-
-document.getElementById('loginBtn').addEventListener('click', attemptLogin);
-document.getElementById('loginPassword').addEventListener('keydown', e => {
-    if (e.key === 'Enter') attemptLogin();
-});
-
-function attemptLogin() {
-    const pw = document.getElementById('loginPassword').value;
-    const errEl = document.getElementById('loginError');
-    if (pw === getPassword()) {
-        localStorage.setItem(LS_AUTH, 'authenticated');
-        errEl.classList.remove('visible');
-        showDashboard();
-    } else {
-        errEl.classList.add('visible');
-        document.getElementById('loginPassword').value = '';
-        document.getElementById('loginPassword').focus();
-    }
+    document.getElementById('appLayout').classList.remove('hidden');
+    init();
+  } else {
+    err.classList.add('visible');
+    document.getElementById('loginPassword').value = '';
+  }
 }
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem(LS_AUTH);
-    showLogin();
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginError').classList.remove('visible');
+  sessionStorage.removeItem('ib_admin_session');
+  location.reload();
 });
 
-/* ════════════════════════════════
-   DASHBOARD INIT
-════════════════════════════════ */
-function initDashboard() {
-    categoryDisabled = JSON.parse(localStorage.getItem(LS_CATEGORIES) || '{}');
-    newArticles = JSON.parse(localStorage.getItem(LS_NEW_ARTICLES) || '[]');
-    loadArticlesFromFaq();
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function navigate(pageId) {
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === pageId);
+  });
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.toggle('active', p.id === 'page-' + pageId);
+  });
+  if (pageId === 'dashboard') renderDashboard();
+  if (pageId === 'content') renderContentTable();
+  if (pageId === 'inbox') renderInbox();
+  if (pageId === 'settings') renderSettings();
+  // close mobile menu
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobileOverlay').classList.remove('open');
 }
 
-/* ════════════════════════════════
-   LOAD ARTICLES FROM faq.html
-════════════════════════════════ */
-async function loadArticlesFromFaq() {
-    try {
-        const resp = await fetch('faq.html?_nocache=' + Date.now());
-        const html = await resp.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', e => {
+    e.preventDefault();
+    navigate(el.dataset.page);
+  });
+});
 
-        allArticles = [];
-        originalStatuses = {};
+// Mobile sidebar
+document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('mobileOverlay').classList.add('open');
+});
+document.getElementById('mobileOverlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobileOverlay').classList.remove('open');
+});
 
-        const groups = doc.querySelectorAll('.article-group');
-        groups.forEach(group => {
-            const cat = group.dataset.cat || 'uncategorized';
-            const cards = group.querySelectorAll('.article-card');
-            cards.forEach(card => {
-                let id = card.id;
-                const h3 = card.querySelector('h3');
-                const questionRaw = h3 ? h3.textContent.trim() : '(no title)';
+function checkMobile() {
+  const isMobile = window.innerWidth <= 768;
+  document.getElementById('mobileTopbar').style.display = isMobile ? 'flex' : 'none';
+}
+window.addEventListener('resize', checkMobile);
 
-                // Generate slug ID if missing
-                if (!id) {
-                    id = questionRaw.toLowerCase()
-                        .replace(/[^a-z0-9\s-]/g, '')
-                        .trim()
-                        .replace(/\s+/g, '-')
-                        .substring(0, 60);
-                }
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function renderDashboard() {
+  loadArticles();
+  const tickets = getTickets();
+  const openTickets = tickets.filter(t => t.status === 'Open').length;
 
-                const defaultStatus = card.dataset.status || 'approved';
-                originalStatuses[id] = defaultStatus;
+  const counts = {
+    total: articles.length,
+    pending: articles.filter(a => a.status === 'pending').length,
+    published: articles.filter(a => a.status === 'published').length,
+    approved: articles.filter(a => a.status === 'approved').length,
+    draft: articles.filter(a => a.status === 'draft').length,
+    rejected: articles.filter(a => a.status === 'rejected').length,
+  };
 
-                // Get current status (localStorage override or default)
-                const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + id);
-                const effectiveStatus = storedStatus || defaultStatus;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Total Articles</span>
+        <div class="stat-icon green"><i class="fas fa-file-alt"></i></div>
+      </div>
+      <div class="stat-value">${counts.total}</div>
+      <div class="stat-delta">In knowledge base</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Pending Review</span>
+        <div class="stat-icon orange"><i class="fas fa-hourglass-half"></i></div>
+      </div>
+      <div class="stat-value">${counts.pending}</div>
+      <div class="stat-delta">Awaiting approval</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Published</span>
+        <div class="stat-icon green"><i class="fas fa-globe"></i></div>
+      </div>
+      <div class="stat-value">${counts.published}</div>
+      <div class="stat-delta">Live on portal</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Open Tickets</span>
+        <div class="stat-icon red"><i class="fas fa-ticket-alt"></i></div>
+      </div>
+      <div class="stat-value">${openTickets}</div>
+      <div class="stat-delta">Awaiting response</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Drafts</span>
+        <div class="stat-icon purple"><i class="fas fa-pencil-alt"></i></div>
+      </div>
+      <div class="stat-value">${counts.draft}</div>
+      <div class="stat-delta">Work in progress</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Approved</span>
+        <div class="stat-icon blue"><i class="fas fa-check-circle"></i></div>
+      </div>
+      <div class="stat-value">${counts.approved}</div>
+      <div class="stat-delta">Ready to publish</div>
+    </div>
+  `;
 
-                const summaryEl = card.querySelector('h3 + p') || card.querySelector('.article-trigger-left p');
-                const summary = summaryEl ? summaryEl.textContent.trim() : '';
+  // Status breakdown
+  const total = counts.total || 1;
+  document.getElementById('statusBreakdown').innerHTML = [
+    { label: 'Published', count: counts.published, color: '#00C805' },
+    { label: 'Approved', count: counts.approved, color: '#58a6ff' },
+    { label: 'Pending', count: counts.pending, color: '#e3b341' },
+    { label: 'Draft', count: counts.draft, color: '#8b949e' },
+    { label: 'Rejected', count: counts.rejected, color: '#f85149' },
+  ].map(s => `
+    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+      <div style="width:10px; height:10px; border-radius:50%; background:${s.color}; flex-shrink:0;"></div>
+      <div style="flex:1; font-size:0.85rem; color:#c9d1d9;">${s.label}</div>
+      <div style="font-size:0.85rem; font-weight:700; color:#f0f6fc;">${s.count}</div>
+      <div style="width:80px; height:4px; background:#21262d; border-radius:4px; overflow:hidden;">
+        <div style="height:100%; width:${Math.round((s.count/total)*100)}%; background:${s.color}; border-radius:4px;"></div>
+      </div>
+    </div>
+  `).join('');
 
-                allArticles.push({
-                    id,
-                    question: questionRaw,
-                    summary,
-                    cat,
-                    status: effectiveStatus,
-                    defaultStatus,
-                    isNew: false,
-                });
-            });
-        });
+  // Activity feed
+  const activity = getActivity();
+  const feed = document.getElementById('activityFeed');
+  if (activity.length === 0) {
+    feed.innerHTML = '<div class="activity-item"><div class="activity-text" style="color:#484f58;">No activity yet. Start managing content to see updates here.</div></div>';
+  } else {
+    feed.innerHTML = activity.slice(0,10).map(a => `
+      <div class="activity-item">
+        <div class="activity-dot ${a.color}"></div>
+        <div class="activity-text">${a.text}</div>
+        <div class="activity-time">${timeAgo(a.time)}</div>
+      </div>
+    `).join('');
+  }
 
-        // Inject new articles from localStorage
-        newArticles.forEach(na => {
-            const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + na.id) || na.status || 'pending';
-            allArticles.push({
-                id: na.id,
-                question: na.question,
-                summary: na.summary || '',
-                cat: na.category,
-                status: storedStatus,
-                defaultStatus: na.status,
-                isNew: true,
-            });
-            originalStatuses[na.id] = na.status;
-        });
+  // Inbox badge
+  const badge = document.getElementById('inboxBadge');
+  if (openTickets > 0) { badge.textContent = openTickets; badge.style.display = 'inline'; }
+  else { badge.style.display = 'none'; }
+}
 
-        populateCatFilter();
-        populateAddArticleCats();
-        renderTable();
-        updateStats();
-        renderCategories();
-        renderNewArticlesList();
-        checkPendingBanner();
+// ═══════════════════════════════════════════════════════════
+// CONTENT MANAGER
+// ═══════════════════════════════════════════════════════════
+function renderContentTable() {
+  loadArticles();
+  const statusFilter = document.getElementById('filterStatus').value;
+  const catFilter = document.getElementById('filterCat').value;
+  const search = document.getElementById('filterSearch').value.toLowerCase();
 
-    } catch (err) {
-        document.getElementById('articlesTableBody').innerHTML = `
-            <tr><td colspan="5">
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-triangle" style="color:#E53E3E;"></i>
-                    <p>Failed to load faq.html. Make sure you're running this via a local server.<br>
-                    <small style="color:#A0AEC0;">${err.message}</small></p>
-                </div>
-            </td></tr>`;
+  const filtered = articles.filter(a => {
+    const matchStatus = statusFilter === 'all' || a.status === statusFilter;
+    const matchCat = catFilter === 'all' || a.cat === catFilter;
+    const matchSearch = !search || a.question.toLowerCase().includes(search) || a.subcat.toLowerCase().includes(search);
+    return matchStatus && matchCat && matchSearch;
+  });
+
+  document.getElementById('contentCount').textContent = `${filtered.length} article${filtered.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('contentBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><i class="fas fa-search"></i><p>No articles match your filters.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((a, i) => {
+    const checked = selectedIds.has(a.id) ? 'checked' : '';
+    const rowClass = selectedIds.has(a.id) ? 'selected' : '';
+    return `
+      <tr class="${rowClass}" id="row-${a.id}">
+        <td class="col-check"><input type="checkbox" data-id="${a.id}" onchange="toggleRowSelect(this)" ${checked}></td>
+        <td class="col-num">${i + 1}</td>
+        <td><span class="cat-pill">${a.cat}</span></td>
+        <td style="color:#8b949e;">${a.subcat}</td>
+        <td style="color:#f0f6fc;">${truncate(a.question, 65)}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td class="col-actions">
+          <div style="display:flex; gap:0.35rem; align-items:center;">
+            <button class="btn btn-secondary btn-sm btn-icon" title="Edit" onclick="openArticleModal('${a.id}')"><i class="fas fa-pencil-alt"></i></button>
+            ${a.status !== 'approved' ? `<button class="btn btn-blue btn-sm" title="Approve" onclick="quickStatus('${a.id}','approved')">Approve</button>` : ''}
+            ${a.status !== 'published' ? `<button class="btn btn-success btn-sm" title="Publish" onclick="quickStatus('${a.id}','published')">Publish</button>` : ''}
+            ${a.status !== 'rejected' ? `<button class="btn btn-danger btn-sm" title="Reject" onclick="quickStatus('${a.id}','rejected')">Reject</button>` : ''}
+            <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteArticle('${a.id}')"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function applyFilter(status) {
+  document.getElementById('filterStatus').value = status;
+  renderContentTable();
+}
+
+function resetFilters() {
+  document.getElementById('filterStatus').value = 'all';
+  document.getElementById('filterCat').value = 'all';
+  document.getElementById('filterSearch').value = '';
+  renderContentTable();
+}
+
+function quickStatus(id, status) {
+  loadArticles();
+  const art = articles.find(a => a.id === id);
+  if (!art) return;
+  art.status = status;
+  saveArticleStatus(id, status);
+  logActivity(`Article "<b>${truncate(art.question, 40)}</b>" marked as <b>${status}</b>`, status === 'published' ? 'green' : status === 'approved' ? 'blue' : status === 'rejected' ? 'red' : 'orange');
+  showToast(`Article ${status} successfully.`);
+  renderContentTable();
+  updateInboxBadge();
+}
+
+function deleteArticle(id) {
+  if (!confirm('Delete this article? This cannot be undone.')) return;
+  loadArticles();
+  const art = articles.find(a => a.id === id);
+
+  // Remove from defaults display by setting status to 'rejected' in storage
+  // (we keep it in array but mark deleted)
+  const stored = getStoredStatuses();
+  stored[id] = '__deleted__';
+  saveStoredStatuses(stored);
+
+  // Remove from extras if it was an extra
+  const extras = JSON.parse(localStorage.getItem('ib_extra_articles') || '[]');
+  const newExtras = extras.filter(e => e.id !== id);
+  localStorage.setItem('ib_extra_articles', JSON.stringify(newExtras));
+
+  logActivity(`Article "${art ? truncate(art.question, 40) : id}" was deleted`, 'red');
+  showToast('Article deleted.', 'warning');
+  selectedIds.delete(id);
+  renderContentTable();
+}
+
+// Bulk select
+function toggleSelectAll(cb) {
+  const checkboxes = document.querySelectorAll('#contentBody input[type=checkbox]');
+  checkboxes.forEach(c => {
+    c.checked = cb.checked;
+    if (cb.checked) selectedIds.add(c.dataset.id);
+    else selectedIds.delete(c.dataset.id);
+  });
+  updateBulkBar();
+}
+
+function toggleRowSelect(cb) {
+  if (cb.checked) selectedIds.add(cb.dataset.id);
+  else selectedIds.delete(cb.dataset.id);
+  document.getElementById('row-' + cb.dataset.id).classList.toggle('selected', cb.checked);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const count = selectedIds.size;
+  document.getElementById('bulkCount').textContent = `${count} selected`;
+  bar.classList.toggle('visible', count > 0);
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('#contentBody input[type=checkbox]').forEach(c => c.checked = false);
+  document.getElementById('selectAll').checked = false;
+  updateBulkBar();
+}
+
+function bulkAction(status) {
+  if (selectedIds.size === 0) return;
+  const stored = getStoredStatuses();
+  selectedIds.forEach(id => { stored[id] = status; });
+  saveStoredStatuses(stored);
+  logActivity(`Bulk action: ${selectedIds.size} articles set to <b>${status}</b>`, status === 'published' ? 'green' : status === 'approved' ? 'blue' : 'red');
+  showToast(`${selectedIds.size} articles ${status}.`);
+  clearSelection();
+  renderContentTable();
+}
+
+// ─── Article Modal ───
+function openArticleModal(id) {
+  const modal = document.getElementById('articleModal');
+  document.getElementById('articleModalTitle').textContent = id ? 'Edit Article' : 'Add New Article';
+  document.getElementById('editArticleId').value = id || '';
+
+  if (id) {
+    loadArticles();
+    const art = articles.find(a => a.id === id);
+    if (art) {
+      document.getElementById('editCat').value = art.cat;
+      document.getElementById('editSubcat').value = art.subcat;
+      document.getElementById('editQuestion').value = art.question;
+      document.getElementById('editAnswer').value = art.answer || '';
+      document.getElementById('editStatus').value = art.status;
     }
+  } else {
+    document.getElementById('editCat').value = 'getting-started';
+    document.getElementById('editSubcat').value = '';
+    document.getElementById('editQuestion').value = '';
+    document.getElementById('editAnswer').value = '';
+    document.getElementById('editStatus').value = 'draft';
+  }
+
+  modal.classList.add('open');
 }
 
-/* ════════════════════════════════
-   TABLE RENDER
-════════════════════════════════ */
-function renderTable() {
-    const query = (document.getElementById('tableSearch').value || '').toLowerCase();
-    const statusF = document.getElementById('statusFilter').value;
-    const catF = document.getElementById('catFilter').value;
-
-    filteredArticles = allArticles.filter(a => {
-        const matchQ = !query || a.question.toLowerCase().includes(query) || a.id.toLowerCase().includes(query);
-        const matchS = statusF === 'all' || a.status === statusF;
-        const matchC = catF === 'all' || a.cat === catF;
-        return matchQ && matchS && matchC;
-    });
-
-    const tbody = document.getElementById('articlesTableBody');
-    document.getElementById('tableCount').textContent = `${filteredArticles.length} of ${allArticles.length} articles`;
-
-    if (filteredArticles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">
-            <div class="empty-state">
-                <i class="fas fa-search"></i>
-                <p>No articles match your current filters.</p>
-            </div>
-        </td></tr>`;
-        return;
-    }
-
-    tbody.innerHTML = filteredArticles.map((a, idx) => {
-        const catMeta = CAT_META[a.cat] || { label: a.cat, icon: 'fa-circle' };
-        const isChecked = a.status === 'approved' ? 'checked' : '';
-        const questionDisplay = a.question.length > 65 ? a.question.substring(0, 65) + '…' : a.question;
-        const newBadge = a.isNew ? `<span class="new-badge"><i class="fas fa-sparkles"></i> NEW</span>` : '';
-
-        return `
-        <tr>
-            <td class="col-num">${idx + 1}</td>
-            <td class="col-question">
-                <div class="question-text">${escapeHtml(questionDisplay)}${newBadge}</div>
-                <div class="question-id">#${a.id}</div>
-            </td>
-            <td class="col-cat">
-                <span class="cat-pill" data-catcolor="${a.cat}">${escapeHtml(catMeta.label)}</span>
-            </td>
-            <td class="col-status">
-                <div class="toggle-wrap">
-                    <label class="toggle">
-                        <input type="checkbox" ${isChecked}
-                            data-id="${a.id}"
-                            onchange="toggleStatus(this, '${a.id}')">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span class="toggle-label" id="status-label-${a.id}" style="font-size:0.75rem; font-weight:600; color:${a.status === 'approved' ? '#38A169' : '#E53E3E'};">
-                        ${a.status === 'approved' ? 'Approved' : 'Pending'}
-                    </span>
-                </div>
-            </td>
-            <td class="col-actions">
-                <div class="action-btns">
-                    <button class="action-btn edit" title="Edit" onclick="openEditModal('${a.id}')">
-                        <i class="fas fa-pencil"></i>
-                    </button>
-                    <a class="action-btn preview" title="Preview on site" href="faq.html#${a.id}" target="_blank" style="text-decoration:none;">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    ${a.isNew ? `<button class="action-btn delete" title="Delete" onclick="deleteNewArticle('${a.id}')"><i class="fas fa-trash"></i></button>` : ''}
-                </div>
-            </td>
-        </tr>`;
-    }).join('');
+function closeArticleModal() {
+  document.getElementById('articleModal').classList.remove('open');
 }
 
-/* ════════════════════════════════
-   TOGGLE STATUS
-════════════════════════════════ */
-function toggleStatus(checkbox, id) {
-    const newStatus = checkbox.checked ? 'approved' : 'pending';
-    localStorage.setItem(LS_STATUS_PREFIX + id, newStatus);
+function saveArticle() {
+  const id = document.getElementById('editArticleId').value;
+  const cat = document.getElementById('editCat').value;
+  const subcat = document.getElementById('editSubcat').value.trim();
+  const question = document.getElementById('editQuestion').value.trim();
+  const answer = document.getElementById('editAnswer').value.trim();
+  const status = document.getElementById('editStatus').value;
 
-    // Update in-memory state
-    const art = allArticles.find(a => a.id === id);
-    if (art) art.status = newStatus;
+  if (!question) { showToast('Question is required.', 'error'); return; }
 
-    // Update label
-    const label = document.getElementById('status-label-' + id);
-    if (label) {
-        label.textContent = newStatus === 'approved' ? 'Approved' : 'Pending';
-        label.style.color = newStatus === 'approved' ? '#38A169' : '#E53E3E';
-    }
+  loadArticles();
 
-    updateStats();
-    checkPendingBanner();
-    showToast(newStatus === 'approved' ? 'Article approved' : 'Article set to pending', 'success');
-}
+  if (id) {
+    // Update existing
+    const stored = getStoredStatuses();
+    stored[id] = status;
+    saveStoredStatuses(stored);
 
-/* ════════════════════════════════
-   STATS
-════════════════════════════════ */
-function updateStats() {
-    const total = allArticles.length;
-    const approved = allArticles.filter(a => a.status === 'approved').length;
-    const pending = total - approved;
-    const cats = new Set(allArticles.map(a => a.cat)).size;
-
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-approved').textContent = approved;
-    document.getElementById('stat-pending').textContent = pending;
-    document.getElementById('stat-cats').textContent = cats;
-}
-
-/* ════════════════════════════════
-   PENDING BANNER
-════════════════════════════════ */
-function checkPendingBanner() {
-    let changed = 0;
-    allArticles.forEach(a => {
-        const stored = localStorage.getItem(LS_STATUS_PREFIX + a.id);
-        if (stored && stored !== a.defaultStatus) changed++;
-    });
-    unsavedChanges = changed;
-    const banner = document.getElementById('pendingBanner');
-    if (changed > 0) {
-        banner.classList.remove('hidden');
-        document.getElementById('pendingBannerText').textContent =
-            `${changed} article${changed > 1 ? 's have' : ' has'} status overrides from their original values.`;
-    } else {
-        banner.classList.add('hidden');
-    }
-}
-
-/* ════════════════════════════════
-   FILTER DROPDOWNS
-════════════════════════════════ */
-function populateCatFilter() {
-    const cats = [...new Set(allArticles.map(a => a.cat))].sort();
-    const sel = document.getElementById('catFilter');
-    sel.innerHTML = '<option value="all">All Categories</option>';
-    cats.forEach(c => {
-        const meta = CAT_META[c] || { label: c };
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = meta.label;
-        sel.appendChild(opt);
-    });
-}
-
-function populateAddArticleCats() {
-    const sel = document.getElementById('newArticleCat');
-    sel.innerHTML = '<option value="">— Select Category —</option>';
-    Object.entries(CAT_META).forEach(([key, meta]) => {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = meta.label;
-        sel.appendChild(opt);
-    });
-}
-
-/* ════════════════════════════════
-   SEARCH + FILTER EVENTS
-════════════════════════════════ */
-document.getElementById('tableSearch').addEventListener('input', renderTable);
-document.getElementById('statusFilter').addEventListener('change', renderTable);
-document.getElementById('catFilter').addEventListener('change', renderTable);
-
-/* ════════════════════════════════
-   NAVIGATION
-════════════════════════════════ */
-const viewTitles = {
-    'content-manager': { title: 'Content Manager', sub: 'Manage all Knowledge Base articles and their publish status' },
-    'add-article':     { title: 'Add Article',     sub: 'Create and save a new article to the Knowledge Base' },
-    'categories':      { title: 'Categories',      sub: 'Enable or disable article categories on the public portal' },
-    'settings':        { title: 'Settings',        sub: 'Admin password, data reset, and system configuration' },
-};
-
-document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        // Update nav active state
-        document.querySelectorAll('.nav-item[data-view]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        // Switch view
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById('view-' + view).classList.add('active');
-        // Update topbar
-        const meta = viewTitles[view] || { title: view, sub: '' };
-        document.getElementById('topbarTitle').textContent = meta.title;
-        document.getElementById('topbarBreadcrumb').textContent = meta.sub;
-        // Show/hide export in topbar
-        document.getElementById('exportBtn').style.display = view === 'content-manager' ? '' : 'none';
-    });
-});
-
-/* ════════════════════════════════
-   EXPORT CONFIG
-════════════════════════════════ */
-function exportConfig() {
-    const overrides = {};
-    allArticles.forEach(a => {
-        const stored = localStorage.getItem(LS_STATUS_PREFIX + a.id);
-        if (stored) overrides[a.id] = stored;
-    });
-
-    const config = {
-        exportedAt: new Date().toISOString(),
-        statusOverrides: overrides,
-        disabledCategories: categoryDisabled,
-        newArticles: newArticles,
-        totalArticles: allArticles.length,
-        approvedCount: allArticles.filter(a => a.status === 'approved').length,
-        pendingCount: allArticles.filter(a => a.status === 'pending').length,
-    };
-
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ibulls-cms-config-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Config exported successfully', 'success');
-}
-
-document.getElementById('exportBtn').addEventListener('click', exportConfig);
-document.getElementById('exportConfigBtn2').addEventListener('click', exportConfig);
-
-/* ════════════════════════════════
-   RESET CHANGES
-════════════════════════════════ */
-document.getElementById('resetChangesBtn').addEventListener('click', () => {
-    if (!confirm('Reset all status overrides to their defaults? This cannot be undone.')) return;
-    allArticles.forEach(a => {
-        localStorage.removeItem(LS_STATUS_PREFIX + a.id);
-        a.status = a.defaultStatus;
-    });
-    renderTable();
-    updateStats();
-    checkPendingBanner();
-    showToast('All status overrides cleared', 'success');
-});
-
-/* ════════════════════════════════
-   EDIT MODAL
-════════════════════════════════ */
-function openEditModal(id) {
-    const art = allArticles.find(a => a.id === id);
-    if (!art) return;
-
-    document.getElementById('editArticleId').value = id;
-    document.getElementById('editArticleIdDisplay').value = id;
-    document.getElementById('editArticleCat').value = (CAT_META[art.cat] || { label: art.cat }).label;
-    document.getElementById('editArticleQuestion').value = art.question;
-
-    document.querySelectorAll('input[name="editStatus"]').forEach(r => {
-        r.checked = r.value === art.status;
-    });
-
-    document.getElementById('editModal').classList.add('open');
-}
-
-document.getElementById('editModalClose').addEventListener('click', () => {
-    document.getElementById('editModal').classList.remove('open');
-});
-document.getElementById('editModalCancel').addEventListener('click', () => {
-    document.getElementById('editModal').classList.remove('open');
-});
-document.getElementById('editModal').addEventListener('click', e => {
-    if (e.target === document.getElementById('editModal'))
-        document.getElementById('editModal').classList.remove('open');
-});
-
-document.getElementById('editModalSave').addEventListener('click', () => {
-    const id = document.getElementById('editArticleId').value;
-    const newQ = document.getElementById('editArticleQuestion').value.trim();
-    const newStatus = document.querySelector('input[name="editStatus"]:checked')?.value || 'approved';
-
-    if (!newQ) { showToast('Question cannot be empty', 'error'); return; }
-
-    const art = allArticles.find(a => a.id === id);
-    if (!art) return;
-
-    art.question = newQ;
-    art.status = newStatus;
-    localStorage.setItem(LS_STATUS_PREFIX + id, newStatus);
-
-    // If it's a new article, update in localStorage too
-    if (art.isNew) {
-        const idx = newArticles.findIndex(n => n.id === id);
-        if (idx !== -1) {
-            newArticles[idx].question = newQ;
-            newArticles[idx].status = newStatus;
-            localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-        }
+    // Update extras if it was one
+    const extras = JSON.parse(localStorage.getItem('ib_extra_articles') || '[]');
+    const idx = extras.findIndex(e => e.id === id);
+    if (idx !== -1) {
+      extras[idx] = { id, cat, subcat, question, answer, status };
+      localStorage.setItem('ib_extra_articles', JSON.stringify(extras));
     }
 
-    document.getElementById('editModal').classList.remove('open');
-    renderTable();
-    updateStats();
-    checkPendingBanner();
-    renderNewArticlesList();
-    showToast('Article updated', 'success');
+    logActivity(`Article "<b>${truncate(question, 40)}</b>" updated to <b>${status}</b>`, 'blue');
+    showToast('Article updated successfully.');
+  } else {
+    // Create new
+    const newId = slugify(question).slice(0, 40) + '-' + Date.now().toString(36);
+    const newArt = { id: newId, cat, subcat, question, answer, status };
+    const extras = JSON.parse(localStorage.getItem('ib_extra_articles') || '[]');
+    extras.push(newArt);
+    localStorage.setItem('ib_extra_articles', JSON.stringify(extras));
+
+    const stored = getStoredStatuses();
+    stored[newId] = status;
+    saveStoredStatuses(stored);
+
+    logActivity(`New article "<b>${truncate(question, 40)}</b>" created as <b>${status}</b>`, 'green');
+    showToast('Article created successfully.');
+  }
+
+  closeArticleModal();
+  renderContentTable();
+  updateInboxBadge();
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUPPORT INBOX
+// ═══════════════════════════════════════════════════════════
+function renderInbox() {
+  const tickets = getTickets();
+  const sFilter = document.getElementById('inboxFilterStatus').value;
+  const cFilter = document.getElementById('inboxFilterCat').value;
+  const pFilter = document.getElementById('inboxFilterPriority').value;
+  const search = document.getElementById('inboxSearch').value.toLowerCase();
+
+  const filtered = tickets.filter(t => {
+    const matchS = sFilter === 'all' || t.status === sFilter;
+    const matchC = cFilter === 'all' || t.category === cFilter;
+    const matchP = pFilter === 'all' || t.priority === pFilter;
+    const matchQ = !search || (t.subject||'').toLowerCase().includes(search) || (t.name||'').toLowerCase().includes(search);
+    return matchS && matchC && matchP && matchQ;
+  });
+
+  const openCount = tickets.filter(t => t.status === 'Open').length;
+  document.getElementById('inboxStats').textContent = `${filtered.length} shown · ${openCount} open total`;
+
+  const tbody = document.getElementById('inboxBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><i class="fas fa-inbox"></i><p>No tickets found.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(t => {
+    const priority = t.priority || 'Medium';
+    const date = t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-IN') : '—';
+    return `
+      <tr class="ticket-row" onclick="openTicket('${t.id}')">
+        <td class="ticket-id">${t.id}</td>
+        <td>
+          <div class="user-cell-name">${t.name || 'Unknown'}</div>
+          <div class="user-cell-email">${t.email || ''}</div>
+        </td>
+        <td>${t.subject || '—'}</td>
+        <td><span class="cat-pill">${t.category || '—'}</span></td>
+        <td>${statusBadge('priority-' + priority.toLowerCase()).replace('priority-', '')}</td>
+        <td>${statusBadge(t.status ? t.status.toLowerCase() : 'open')}</td>
+        <td style="color:#8b949e; font-size:0.8rem;">${date}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openTicket(id) {
+  const tickets = getTickets();
+  const t = tickets.find(tk => tk.id === id);
+  if (!t) return;
+  currentTicketId = id;
+
+  const date = t.timestamp ? new Date(t.timestamp).toLocaleString('en-IN') : '—';
+  const priority = t.priority || 'Medium';
+
+  document.getElementById('ticketModalTitle').textContent = `Ticket ${t.id}`;
+  document.getElementById('ticketModalBody').innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
+      <div style="background:#0d1117; padding:1rem; border-radius:8px; border:1px solid #21262d;">
+        <div style="font-size:0.7rem; color:#8b949e; text-transform:uppercase; font-weight:700; margin-bottom:0.4rem;">Subject</div>
+        <div style="font-weight:600; color:#f0f6fc;">${t.subject || '—'}</div>
+      </div>
+      <div style="background:#0d1117; padding:1rem; border-radius:8px; border:1px solid #21262d;">
+        <div style="font-size:0.7rem; color:#8b949e; text-transform:uppercase; font-weight:700; margin-bottom:0.4rem;">Status</div>
+        ${statusBadge(t.status ? t.status.toLowerCase() : 'open')}
+      </div>
+      <div style="background:#0d1117; padding:1rem; border-radius:8px; border:1px solid #21262d;">
+        <div style="font-size:0.7rem; color:#8b949e; text-transform:uppercase; font-weight:700; margin-bottom:0.4rem;">User</div>
+        <div style="font-weight:600; color:#f0f6fc;">${t.name || '—'}</div>
+        <div style="font-size:0.8rem; color:#8b949e;">${t.email || ''}</div>
+      </div>
+      <div style="background:#0d1117; padding:1rem; border-radius:8px; border:1px solid #21262d;">
+        <div style="font-size:0.7rem; color:#8b949e; text-transform:uppercase; font-weight:700; margin-bottom:0.4rem;">Category / Priority</div>
+        <div><span class="cat-pill">${t.category || '—'}</span> &nbsp; ${statusBadge('priority-' + priority.toLowerCase()).replace('priority-', '')}</div>
+      </div>
+    </div>
+    <div style="background:#0d1117; padding:1rem; border-radius:8px; border:1px solid #21262d; margin-bottom:1rem;">
+      <div style="font-size:0.7rem; color:#8b949e; text-transform:uppercase; font-weight:700; margin-bottom:0.5rem;">Description</div>
+      <p style="line-height:1.7; color:#c9d1d9; font-size:0.9rem; white-space:pre-line;">${t.description || 'No description provided.'}</p>
+    </div>
+    <div style="font-size:0.75rem; color:#484f58; text-align:right;">Submitted: ${date}</div>
+  `;
+
+  const footer = document.getElementById('ticketModalFooter');
+  footer.innerHTML = `
+    <button class="btn btn-secondary" onclick="closeTicketModal()">Close</button>
+    ${t.status === 'Open' ? `<button class="btn btn-warning" onclick="escalateTicket('${id}')"><i class="fas fa-arrow-up"></i> Escalate</button>` : ''}
+    ${t.status !== 'Closed' ? `<button class="btn btn-primary" onclick="resolveTicket('${id}')"><i class="fas fa-check"></i> Mark as Resolved</button>` : ''}
+  `;
+
+  document.getElementById('ticketModal').classList.add('open');
+}
+
+function closeTicketModal() { document.getElementById('ticketModal').classList.remove('open'); }
+
+function resolveTicket(id) {
+  const tickets = getTickets();
+  const idx = tickets.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    tickets[idx].status = 'Closed';
+    saveTickets(tickets);
+    logActivity(`Ticket <b>${id}</b> marked as Resolved`, 'green');
+    showToast('Ticket resolved.');
+    closeTicketModal();
+    renderInbox();
+    updateInboxBadge();
+  }
+}
+
+function escalateTicket(id) {
+  const tickets = getTickets();
+  const idx = tickets.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    tickets[idx].status = 'Escalated';
+    saveTickets(tickets);
+    logActivity(`Ticket <b>${id}</b> escalated`, 'orange');
+    showToast('Ticket escalated.', 'warning');
+    closeTicketModal();
+    renderInbox();
+    updateInboxBadge();
+  }
+}
+
+function updateInboxBadge() {
+  const openCount = getTickets().filter(t => t.status === 'Open').length;
+  const badge = document.getElementById('inboxBadge');
+  if (openCount > 0) { badge.textContent = openCount; badge.style.display = 'inline'; }
+  else { badge.style.display = 'none'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════
+function renderSettings() {
+  const visibility = getCatVisibility();
+  document.getElementById('categoryToggles').innerHTML = CATEGORIES.map(cat => {
+    const enabled = visibility[cat.id] !== false; // default visible
+    return `
+      <div class="settings-row">
+        <div class="settings-row-info">
+          <div class="settings-row-label">${cat.label}</div>
+          <div class="settings-row-desc">Category: <code style="background:#21262d; padding:0.1rem 0.4rem; border-radius:3px; font-size:0.75rem;">${cat.id}</code></div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleCategory('${cat.id}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleCategory(catId, enabled) {
+  const vis = getCatVisibility();
+  vis[catId] = enabled;
+  saveCatVisibility(vis);
+  try { window.dispatchEvent(new CustomEvent('faqCatVisibilityUpdated', { detail: vis })); } catch {}
+  showToast(`Category "${catId}" ${enabled ? 'shown' : 'hidden'} on portal.`);
+  logActivity(`Category <b>${catId}</b> ${enabled ? 'enabled' : 'disabled'} on portal`, enabled ? 'green' : 'red');
+}
+
+function changePassword() {
+  const current = document.getElementById('currentPwd').value;
+  const newP = document.getElementById('newPwd').value;
+  const confirm = document.getElementById('confirmPwd').value;
+
+  if (current !== getAdminPassword()) { showToast('Current password is incorrect.', 'error'); return; }
+  if (newP.length < 6) { showToast('New password must be at least 6 characters.', 'error'); return; }
+  if (newP !== confirm) { showToast('Passwords do not match.', 'error'); return; }
+
+  localStorage.setItem(CORRECT_PASSWORD_KEY, newP);
+  showToast('Password updated successfully.');
+  logActivity('Admin password was changed', 'orange');
+  document.getElementById('currentPwd').value = '';
+  document.getElementById('newPwd').value = '';
+  document.getElementById('confirmPwd').value = '';
+}
+
+function resetContentStatus() {
+  if (!confirm('Reset all article statuses to defaults? This will remove any overrides.')) return;
+  localStorage.removeItem(CONTENT_STATUS_KEY);
+  logActivity('Content statuses reset to defaults', 'orange');
+  showToast('Content statuses reset.', 'warning');
+  renderDashboard();
+}
+
+function clearClosedTickets() {
+  if (!confirm('Remove all closed/resolved tickets?')) return;
+  const tickets = getTickets().filter(t => t.status === 'Open' || t.status === 'Escalated');
+  saveTickets(tickets);
+  logActivity(`Closed tickets cleared`, 'orange');
+  showToast('Closed tickets removed.', 'warning');
+  updateInboxBadge();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLOSE MODALS ON OVERLAY CLICK
+// ═══════════════════════════════════════════════════════════
+document.getElementById('articleModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('articleModal')) closeArticleModal();
+});
+document.getElementById('ticketModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('ticketModal')) closeTicketModal();
 });
 
-/* ════════════════════════════════
-   ADD ARTICLE
-════════════════════════════════ */
-document.getElementById('saveArticleBtn').addEventListener('click', saveNewArticle);
-document.getElementById('clearFormBtn').addEventListener('click', clearArticleForm);
-
-function saveNewArticle() {
-    const cat = document.getElementById('newArticleCat').value;
-    const question = document.getElementById('newArticleQuestion').value.trim();
-    const summary = document.getElementById('newArticleSummary').value.trim();
-    const answer = document.getElementById('newArticleAnswer').value.trim();
-    const status = document.querySelector('input[name="newArticleStatus"]:checked')?.value || 'pending';
-
-    if (!cat) { showToast('Please select a category', 'error'); return; }
-    if (!question) { showToast('Question / Title is required', 'error'); return; }
-    if (!answer) { showToast('Answer / Content is required', 'error'); return; }
-
-    const id = 'new-' + question.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .substring(0, 50) + '-' + Date.now().toString(36);
-
-    const article = { id, category: cat, question, summary, answer, status, createdAt: new Date().toISOString() };
-    newArticles.push(article);
-    localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-    localStorage.setItem(LS_STATUS_PREFIX + id, status);
-
-    // Add to allArticles — use `cat` (not `category`) here
-    allArticles.push({
-        id, question, summary, cat, status,
-        defaultStatus: status, isNew: true,
-    });
-
-    clearArticleForm();
-    const succ = document.getElementById('formSuccess');
-    succ.classList.add('visible');
-    setTimeout(() => succ.classList.remove('visible'), 3500);
-
-    renderTable();
-    renderNewArticlesList();
-    updateStats();
-    checkPendingBanner();
-    showToast('Article saved successfully', 'success');
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+function init() {
+  checkMobile();
+  loadArticles();
+  renderDashboard();
+  updateInboxBadge();
 }
 
-function clearArticleForm() {
-    document.getElementById('newArticleCat').value = '';
-    document.getElementById('newArticleQuestion').value = '';
-    document.getElementById('newArticleSummary').value = '';
-    document.getElementById('newArticleAnswer').value = '';
-    document.querySelector('input[name="newArticleStatus"][value="pending"]').checked = true;
+// Auto-login if session exists
+if (checkSession()) {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appLayout').classList.remove('hidden');
+  init();
 }
-
-function renderNewArticlesList() {
-    const container = document.getElementById('newArticlesList');
-    const countEl = document.getElementById('newArticlesCount');
-    countEl.textContent = `${newArticles.length} article${newArticles.length !== 1 ? 's' : ''}`;
-
-    if (newArticles.length === 0) {
-        container.innerHTML = `<div class="empty-state">
-            <i class="fas fa-file-circle-plus"></i>
-            <p>No new articles added yet.</p>
-        </div>`;
-        return;
-    }
-
-    container.innerHTML = newArticles.map(a => {
-        const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + a.id) || a.status;
-        const catMeta = CAT_META[a.category] || { label: a.category };
-        return `<div style="padding:0.875rem; border-bottom:1px solid #EDF2F7; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
-            <div style="flex:1;">
-                <div style="font-size:0.875rem; font-weight:600; color:#1A202C;">${escapeHtml(a.question)}</div>
-                <div style="font-size:0.7rem; color:#A0AEC0; margin-top:0.25rem;">#${a.id} · <span class="cat-pill" data-catcolor="${a.category}">${escapeHtml(catMeta.label)}</span></div>
-            </div>
-            <span style="font-size:0.75rem; font-weight:700; color:${storedStatus === 'approved' ? '#38A169' : '#E53E3E'}; flex-shrink:0;">
-                ${storedStatus === 'approved' ? '● Approved' : '○ Pending'}
-            </span>
-            <button class="btn btn-sm btn-outline" onclick="deleteNewArticle('${a.id}')">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>`;
-    }).join('');
-}
-
-function deleteNewArticle(id) {
-    if (!confirm('Delete this article? This cannot be undone.')) return;
-    newArticles = newArticles.filter(a => a.id !== id);
-    localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-    localStorage.removeItem(LS_STATUS_PREFIX + id);
-    // Remove from allArticles
-    const idx = allArticles.findIndex(a => a.id === id);
-    if (idx !== -1) allArticles.splice(idx, 1);
-    renderTable();
-    renderNewArticlesList();
-    updateStats();
-    checkPendingBanner();
-    showToast('Article deleted', 'success');
-}
-
-/* ════════════════════════════════
-   CATEGORIES VIEW
-════════════════════════════════ */
-function renderCategories() {
-    const catCounts = {};
-    allArticles.forEach(a => {
-        catCounts[a.cat] = (catCounts[a.cat] || 0) + 1;
-    });
-
-    const grid = document.getElementById('categoriesGrid');
-    const allCats = Object.keys(CAT_META);
-
-    grid.innerHTML = allCats.map(cat => {
-        const meta = CAT_META[cat];
-        const count = catCounts[cat] || 0;
-        const isEnabled = categoryDisabled[cat] !== false;
-
-        return `<div class="cat-card">
-            <div class="cat-card-header">
-                <div>
-                    <div class="cat-card-name">${escapeHtml(meta.label)}</div>
-                    <div class="cat-card-meta"><code style="font-size:0.7rem;">${cat}</code></div>
-                </div>
-                <div class="cat-card-count">${count} <span>articles</span></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="cat-enabled-badge ${isEnabled ? 'enabled' : 'disabled'}">
-                    <i class="fas fa-${isEnabled ? 'check-circle' : 'times-circle'}"></i>
-                    ${isEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <label class="toggle" title="${isEnabled ? 'Disable' : 'Enable'} this category on public site">
-                    <input type="checkbox" ${isEnabled ? 'checked' : ''}
-                        onchange="toggleCategory('${cat}', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function toggleCategory(cat, enabled) {
-    if (enabled) {
-        delete categoryDisabled[cat];
-    } else {
-        categoryDisabled[cat] = false;
-    }
-    localStorage.setItem(LS_CATEGORIES, JSON.stringify(categoryDisabled));
-    renderCategories();
-    showToast(`Category "${CAT_META[cat]?.label || cat}" ${enabled ? 'enabled' : 'disabled'}`, 'success');
-}
-
-/* ════════════════════════════════
-   SETTINGS
-════════════════════════════════ */
-document.getElementById('changePassBtn').addEventListener('click', () => {
-    const np = document.getElementById('newPassword').value;
-    const cp = document.getElementById('confirmPassword').value;
-    const msg = document.getElementById('passMsg');
-
-    if (!np) { msg.innerHTML = '<span style="color:#E53E3E;">Password cannot be empty.</span>'; return; }
-    if (np !== cp) { msg.innerHTML = '<span style="color:#E53E3E;">Passwords do not match.</span>'; return; }
-    if (np.length < 6) { msg.innerHTML = '<span style="color:#E53E3E;">Password must be at least 6 characters.</span>'; return; }
-
-    localStorage.setItem(LS_PASS, np);
-    document.getElementById('newPassword').value = '';
-    document.getElementById('confirmPassword').value = '';
-    msg.innerHTML = '<span style="color:#38A169;"><i class="fas fa-check-circle"></i> Password updated successfully.</span>';
-    showToast('Password updated', 'success');
-});
-
-document.getElementById('resetAllBtn').addEventListener('click', () => {
-    if (!confirm('This will clear ALL CMS data including status overrides, new articles, and category settings. Are you sure?')) return;
-    if (!confirm('Last chance — this cannot be undone. Proceed?')) return;
-
-    // Clear all cms_ keys
-    Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('cms_') || key.startsWith(LS_STATUS_PREFIX)) {
-            localStorage.removeItem(key);
-        }
-    });
-
-    newArticles = [];
-    categoryDisabled = {};
-    showToast('All CMS data reset to defaults', 'success');
-    initDashboard();
-});
-
-/* ════════════════════════════════
-   TOAST
-════════════════════════════════ */
-let toastTimer = null;
-function showToast(msg, type = 'success') {
-    const toast = document.getElementById('toast');
-    const icon = toast.querySelector('i');
-    document.getElementById('toastMsg').textContent = msg;
-
-    icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
-    toast.className = 'toast ' + type;
-    toast.classList.add('show');
-
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
-}
-
-/* ════════════════════════════════
-   UTILITY
-════════════════════════════════ */
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;');
-}
-
-/* ════════════════════════════════
-   INIT
-════════════════════════════════ */
-checkAuth();
 </script>
 </body>
 </html>
