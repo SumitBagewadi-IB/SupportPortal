@@ -43,18 +43,3 @@ jobs:
             --delete
           echo "✅ UAT deploy complete"
 
-      - name: Invalidate CloudFront cache (Production)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_PROD }} \
-            --paths "/*"
-          echo "✅ Production CDN cache cleared"
-
-      - name: Invalidate CloudFront cache (UAT)
-        if: github.ref == 'refs/heads/uat'
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_UAT }} \
-            --paths "/*"
-          echo "✅ UAT CDN cache cleared"
