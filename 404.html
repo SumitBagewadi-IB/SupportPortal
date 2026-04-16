@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function () {
+            const theme = localStorage.getItem('theme') || 'light';
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found | Indiabulls Securities Support</title>
+    <meta name="description" content="The page you're looking for couldn't be found. Return to the Indiabulls Securities Help Center.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .error-page {
+            min-height: 70vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 1rem;
+            text-align: center;
+        }
+
+        .error-inner {
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .error-code {
+            font-size: 7rem;
+            font-weight: 900;
+            line-height: 1;
+            background: linear-gradient(135deg, #00C805 0%, #0052CC 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -4px;
+        }
+
+        .error-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+
+        .error-desc {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 2.5rem;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .error-icon-wrap {
+            width: 90px;
+            height: 90px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: var(--text-muted);
+            margin: 0 auto 2rem;
+        }
+
+        .quick-links {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .quick-link-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            color: var(--text-mid);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .quick-link-chip:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- NAV -->
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">
+                <img src="logo.svg" alt="Indiabulls Securities" class="logo-light">
+                <img src="logo-dark.svg" alt="Indiabulls Securities" class="logo-dark">
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="faq.html">Knowledge Base</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+            </ul>
+            <a href="#" class="btn-signin">Sign In</a>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 404 CONTENT -->
+    <main>
+        <div class="error-page">
+            <div class="error-inner">
+                <div class="error-icon-wrap">
+                    <i class="fas fa-map-pin"></i>
+                </div>
+
+                <div class="error-code">404</div>
+                <h1 class="error-title">Page not found</h1>
+                <p class="error-desc">
+                    Oops! The page you're looking for has moved or doesn't exist.<br>
+                    Try searching our Help Center or use the links below to find what you need.
+                </p>
+
+                <div class="error-actions">
+                    <a href="index.html" class="btn-primary" id="go-home-btn">
+                        <i class="fas fa-house"></i> Go to Home
+                    </a>
+                    <a href="contact.html" class="btn-secondary" id="contact-support-btn">
+                        <i class="fas fa-headset"></i> Contact Support
+                    </a>
+                </div>
+
+                <div class="quick-links">
+                    <a href="faq.html?cat=trading" class="quick-link-chip" id="ql-trading">
+                        <i class="fas fa-chart-line"></i> Trading
+                    </a>
+                    <a href="faq.html?cat=funds" class="quick-link-chip" id="ql-funds">
+                        <i class="fas fa-wallet"></i> Funds
+                    </a>
+                    <a href="faq.html?cat=account-opening" class="quick-link-chip" id="ql-account">
+                        <i class="fas fa-id-card"></i> Account Opening
+                    </a>
+                    <a href="faq.html?cat=charges" class="quick-link-chip" id="ql-charges">
+                        <i class="fas fa-tags"></i> Charges
+                    </a>
+                    <a href="my-tickets.html" class="quick-link-chip" id="ql-tickets">
+                        <i class="fas fa-ticket"></i> My Tickets
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                <p>&copy; 2025 Indiabulls Securities Limited. All rights reserved. | SEBI Reg. No.: INZ000002809</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
