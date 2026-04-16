@@ -1164,6 +1164,7 @@ const LS_PASS = 'ibulls_admin_pass';
 const LS_STATUS_PREFIX = 'cms_status_';
 const LS_CATEGORIES = 'cms_categories';
 const LS_NEW_ARTICLES = 'cms_new_articles';
+const API_BASE = 'https://un1k0vx0ij.execute-api.ap-south-1.amazonaws.com/uat';
 
 /* ── STATE ── */
 let allArticles = []; // parsed from faq.html
@@ -1258,6 +1259,39 @@ function initDashboard() {
     categoryDisabled = JSON.parse(localStorage.getItem(LS_CATEGORIES) || '{}');
     newArticles = JSON.parse(localStorage.getItem(LS_NEW_ARTICLES) || '[]');
     loadArticlesFromFaq();
+    loadArticlesFromDynamoDB();
+}
+
+/* ════════════════════════════════
+   LOAD ARTICLES FROM DYNAMODB
+════════════════════════════════ */
+async function loadArticlesFromDynamoDB() {
+    try {
+        const resp = await fetch(API_BASE + '/faq');
+        if (!resp.ok) return;
+        const items = await resp.json();
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        // Merge DynamoDB articles into newArticles (avoid duplicates)
+        const existingIds = new Set(newArticles.map(a => a.id));
+        let added = 0;
+        items.forEach(item => {
+            if (!existingIds.has(item.id)) {
+                newArticles.push(item);
+                existingIds.add(item.id);
+                added++;
+            }
+        });
+
+        if (added > 0) {
+            localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
+            renderNewArticlesList();
+            updateStats();
+            showToast(`Synced ${added} article(s) from DynamoDB`, 'success');
+        }
+    } catch (e) {
+        // Silently fail — DynamoDB is optional enhancement
+    }
 }
 
 /* ════════════════════════════════
@@ -1678,6 +1712,13 @@ function saveNewArticle() {
     localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
     localStorage.setItem(LS_STATUS_PREFIX + id, status);
 
+    // Persist to DynamoDB via API
+    fetch(API_BASE + '/faq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(article)
+    }).catch(() => {}); // fire-and-forget; local state is source of truth for now
+
     // Add to allArticles — use `cat` (not `category`) here
     allArticles.push({
         id, question, summary, cat, status,
@@ -1740,6 +1781,9 @@ function deleteNewArticle(id) {
     newArticles = newArticles.filter(a => a.id !== id);
     localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
     localStorage.removeItem(LS_STATUS_PREFIX + id);
+
+    // Delete from DynamoDB via API
+    fetch(API_BASE + '/faq/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
     // Remove from allArticles
     const idx = allArticles.findIndex(a => a.id === id);
     if (idx !== -1) allArticles.splice(idx, 1);
