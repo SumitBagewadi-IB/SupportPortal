@@ -98,11 +98,11 @@ export default function ContactPage() {
       <div className="page-wrap">
         <div className="container" style={{ maxWidth: 520, textAlign: 'center', paddingTop: '5rem', paddingBottom: '5rem' }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E6FAE6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-            <i className="fas fa-check" style={{ color: '#00C805', fontSize: '1.5rem' }}></i>
+            <i className="fas fa-check" style={{ color: '#00AB4E', fontSize: '1.5rem' }}></i>
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.75rem' }}>Ticket Submitted!</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-            Your ticket <strong style={{ color: '#00C805' }}>{ticketId}</strong> has been created.
+            Your ticket <strong style={{ color: '#00AB4E' }}>{ticketId}</strong> has been created.
           </p>
           <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>We&apos;ll get back to you within 24 hours.</p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>

@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#00C805' }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#00AB4E' }}>
             <span className="text-white font-bold text-xl">IB</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
@@ -122,7 +122,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2"
-              style={{ backgroundColor: '#00C805' }}
+              style={{ backgroundColor: '#00AB4E' }}
             >
               {loading ? (
                 <>

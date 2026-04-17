@@ -394,14 +394,14 @@ export default function HomePage() {
           <p className="section-title">Browse by topic</p>
           <div className="category-grid">
             <Link href="/faq?cat=getting-started" className="cat-card" id="cat-getting-started">
-              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00C805' }}><i className="fas fa-rocket"></i></div>
+              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00AB4E' }}><i className="fas fa-rocket"></i></div>
               <div>
                 <h3>Getting Started</h3>
                 <p>Account, KYC, first trade</p>
               </div>
             </Link>
             <Link href="/faq?cat=account-opening" className="cat-card" id="cat-account-opening">
-              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00C805' }}><i className="fas fa-id-card"></i></div>
+              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00AB4E' }}><i className="fas fa-id-card"></i></div>
               <div>
                 <h3>Account Opening</h3>
                 <p>KYC, documents, activation</p>

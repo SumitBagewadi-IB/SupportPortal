@@ -94,7 +94,7 @@ export default function MyTicketsPage() {
                   key={ticket.id}
                   onClick={() => setSelectedTicket(ticket)}
                   style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem 1.5rem', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#00C805'; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#00AB4E'; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
