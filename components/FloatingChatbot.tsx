@@ -115,7 +115,7 @@ export default function FloatingChatbot() {
                     onClick={() => selectPersona(p)}
                     className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors capitalize"
                   >
-                    {p === 'general' ? '💬 General Support' : p === 'technical' ? '🔧 Technical Support' : '💰 Billing & Charges'}
+                    {p === 'general' ? 'General Support' : p === 'technical' ? 'Technical Support' : 'Billing & Charges'}
                   </button>
                 ))}
               </div>

@@ -236,7 +236,7 @@ export default function ContactPage() {
             {suggestions.length > 0 && (
               <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                 <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                  📖 You might find these articles helpful:
+                  You might find these articles helpful:
                 </p>
                 <ul className="space-y-1">
                   {suggestions.map((s, i) => (

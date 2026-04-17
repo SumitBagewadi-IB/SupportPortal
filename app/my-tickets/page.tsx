@@ -91,7 +91,7 @@ export default function MyTicketsPage() {
 
       {tickets.length === 0 ? (
         <div className="text-center py-20 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
-          <div className="text-5xl mb-4">🎟️</div>
+          <div className="text-5xl mb-4"></div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No tickets yet</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">Submit a support request to get help</p>
           <Link
