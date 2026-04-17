@@ -64,6 +64,7 @@
 /* ──────────────────────────
    VIEW TRANSITIONS (THEME)
 ────────────────────────── */
+
 ::view-transition-old(root) {
     z-index: 1;
     animation: 0.5s cubic-bezier(0.4, 0, 0.2, 1) both fade-out;
@@ -72,6 +73,19 @@
 ::view-transition-new(root) {
     z-index: 2;
     animation: reveal-diagonal 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* During an active view transition, suppress all element-level transitions
+   so the full-page wipe is clean without competing per-element fades */
+::view-transition-group(*) {
+    animation-duration: inherit;
+}
+
+html:active-view-transition *,
+html:active-view-transition *::before,
+html:active-view-transition *::after {
+    transition: none !important;
+    animation: none !important;
 }
 
 @keyframes reveal-diagonal {

@@ -8,26 +8,29 @@ export default function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const btn = document.getElementById('themeToggle');
-    if (!btn) return;
-    const handler = () => {
-      const html = document.documentElement;
-      const isDark = html.getAttribute('data-theme') === 'dark';
-      if (isDark) {
-        html.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-      } else {
-        html.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-      }
-    };
-    btn.addEventListener('click', handler);
-    return () => btn.removeEventListener('click', handler);
-  }, []);
-
   // Close menu on route change
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  const handleThemeToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const x = e.clientX;
+    const y = e.clientY;
+    document.documentElement.style.setProperty('--x', x + 'px');
+    document.documentElement.style.setProperty('--y', y + 'px');
+
+    const toggleTheme = () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    };
+
+    if (typeof document.startViewTransition !== 'function') {
+      toggleTheme();
+      return;
+    }
+
+    document.startViewTransition(toggleTheme);
+  };
 
   return (
     <nav aria-label="Main navigation">
@@ -63,7 +66,7 @@ export default function Navbar() {
           <span className={`hamburger-line${menuOpen ? ' open' : ''}`}></span>
         </button>
 
-        <button id="themeToggle" className="theme-toggle" aria-label="Toggle dark mode">
+        <button id="themeToggle" className="theme-toggle" aria-label="Toggle dark mode" onClick={handleThemeToggle}>
           <i className="fas fa-moon"></i>
           <i className="fas fa-sun"></i>
         </button>
