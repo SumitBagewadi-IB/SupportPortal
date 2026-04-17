@@ -1499,7 +1499,7 @@ footer {
     color: #fff;
     border: none;
     border-radius: 50%;
-    box-shadow: 0 8px 24px rgba(0, 200, 5, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 171, 78, 0.3);
     cursor: grab;
     display: flex;
     align-items: center;
@@ -1514,7 +1514,7 @@ footer {
 
 @keyframes bubblePulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(0, 200, 5, 0.4);
+        box-shadow: 0 0 0 0 rgba(0, 171, 78, 0.4);
     }
 
     70% {
@@ -1704,6 +1704,47 @@ footer {
 
 .action-chip:hover {
     border-color: var(--green);
+    color: var(--green);
+}
+
+.persona-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.persona-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--chat-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--chat-text);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    width: 100%;
+}
+
+.persona-btn i {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    color: var(--green);
+}
+
+.persona-btn:hover {
+    border-color: var(--green);
+    background: var(--green-light);
+    color: var(--green);
+}
+
+.persona-btn:hover i {
     color: var(--green);
 }
 
