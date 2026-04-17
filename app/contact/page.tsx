@@ -32,7 +32,10 @@ function getSuggestions(subject: string): string[] {
 }
 
 function generateTicketId(): string {
-  return `TIC-${Math.floor(10000 + Math.random() * 90000)}`;
+  const rand = typeof crypto !== 'undefined' && crypto.getRandomValues
+    ? crypto.getRandomValues(new Uint32Array(1))[0] % 900000 + 100000
+    : Math.floor(100000 + Math.random() * 900000);
+  return `TIC-${rand}`;
 }
 
 interface Ticket {
@@ -132,7 +135,7 @@ export default function ContactPage() {
               <label style={labelStyle}>Full Name <span style={{ color: '#E53E3E' }}>*</span></label>
               <div style={{ position: 'relative' }}>
                 <i className="fas fa-user" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" style={{ ...inputStyle(!!errors.name), paddingLeft: '2.5rem' }} />
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" maxLength={100} style={{ ...inputStyle(!!errors.name), paddingLeft: '2.5rem' }} />
               </div>
               {errors.name && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.name}</p>}
             </div>
@@ -140,7 +143,7 @@ export default function ContactPage() {
               <label style={labelStyle}>Email Address <span style={{ color: '#E53E3E' }}>*</span></label>
               <div style={{ position: 'relative' }}>
                 <i className="fas fa-envelope" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" style={{ ...inputStyle(!!errors.email), paddingLeft: '2.5rem' }} />
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" maxLength={150} style={{ ...inputStyle(!!errors.email), paddingLeft: '2.5rem' }} />
               </div>
               {errors.email && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.email}</p>}
             </div>
@@ -162,7 +165,7 @@ export default function ContactPage() {
             <label style={labelStyle}>Subject <span style={{ color: '#E53E3E' }}>*</span></label>
             <div style={{ position: 'relative' }}>
               <i className="fas fa-pen" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
-              <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Brief summary of your issue" style={{ ...inputStyle(!!errors.subject), paddingLeft: '2.5rem' }} />
+              <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Brief summary of your issue" maxLength={200} style={{ ...inputStyle(!!errors.subject), paddingLeft: '2.5rem' }} />
             </div>
             {errors.subject && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.subject}</p>}
             {suggestions.length > 0 && (
@@ -183,7 +186,7 @@ export default function ContactPage() {
 
           <div className="form-field">
             <label style={labelStyle}>Detailed Description <span style={{ color: '#E53E3E' }}>*</span></label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="Please provide as much detail as possible (Order ID, Ticker, etc.)" style={{ ...inputStyle(!!errors.description), resize: 'vertical', minHeight: 120 }} />
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} maxLength={2000} placeholder="Please provide as much detail as possible (Order ID, Ticker, etc.)" style={{ ...inputStyle(!!errors.description), resize: 'vertical', minHeight: 120 }} />
             {errors.description && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.description}</p>}
           </div>
 
@@ -191,7 +194,7 @@ export default function ContactPage() {
             <i className="fas fa-paper-plane" style={{ fontSize: '0.9rem' }}></i> Send Message
           </button>
           <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            <i className="fas fa-shield-alt" style={{ marginRight: 4 }}></i> Secure SSL Encrypted Submission
+            <i className="fas fa-shield-alt" style={{ marginRight: 4 }}></i> Your data is handled securely and in accordance with our Privacy Policy
           </p>
         </form>
 

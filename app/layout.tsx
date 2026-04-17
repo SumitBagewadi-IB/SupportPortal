@@ -66,22 +66,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
               <div className="footer-col">
                 <p className="footer-col-title">Regulatory</p>
-                <a href="https://www.sebi.gov.in" target="_blank" rel="noopener">
+                <a href="https://www.sebi.gov.in" target="_blank" rel="noopener noreferrer">
                   SEBI <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
                 </a>
-                <a href="https://www.nseindia.com" target="_blank" rel="noopener">
+                <a href="https://www.nseindia.com" target="_blank" rel="noopener noreferrer">
                   NSE <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
                 </a>
-                <a href="https://www.bseindia.com" target="_blank" rel="noopener">
+                <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer">
                   BSE <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
                 </a>
-                <a href="https://www.cdslindia.com" target="_blank" rel="noopener">
+                <a href="https://www.cdslindia.com" target="_blank" rel="noopener noreferrer">
                   CDSL <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
                 </a>
               </div>
               <div className="footer-col">
                 <p className="footer-col-title">Investor Services</p>
-                <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener">
+                <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener noreferrer">
                   SCORES Grievance <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
                 </a>
                 <a href="#">Grievance Redressal</a>
