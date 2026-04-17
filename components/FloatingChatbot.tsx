@@ -65,7 +65,7 @@ export default function FloatingChatbot() {
       <button
         onClick={() => setOpen(!open)}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-transform hover:scale-110"
-        style={{ backgroundColor: '#00C805' }}
+        style={{ backgroundColor: '#00AB4E' }}
         aria-label="Open chat"
       >
         {open ? (
@@ -83,7 +83,7 @@ export default function FloatingChatbot() {
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#00C805' }}>
+          <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#00AB4E' }}>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +132,7 @@ export default function FloatingChatbot() {
                           ? 'text-white rounded-br-none'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-bl-none'
                       }`}
-                      style={msg.role === 'user' ? { backgroundColor: '#00C805' } : {}}
+                      style={msg.role === 'user' ? { backgroundColor: '#00AB4E' } : {}}
                     >
                       {msg.text}
                     </div>
@@ -163,7 +163,7 @@ export default function FloatingChatbot() {
             <a
               href="/contact"
               className="block text-center text-xs font-medium py-2 rounded-lg text-white transition-colors"
-              style={{ backgroundColor: '#00C805' }}
+              style={{ backgroundColor: '#00AB4E' }}
             >
               Raise a Support Ticket
             </a>
