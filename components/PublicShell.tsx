@@ -10,7 +10,12 @@ export default function PublicShell({ children }: { children: React.ReactNode })
   const isAdmin = pathname?.startsWith('/admin') || pathname?.startsWith('/login');
 
   if (isAdmin) {
-    return <>{children}</>;
+    return (
+      <>
+        <Navbar />
+        {children}
+      </>
+    );
   }
 
   return (
