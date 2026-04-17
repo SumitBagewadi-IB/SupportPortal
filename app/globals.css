@@ -8,6 +8,25 @@
    =========================== */
 
 :root {
+    /* Admin panel color tokens */
+    --admin-bg: #F4F7FE;
+    --admin-surface: #FFFFFF;
+    --admin-sidebar: #1A202C;
+    --admin-sidebar-hover: #2D3748;
+    --admin-sidebar-text: #A0AEC0;
+    --admin-sidebar-active: #FFFFFF;
+    --admin-sidebar-divider: #2D3748;
+    --admin-topbar: #FFFFFF;
+    --admin-text-primary: #1A202C;
+    --admin-text-secondary: #718096;
+    --admin-text-muted: #A0AEC0;
+    --admin-border: #E2E8F0;
+    --admin-border-subtle: #EDF2F7;
+    --admin-input-bg: #FFFFFF;
+    --admin-modal-bg: #FFFFFF;
+    --admin-row-hover: #FAFAFA;
+
+
     --green: #00AB4E;
     --green-light: #E6FAE6;
     --blue: #3B82F6;
@@ -59,6 +78,19 @@
     --btn-primary-bg: #FFFFFF;
     --btn-primary-text: #0B0E11;
     --btn-primary-hover: #E2E8F0;
+
+    /* Admin dark mode overrides */
+    --admin-bg: #0B0E11;
+    --admin-surface: #15191E;
+    --admin-topbar: #15191E;
+    --admin-text-primary: #F1F5F9;
+    --admin-text-secondary: #94A3B8;
+    --admin-text-muted: #64748B;
+    --admin-border: #2D3748;
+    --admin-border-subtle: #1E2631;
+    --admin-input-bg: #1C2128;
+    --admin-modal-bg: #1C2128;
+    --admin-row-hover: #1C2128;
 }
 
 /* ──────────────────────────
