@@ -29,7 +29,11 @@ export default function Navbar() {
       return;
     }
 
-    document.startViewTransition(toggleTheme);
+    document.documentElement.classList.add('theme-transitioning');
+    const transition = document.startViewTransition(toggleTheme);
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove('theme-transitioning');
+    });
   };
 
   return (

@@ -75,15 +75,11 @@
     animation: reveal-diagonal 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* During an active view transition, suppress all element-level transitions
-   so the full-page wipe is clean without competing per-element fades */
-::view-transition-group(*) {
-    animation-duration: inherit;
-}
-
-html:active-view-transition *,
-html:active-view-transition *::before,
-html:active-view-transition *::after {
+/* JS adds .theme-transitioning to <html> during startViewTransition,
+   suppressing element-level transitions so the full-page wipe is clean */
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
     transition: none !important;
     animation: none !important;
 }
