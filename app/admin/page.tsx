@@ -1,10 +1,8 @@
 'use client';
 
-// Metadata cannot be exported from a 'use client' component.
-// To add metadata, create app/admin/layout.tsx with the metadata export.
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
@@ -46,39 +44,6 @@ interface Ticket {
 
 const emptyForm = { title: '', category: '', content: '', status: 'published' };
 
-// ── SVG icons ──────────────────────────────────────────────────────────────
-
-const IconTrash = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-
-const IconPencil = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 0110.414 16H9v-1.414a2 2 0 01.586-1.414z" />
-  </svg>
-);
-
-const IconEye = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-  </svg>
-);
-
-const IconEyeOff = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.956 9.956 0 012.293-3.95M6.938 6.938A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-2.63 4.062M6.938 6.938L3 3m3.938 3.938l10.124 10.124M17.062 17.062L21 21" />
-  </svg>
-);
-
-const Spinner = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <div className={`${className} border-2 border-current border-t-transparent rounded-full animate-spin`} />
-);
-
-// ── Main component ─────────────────────────────────────────────────────────
-
 export default function AdminPage() {
   // Auth
   const [authed, setAuthed] = useState(false);
@@ -95,7 +60,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Form (add/edit)
+  // Form
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -103,20 +68,20 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('');
   const [page, setPage] = useState(1);
 
   // Modals
   const [previewArticle, setPreviewArticle] = useState<Article | null>(null);
   const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'articles' | 'tickets'>('articles');
+  // Sidebar view
+  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets'>('articles');
 
-  // Tickets (localStorage)
+  // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
-  // ── Auth effects ──────────────────────────────────────────────────────────
-
+  // Auth effects
   useEffect(() => {
     const stored = sessionStorage.getItem('admin_auth');
     if (stored === 'true') setAuthed(true);
@@ -136,25 +101,18 @@ export default function AdminPage() {
       };
       tick();
       lockoutTimerRef.current = setInterval(tick, 1000);
-      return () => {
-        if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current);
-      };
+      return () => { if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current); };
     }
   }, [lockoutUntil]);
 
-  // Load tickets from localStorage
   useEffect(() => {
     if (authed) {
       try {
         const raw = localStorage.getItem('is_tickets');
         if (raw) setTickets(JSON.parse(raw) as Ticket[]);
-      } catch {
-        setTickets([]);
-      }
+      } catch { setTickets([]); }
     }
   }, [authed]);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,7 +127,7 @@ export default function AdminPage() {
       if (newAttempts >= MAX_ATTEMPTS) {
         const until = Date.now() + LOCKOUT_SECONDS * 1000;
         setLockoutUntil(until);
-        setAuthError(`Too many failed attempts. Login disabled for ${LOCKOUT_SECONDS} seconds.`);
+        setAuthError(`Too many failed attempts. Login disabled for ${LOCKOUT_SECONDS}s.`);
       } else {
         setAuthError(`Incorrect password. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
       }
@@ -185,99 +143,54 @@ export default function AdminPage() {
       const data = await res.json();
       const items: Article[] = Array.isArray(data) ? data : (data.items || data.articles || []);
       setArticles(items);
-    } catch {
-      setError('Failed to load articles.');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Failed to load articles.'); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (authed) fetchArticles();
-  }, [authed, fetchArticles]);
+  useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.category || !form.content) {
-      setFormMsg('All fields are required.');
-      return;
-    }
+    if (!form.title || !form.category || !form.content) { setFormMsg('All fields are required.'); return; }
+    if (form.content.length > MAX_CONTENT) { setFormMsg('Content exceeds 2000 characters.'); return; }
     setSubmitting(true);
     setFormMsg('');
     try {
-      if (editingId) {
-        // Edit mode: PUT/POST with id
-        const res = await fetch(`${API_BASE}/faq`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-Time': new Date().toISOString(),
-            'X-Client-Version': '1.0',
-          },
-          body: JSON.stringify({ ...form, id: editingId }),
-        });
-        if (!res.ok) throw new Error('Failed to update article');
-        setFormMsg('Article updated successfully!');
-      } else {
-        // Add mode: POST without id
-        const res = await fetch(`${API_BASE}/faq`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-Time': new Date().toISOString(),
-            'X-Client-Version': '1.0',
-          },
-          body: JSON.stringify(form),
-        });
-        if (!res.ok) throw new Error('Failed to add article');
-        setFormMsg('Article added successfully!');
-      }
+      const method = editingId ? 'PUT' : 'POST';
+      const body = editingId ? { ...form, id: editingId } : form;
+      const res = await fetch(`${API_BASE}/faq`, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setFormMsg(editingId ? '✓ Article updated successfully!' : '✓ Article added successfully!');
       setForm(emptyForm);
       setEditingId(null);
       fetchArticles();
-    } catch {
-      setFormMsg(editingId ? 'Failed to update article. Please try again.' : 'Failed to add article. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+      setTimeout(() => { setActiveView('articles'); setFormMsg(''); }, 1200);
+    } catch { setFormMsg(editingId ? 'Failed to update article.' : 'Failed to add article.'); }
+    finally { setSubmitting(false); }
   };
 
   const handleEdit = (article: Article) => {
-    setForm({
-      title: article.title || article.question || '',
-      category: article.category || '',
-      content: article.content || article.answer || '',
-      status: article.status || 'published',
-    });
+    setForm({ title: article.title || article.question || '', category: article.category || '', content: article.content || article.answer || '', status: article.status || 'published' });
     setEditingId(article.id);
     setFormMsg('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveView('add');
   };
 
-  const handleCancelEdit = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setFormMsg('');
-  };
+  const handleCancelEdit = () => { setForm(emptyForm); setEditingId(null); setFormMsg(''); setActiveView('articles'); };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this article?')) return;
+    if (!confirm('Delete this article? This cannot be undone.')) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/faq/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'X-Request-Time': new Date().toISOString(),
-          'X-Client-Version': '1.0',
-        },
-      });
-      if (!res.ok) throw new Error('Failed to delete');
+      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' } });
+      if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
-    } catch {
-      alert('Failed to delete article. Please try again.');
-    } finally {
-      setDeletingId(null);
-    }
+    } catch { alert('Failed to delete article.'); }
+    finally { setDeletingId(null); }
   };
 
   const handleToggleStatus = async (article: Article) => {
@@ -285,580 +198,464 @@ export default function AdminPage() {
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     try {
-      const res = await fetch(`${API_BASE}/faq`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Request-Time': new Date().toISOString(),
-          'X-Client-Version': '1.0',
-        },
-        body: JSON.stringify({ id: article.id, status: newStatus }),
-      });
-      if (!res.ok) throw new Error('Failed to toggle status');
-      setArticles((prev) =>
-        prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a))
-      );
-    } catch {
-      alert('Failed to update status. Please try again.');
-    } finally {
-      setTogglingId(null);
-    }
+      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' }, body: JSON.stringify({ id: article.id, status: newStatus }) });
+      setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
+    } catch { alert('Failed to update status.'); }
+    finally { setTogglingId(null); }
   };
 
   const handleMarkResolved = (ticketId: string) => {
-    const updated = tickets.map((t) =>
-      t.id === ticketId ? { ...t, status: 'resolved' } : t
-    );
+    const updated = tickets.map((t) => t.id === ticketId ? { ...t, status: 'resolved' } : t);
     setTickets(updated);
     localStorage.setItem('is_tickets', JSON.stringify(updated));
-    if (previewTicket?.id === ticketId) {
-      setPreviewTicket((prev) => (prev ? { ...prev, status: 'resolved' } : prev));
-    }
+    if (previewTicket?.id === ticketId) setPreviewTicket((prev) => prev ? { ...prev, status: 'resolved' } : prev);
   };
 
-  const logout = () => {
-    sessionStorage.removeItem('admin_auth');
-    setAuthed(false);
-  };
+  const logout = () => { sessionStorage.removeItem('admin_auth'); setAuthed(false); };
 
-  // ── Derived data ──────────────────────────────────────────────────────────
-
-  const filtered = articles.filter((a) =>
-    !search ||
-    (a.title || a.question || '')?.toLowerCase().includes(search.toLowerCase()) ||
-    a.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = articles.filter((a) => {
+    const matchSearch = !search || (a.title || a.question || '').toLowerCase().includes(search.toLowerCase()) || a.category?.toLowerCase().includes(search.toLowerCase());
+    const matchCat = !catFilter || a.category === catFilter;
+    return matchSearch && matchCat;
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
   const contentLen = form.content.length;
 
-  // ── Login screen ──────────────────────────────────────────────────────────
+  const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
+  const draftCount = articles.filter((a) => a.status === 'draft').length;
+  const openTickets = tickets.filter((t) => t.status !== 'resolved').length;
 
+  // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
   if (!authed) {
     const isLocked = lockoutUntil !== null && Date.now() < lockoutUntil;
     return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gray-800 dark:bg-gray-700">
-              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-            <p className="text-gray-500 text-sm mt-1">Enter admin password to continue</p>
+      <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+        <div style={{ background: 'white', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <Image src="/logo.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
           </div>
-          <form onSubmit={handleLogin} className="bg-white dark:bg-gray-900 rounded-2xl shadow border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">Password</label>
-              {/* Fix #3: Show/Hide password toggle */}
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Enter admin password"
-                  disabled={isLocked}
-                  className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <IconEyeOff /> : <IconEye />}
-                </button>
-              </div>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Content Admin Portal</h1>
+          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage the Knowledge Base content</p>
+          <form onSubmit={handleLogin}>
+            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+              <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#A0AEC0', fontSize: '0.875rem' }}>🔒</span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Enter admin password"
+                disabled={isLocked}
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 2.75rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
+                {showPassword ? '🙈' : '👁️'}
+              </button>
             </div>
-            {authError && <p className="text-sm text-red-500">{authError}</p>}
+            {authError && (
+              <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
+                ⚠ {authError}
+              </div>
+            )}
             {isLocked && (
-              <p className="text-sm text-orange-500 font-medium">
-                Login disabled. Try again in {lockoutSecsLeft}s.
-              </p>
+              <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {lockoutSecsLeft}s.</p>
             )}
-            {!isLocked && attempts > 0 && attempts < MAX_ATTEMPTS && (
-              <p className="text-xs text-gray-400">
-                Failed attempt {attempts} of {MAX_ATTEMPTS}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={isLocked}
-              className="w-full py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
-              style={{ backgroundColor: '#00C805' }}
-            >
-              Access Admin
+            <button type="submit" disabled={isLocked} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.5 : 1 }}>
+              ➜ Sign In
             </button>
           </form>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>🛡 Indiabulls Securities Internal System · Authorized Access Only</p>
         </div>
       </div>
     );
   }
 
-  // ── Dashboard ─────────────────────────────────────────────────────────────
-
+  // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Fix #5 & #6: Header with View Site link and Admin indicator */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-gray-500 text-sm">Manage FAQ articles</p>
-            {/* Fix #6: Logged in as Admin indicator */}
-            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      {/* SIDEBAR */}
+      <aside style={{ background: '#1A202C', color: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '1.5rem 1.25rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto' }} />
+        </div>
+        <div style={{ padding: '0.5rem 0.75rem', flex: 1 }}>
+          <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Content</p>
+          {[
+            { id: 'articles', label: 'FAQ Articles', icon: '📄' },
+            { id: 'add', label: editingId ? 'Edit Article' : 'Add Article', icon: '✏️' },
+            { id: 'tickets', label: 'Support Tickets', icon: '🎫' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => { setActiveView(item.id as 'articles' | 'add' | 'tickets'); if (item.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: activeView === item.id ? 'white' : '#A0AEC0', background: activeView === item.id ? '#2D3748' : 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, transition: 'all 0.15s', marginBottom: '0.125rem', border: 'none', width: '100%', textAlign: 'left' }}
+            >
+              <span style={{ width: 16, textAlign: 'center' }}>{item.icon}</span>
+              {item.label}
+              {item.id === 'tickets' && openTickets > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#E53E3E', color: 'white', fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 20 }}>{openTickets}</span>
+              )}
+            </button>
+          ))}
+          <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Site</p>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#A0AEC0', fontSize: '0.875rem', fontWeight: 500, textDecoration: 'none' }}>
+            <span style={{ width: 16, textAlign: 'center' }}>🌐</span> View Site
+          </Link>
+        </div>
+        <div style={{ padding: '1rem 0.75rem', borderTop: '1px solid #2D3748' }}>
+          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#FC8181', background: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, border: 'none', width: '100%', textAlign: 'left' }}>
+            <span style={{ width: 16, textAlign: 'center' }}>🚪</span> Logout
+          </button>
+          <p style={{ fontSize: '0.65rem', color: '#4A5568', textAlign: 'center', padding: '0.5rem' }}>v1.0 · Admin</p>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F4F7FE' }}>
+        {/* TOPBAR */}
+        <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '1rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1A202C' }}>
+              {activeView === 'articles' && 'FAQ Articles'}
+              {activeView === 'add' && (editingId ? 'Edit Article' : 'Add New Article')}
+              {activeView === 'tickets' && 'Support Tickets'}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#A0AEC0', marginTop: '0.125rem' }}>
+              Content Management System · Indiabulls Securities
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: '#718096' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block' }} />
               Admin
             </span>
+            {activeView === 'articles' && (
+              <button onClick={() => setActiveView('add')} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                + Add Article
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Fix #5: View Site link */}
-          <Link
-            href="/"
-            className="px-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            ← View Site
-          </Link>
-          <button
-            onClick={logout}
-            className="px-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
 
-      {/* Fix #7: Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
-        {(['articles', 'tickets'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-green-500 text-green-600 dark:text-green-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            {tab === 'articles' ? 'FAQ Articles' : 'Support Tickets'}
-            {tab === 'tickets' && tickets.length > 0 && (
-              <span className="ml-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded-full">
-                {tickets.filter((t) => t.status !== 'resolved').length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+        {/* SCROLLABLE CONTENT */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.75rem' }}>
 
-      {/* ── FAQ Articles Tab ── */}
-      {activeTab === 'articles' && (
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Add / Edit Article Form */}
-          <div>
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-              {/* Fix #1: Dynamic title */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900 dark:text-white">
-                  {editingId ? 'Edit Article' : 'Add New Article'}
-                </h2>
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 underline"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
-              </div>
-              <form onSubmit={handleSubmitForm} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Title</label>
+          {/* STATS */}
+          {activeView === 'articles' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+              {[
+                { label: 'Total Articles', value: articles.length, icon: '📄', color: '#EFF6FF', iconColor: '#3B82F6' },
+                { label: 'Published', value: publishedCount, icon: '✅', color: '#F0FFF4', iconColor: '#38A169' },
+                { label: 'Drafts', value: draftCount, icon: '📝', color: '#FFFBEB', iconColor: '#D97706' },
+                { label: 'Open Tickets', value: openTickets, icon: '🎫', color: '#FAF5FF', iconColor: '#7C3AED' },
+              ].map((s) => (
+                <div key={s.label} style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '1.125rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', flexShrink: 0 }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#718096', marginBottom: '0.25rem' }}>{s.label}</div>
+                    <div style={{ fontSize: '1.625rem', fontWeight: 800, color: '#1A202C', lineHeight: 1 }}>{s.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ARTICLES VIEW */}
+          {activeView === 'articles' && (
+            <>
+              {/* Filter bar */}
+              <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#A0AEC0', fontSize: '0.75rem' }}>🔍</span>
                   <input
                     type="text"
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="Article title"
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-green-500"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                    placeholder="Search articles..."
+                    style={{ width: '100%', padding: '0.5rem 0.875rem 0.5rem 2.25rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Category</label>
-                  <select
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Select category</option>
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  {/* Fix #9: Character counter */}
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Content</label>
-                    <span className={`text-xs ${
-                      contentLen > MAX_CONTENT
-                        ? 'text-red-500 font-semibold'
-                        : contentLen > WARN_CONTENT
-                        ? 'text-orange-500'
-                        : 'text-gray-400'
-                    }`}>
-                      {contentLen} / {MAX_CONTENT} characters
-                    </span>
-                  </div>
-                  <textarea
-                    value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                    placeholder="Article content..."
-                    rows={5}
-                    className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 resize-none ${
-                      contentLen > MAX_CONTENT
-                        ? 'border-red-400 focus:ring-red-400'
-                        : contentLen > WARN_CONTENT
-                        ? 'border-orange-400 focus:ring-orange-400'
-                        : 'border-gray-200 dark:border-gray-700 focus:ring-green-500'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Status</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="published">Published</option>
-                    <option value="draft">Draft</option>
-                  </select>
-                </div>
-                {formMsg && (
-                  <p className={`text-xs ${formMsg.includes('success') ? 'text-green-600' : 'text-red-500'}`}>
-                    {formMsg}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting || contentLen > MAX_CONTENT}
-                  className="w-full py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-70 transition-colors"
-                  style={{ backgroundColor: '#00C805' }}
+                <select
+                  value={catFilter}
+                  onChange={(e) => { setCatFilter(e.target.value); setPage(1); }}
+                  style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'white', color: '#1A202C', cursor: 'pointer' }}
                 >
-                  {submitting
-                    ? (editingId ? 'Updating...' : 'Adding...')
-                    : (editingId ? 'Update Article' : 'Add Article')}
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Article list */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900 dark:text-white">
-                Articles <span className="text-sm text-gray-400 font-normal">({filtered.length})</span>
-              </h2>
-              {/* Fix #4: w-full sm:w-48 */}
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search..."
-                  className="pl-9 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-48"
-                />
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center py-16">
-                <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : error ? (
-              <div className="text-center py-16">
-                <p className="text-red-500 mb-4">{error}</p>
-                <button onClick={fetchArticles} className="px-4 py-2 text-white rounded-lg text-sm" style={{ backgroundColor: '#00C805' }}>
-                  Retry
+                  <option value="">All Categories</option>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button onClick={fetchArticles} style={{ padding: '0.5rem 1rem', background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>
+                  ↻ Refresh
                 </button>
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center py-16 text-gray-400 text-sm">
-                {search ? `No articles matching "${search}"` : 'No articles found. Add one!'}
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  {paginated.map((article) => {
-                    const isPublished = article.status === 'published' || article.status === 'active';
-                    const isToggling = togglingId === article.id;
-                    const isDeleting = deletingId === article.id;
-                    return (
-                      <div
-                        key={article.id}
-                        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-start justify-between gap-4"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                            {article.title || article.question || 'Untitled'}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{article.category}</span>
-                            {/* Fix #2: Publish/Unpublish toggle pill */}
-                            {article.status !== undefined && (
-                              <button
-                                onClick={() => handleToggleStatus(article)}
-                                disabled={isToggling}
-                                className={`text-xs px-1.5 py-0.5 rounded-full transition-colors flex items-center gap-1 ${
-                                  isPublished
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800/40'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                }`}
-                                title={isPublished ? 'Click to unpublish' : 'Click to publish'}
-                              >
-                                {isToggling
-                                  ? <Spinner className="w-3 h-3" />
-                                  : isPublished ? 'Published' : 'Draft'}
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                            {article.content || article.answer || ''}
-                          </p>
-                        </div>
-                        {/* Action buttons: Preview, Edit, Delete */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {/* Fix #8: Preview button */}
-                          <button
-                            onClick={() => setPreviewArticle(article)}
-                            className="p-2 rounded-lg text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                            title="Preview article"
-                          >
-                            <IconEye />
-                          </button>
-                          {/* Fix #1: Edit button */}
-                          <button
-                            onClick={() => handleEdit(article)}
-                            className="p-2 rounded-lg text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-colors"
-                            title="Edit article"
-                          >
-                            <IconPencil />
-                          </button>
-                          {/* Delete button */}
-                          <button
-                            onClick={() => handleDelete(article.id)}
-                            disabled={isDeleting}
-                            className="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-colors disabled:opacity-50"
-                            title="Delete article"
-                          >
-                            {isDeleting
-                              ? <Spinner className="w-4 h-4 text-red-400" />
-                              : <IconTrash />}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+
+              {/* Table */}
+              <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+                <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1A202C' }}>
+                    Articles <span style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 500 }}>({filtered.length} total)</span>
+                  </h2>
                 </div>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#A0AEC0' }}>Loading articles...</div>
+                ) : error ? (
+                  <div style={{ textAlign: 'center', padding: '3rem' }}>
+                    <p style={{ color: '#E53E3E', marginBottom: '1rem' }}>{error}</p>
+                    <button onClick={fetchArticles} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#A0AEC0' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📄</div>
+                    <p style={{ fontSize: '0.875rem' }}>{search || catFilter ? 'No articles match your filters.' : 'No articles yet. Add your first article!'}</p>
+                  </div>
+                ) : (
+                  <>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#FAFAFA' }}>
+                          {['#', 'Question / Title', 'Category', 'Status', 'Actions'].map((h) => (
+                            <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1.25rem', borderBottom: '2px solid #EDF2F7', color: '#718096', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginated.map((article, i) => {
+                          const isPublished = article.status === 'published' || article.status === 'active';
+                          const isToggling = togglingId === article.id;
+                          const isDeleting = deletingId === article.id;
+                          return (
+                            <tr key={article.id} style={{ borderBottom: '1px solid #EDF2F7' }}>
+                              <td style={{ padding: '0.875rem 1.25rem', color: '#A0AEC0', fontWeight: 600, fontSize: '0.8125rem', width: 48 }}>
+                                {(safePage - 1) * PAGE_SIZE + i + 1}
+                              </td>
+                              <td style={{ padding: '0.875rem 1.25rem', maxWidth: 380 }}>
+                                <div style={{ fontWeight: 600, color: '#1A202C', fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {article.title || article.question || 'Untitled'}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#A0AEC0', fontFamily: 'monospace', marginTop: 2 }}>{article.id}</div>
+                              </td>
+                              <td style={{ padding: '0.875rem 1.25rem', width: 160 }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', background: '#EFF6FF', color: '#3B82F6', whiteSpace: 'nowrap' }}>
+                                  {article.category}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.875rem 1.25rem', width: 140 }}>
+                                <button
+                                  onClick={() => handleToggleStatus(article)}
+                                  disabled={isToggling}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: isToggling ? 'wait' : 'pointer', padding: 0 }}
+                                >
+                                  <div style={{ position: 'relative', width: 40, height: 22 }}>
+                                    <div style={{ position: 'absolute', inset: 0, background: isPublished ? '#38A169' : '#CBD5E0', borderRadius: 22, transition: 'background 0.2s' }} />
+                                    <div style={{ position: 'absolute', width: 16, height: 16, background: 'white', borderRadius: '50%', top: 3, left: isPublished ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isPublished ? '#38A169' : '#E53E3E' }}>
+                                    {isToggling ? '...' : isPublished ? 'Published' : 'Draft'}
+                                  </span>
+                                </button>
+                              </td>
+                              <td style={{ padding: '0.875rem 1.25rem', width: 100 }}>
+                                <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
+                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>👁</button>
+                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>✏️</button>
+                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'white', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>🗑</button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === 1 ? 'not-allowed' : 'pointer', opacity: safePage === 1 ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>← Previous</button>
+                        <span style={{ fontSize: '0.8125rem', color: '#718096' }}>Page {safePage} of {totalPages}</span>
+                        <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === totalPages ? 'not-allowed' : 'pointer', opacity: safePage === totalPages ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Next →</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
-                {/* Fix #10: Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage === 1}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          {/* ADD / EDIT ARTICLE VIEW */}
+          {activeView === 'add' && (
+            <div style={{ maxWidth: 720 }}>
+              <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '1.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#1A202C' }}>{editingId ? 'Edit Article' : 'Add New Article'}</h2>
+                  {editingId && (
+                    <button onClick={handleCancelEdit} style={{ fontSize: '0.8125rem', color: '#718096', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cancel Edit</button>
+                  )}
+                </div>
+                <form onSubmit={handleSubmitForm}>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Title / Question *</label>
+                    <input
+                      type="text"
+                      value={form.title}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      placeholder="e.g. How to place a GTT order?"
+                      style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Category *</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'white', color: '#1A202C', boxSizing: 'border-box' }}
                     >
-                      Previous
+                      <option value="">Select a category...</option>
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                      <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Content / Answer *</label>
+                      <span style={{ fontSize: '0.75rem', color: contentLen > MAX_CONTENT ? '#E53E3E' : contentLen > WARN_CONTENT ? '#DD6B20' : '#A0AEC0', fontWeight: contentLen > WARN_CONTENT ? 600 : 400 }}>
+                        {contentLen} / {MAX_CONTENT}
+                      </span>
+                    </div>
+                    <textarea
+                      value={form.content}
+                      onChange={(e) => setForm({ ...form, content: e.target.value })}
+                      placeholder="Write the answer or article content here..."
+                      rows={8}
+                      style={{ width: '100%', padding: '0.625rem 0.875rem', border: `1.5px solid ${contentLen > MAX_CONTENT ? '#FC8181' : contentLen > WARN_CONTENT ? '#F6AD55' : '#E2E8F0'}`, borderRadius: 8, fontSize: '0.875rem', outline: 'none', resize: 'vertical', minHeight: 120, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                    <p style={{ fontSize: '0.75rem', color: '#A0AEC0', marginTop: '0.25rem' }}>Write a clear, concise answer. Max 2,000 characters.</p>
+                  </div>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Status</label>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      {['published', 'draft'].map((s) => (
+                        <label key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
+                          <input type="radio" name="status" value={s} checked={form.status === s} onChange={() => setForm({ ...form, status: s })} />
+                          {s.charAt(0).toUpperCase() + s.slice(1)}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {formMsg && (
+                    <div style={{ padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '1rem', background: formMsg.includes('✓') ? '#F0FFF4' : '#FFF5F5', border: `1px solid ${formMsg.includes('✓') ? '#9AE6B4' : '#FEB2B2'}`, color: formMsg.includes('✓') ? '#276749' : '#C53030', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {formMsg}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1.5rem', borderTop: '1px solid #EDF2F7' }}>
+                    <button type="submit" disabled={submitting || contentLen > MAX_CONTENT} style={{ padding: '0.75rem 1.5rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 700, cursor: submitting || contentLen > MAX_CONTENT ? 'not-allowed' : 'pointer', opacity: submitting || contentLen > MAX_CONTENT ? 0.6 : 1 }}>
+                      {submitting ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? '✓ Update Article' : '+ Add Article')}
                     </button>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Page {safePage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
+                    <button type="button" onClick={() => setActiveView('articles')} style={{ padding: '0.75rem 1.5rem', background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>
+                      Cancel
                     </button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Support Tickets Tab ── */}
-      {activeTab === 'tickets' && (
-        <div>
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">
-            Support Tickets <span className="text-sm text-gray-400 font-normal">({tickets.length})</span>
-          </h2>
-          {tickets.length === 0 ? (
-            <div className="text-center py-16 text-gray-400 text-sm">
-              No support tickets yet
+                </form>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-800 text-left">
-                  <tr>
-                    {['Ticket ID', 'Name', 'Email', 'Category', 'Subject', 'Status', 'Date', ''].map((h) => (
-                      <th key={h} className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {tickets.map((ticket) => (
-                    <tr key={ticket.id} className="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{ticket.id}</td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-white">{ticket.name}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{ticket.email}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{ticket.category}</td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-white max-w-[180px] truncate">{ticket.subject}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          ticket.status === 'resolved'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                        }`}>
-                          {ticket.status || 'open'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{ticket.date}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => setPreviewTicket(ticket)}
-                          className="px-3 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          )}
+
+          {/* TICKETS VIEW */}
+          {activeView === 'tickets' && (
+            <div>
+              <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+                <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1A202C' }}>
+                    Support Tickets <span style={{ fontSize: '0.75rem', color: '#718096', fontWeight: 500 }}>({tickets.length} total, {openTickets} open)</span>
+                  </h2>
+                </div>
+                {tickets.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#A0AEC0' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🎫</div>
+                    <p style={{ fontSize: '0.875rem' }}>No support tickets yet</p>
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#FAFAFA' }}>
+                        {['Ticket ID', 'Name', 'Email', 'Category', 'Subject', 'Status', 'Date', ''].map((h) => (
+                          <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1.25rem', borderBottom: '2px solid #EDF2F7', color: '#718096', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tickets.map((ticket) => (
+                        <tr key={ticket.id} style={{ borderBottom: '1px solid #EDF2F7' }}>
+                          <td style={{ padding: '0.875rem 1.25rem', fontFamily: 'monospace', fontSize: '0.75rem', color: '#718096' }}>{ticket.id}</td>
+                          <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', fontWeight: 600, color: '#1A202C' }}>{ticket.name}</td>
+                          <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', color: '#718096' }}>{ticket.email}</td>
+                          <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', color: '#718096' }}>{ticket.category}</td>
+                          <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', color: '#1A202C', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.subject}</td>
+                          <td style={{ padding: '0.875rem 1.25rem' }}>
+                            <span style={{ display: 'inline-flex', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: ticket.status === 'resolved' ? '#F0FFF4' : '#FFFBEB', color: ticket.status === 'resolved' ? '#276749' : '#744210' }}>
+                              {ticket.status || 'open'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.75rem', color: '#A0AEC0', whiteSpace: 'nowrap' }}>{ticket.date}</td>
+                          <td style={{ padding: '0.875rem 1.25rem' }}>
+                            <button onClick={() => setPreviewTicket(ticket)} style={{ padding: '0.3125rem 0.625rem', background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>View</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           )}
         </div>
-      )}
+      </main>
 
-      {/* ── Article Preview Modal ── */}
+      {/* ARTICLE PREVIEW MODAL */}
       {previewArticle && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setPreviewArticle(null)}
-        >
-          <div
-            className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-lg leading-snug pr-4">
-                {previewArticle.title || previewArticle.question || 'Untitled'}
-              </h3>
-              <button
-                onClick={() => setPreviewArticle(null)}
-                className="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        <div onClick={() => setPreviewArticle(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 540, width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <h3 style={{ fontWeight: 700, color: '#1A202C', fontSize: '1.0625rem', lineHeight: 1.4, paddingRight: '1rem' }}>{previewArticle.title || previewArticle.question || 'Untitled'}</h3>
+              <button onClick={() => setPreviewArticle(null)} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0', lineHeight: 1 }}>×</button>
             </div>
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full">
-                {previewArticle.category}
-              </span>
-              {previewArticle.status && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  previewArticle.status === 'published' || previewArticle.status === 'active'
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                }`}>
-                  {previewArticle.status}
-                </span>
-              )}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: '#EFF6FF', color: '#3B82F6' }}>{previewArticle.category}</span>
+              {previewArticle.status && <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: '#F0FFF4', color: '#276749' }}>{previewArticle.status}</span>}
             </div>
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-              {previewArticle.content || previewArticle.answer || ''}
-            </p>
+            <p style={{ fontSize: '0.875rem', color: '#4A5568', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewArticle.content || previewArticle.answer || ''}</p>
           </div>
         </div>
       )}
 
-      {/* ── Ticket Detail Modal ── */}
+      {/* TICKET DETAIL MODAL */}
       {previewTicket && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setPreviewTicket(null)}
-        >
-          <div
-            className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-lg leading-snug pr-4">
-                Ticket Details
-              </h3>
-              <button
-                onClick={() => setPreviewTicket(null)}
-                className="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        <div onClick={() => setPreviewTicket(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 540, width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontWeight: 700, color: '#1A202C', fontSize: '1.0625rem' }}>Ticket Details</h3>
+              <button onClick={() => setPreviewTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0' }}>×</button>
             </div>
-            <dl className="space-y-3 text-sm mb-6">
-              {[
-                ['Ticket ID', previewTicket.id],
-                ['Name', previewTicket.name],
-                ['Email', previewTicket.email],
-                ['Phone', previewTicket.phone],
-                ['Category', previewTicket.category],
-                ['Subject', previewTicket.subject],
-                ['Status', previewTicket.status || 'open'],
-                ['Date', previewTicket.date],
-              ].map(([label, value]) =>
+            <dl style={{ marginBottom: '1.5rem' }}>
+              {[['Ticket ID', previewTicket.id], ['Name', previewTicket.name], ['Email', previewTicket.email], ['Phone', previewTicket.phone], ['Category', previewTicket.category], ['Subject', previewTicket.subject], ['Status', previewTicket.status || 'open'], ['Date', previewTicket.date]].map(([label, value]) =>
                 value ? (
-                  <div key={label} className="flex gap-2">
-                    <dt className="w-24 flex-shrink-0 text-gray-500 dark:text-gray-400 font-medium">{label}</dt>
-                    <dd className="text-gray-900 dark:text-white flex-1">{value}</dd>
+                  <div key={label} style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+                    <dt style={{ width: 90, flexShrink: 0, color: '#718096', fontWeight: 600 }}>{label}</dt>
+                    <dd style={{ color: '#1A202C' }}>{value}</dd>
                   </div>
                 ) : null
               )}
               {previewTicket.message && (
-                <div>
-                  <dt className="text-gray-500 dark:text-gray-400 font-medium mb-1">Message</dt>
-                  <dd className="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm whitespace-pre-wrap leading-relaxed">
-                    {previewTicket.message}
-                  </dd>
+                <div style={{ marginTop: '0.75rem' }}>
+                  <dt style={{ fontSize: '0.875rem', color: '#718096', fontWeight: 600, marginBottom: '0.5rem' }}>Message</dt>
+                  <dd style={{ background: '#F7FAFC', borderRadius: 8, padding: '0.875rem', fontSize: '0.875rem', color: '#1A202C', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewTicket.message}</dd>
                 </div>
               )}
             </dl>
-            {previewTicket.status !== 'resolved' && (
-              <button
-                onClick={() => handleMarkResolved(previewTicket.id)}
-                className="w-full py-2.5 rounded-xl text-white font-semibold text-sm transition-colors"
-                style={{ backgroundColor: '#00C805' }}
-              >
-                Mark as Resolved
+            {previewTicket.status !== 'resolved' ? (
+              <button onClick={() => handleMarkResolved(previewTicket.id)} style={{ width: '100%', padding: '0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
+                ✓ Mark as Resolved
               </button>
-            )}
-            {previewTicket.status === 'resolved' && (
-              <p className="text-center text-sm text-green-600 dark:text-green-400 font-medium">
-                This ticket has been resolved.
-              </p>
+            ) : (
+              <p style={{ textAlign: 'center', color: '#38A169', fontWeight: 600, fontSize: '0.875rem' }}>✓ This ticket has been resolved.</p>
             )}
           </div>
         </div>
