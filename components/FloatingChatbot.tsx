@@ -64,7 +64,7 @@ export default function FloatingChatbot() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-transform hover:scale-110"
+        className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-transform hover:scale-110"
         style={{ backgroundColor: '#00AB4E' }}
         aria-label="Open chat"
       >
@@ -81,7 +81,7 @@ export default function FloatingChatbot() {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+        <div className="fixed bottom-24 right-4 z-50 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden bg-white dark:bg-gray-900" style={{ width: 'min(320px, calc(100vw - 2rem))', maxHeight: 'min(520px, calc(100vh - 8rem))' }}>
           {/* Header */}
           <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#00AB4E' }}>
             <div className="flex items-center gap-2">

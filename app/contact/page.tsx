@@ -127,7 +127,7 @@ export default function ContactPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="form-container">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label style={labelStyle}>Full Name <span style={{ color: '#E53E3E' }}>*</span></label>
               <div style={{ position: 'relative' }}>

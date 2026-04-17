@@ -274,7 +274,7 @@ export default function AdminPage() {
 
   // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'clamp(56px, 20vw, 240px) 1fr', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {/* SIDEBAR */}
       <aside style={{ background: '#1A202C', color: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '1.5rem 1.25rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
@@ -344,7 +344,7 @@ export default function AdminPage() {
 
           {/* STATS */}
           {activeView === 'articles' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               {[
                 { label: 'Total Articles', value: articles.length, icon: 'i', color: '#EFF6FF', iconColor: '#3B82F6' },
                 { label: 'Published', value: publishedCount, icon: 'P', color: '#F0FFF4', iconColor: '#38A169' },
@@ -456,9 +456,9 @@ export default function AdminPage() {
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 100 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>View</button>
-                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>e</button>
-                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'white', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>Del</button>
+                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>View</button>
+                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>e</button>
+                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'white', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>Del</button>
                                 </div>
                               </td>
                             </tr>

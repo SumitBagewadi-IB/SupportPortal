@@ -131,7 +131,7 @@ export default function MyTicketsPage() {
               <button onClick={() => setSelectedTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0', lineHeight: 1, padding: '0.25rem' }}>&times;</button>
             </div>
             <div style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
                 {[
                   ['Status', <span key="s" style={{ fontSize: '0.7rem', padding: '0.1rem 0.5rem', borderRadius: 20, fontWeight: 600, background: STATUS_CONFIG[selectedTicket.status]?.bg, color: STATUS_CONFIG[selectedTicket.status]?.color }}>{STATUS_CONFIG[selectedTicket.status]?.label}</span>],
                   ['Category', selectedTicket.category],
@@ -151,7 +151,7 @@ export default function MyTicketsPage() {
               </div>
               <div style={{ borderTop: '1px solid #EDF2F7', marginTop: '1.25rem', paddingTop: '1rem', textAlign: 'center' }}>
                 <p style={{ fontSize: '0.75rem', color: '#A0AEC0' }}>
-                  For urgent help, call <a href="tel:02261446300" style={{ color: '#00C805', fontWeight: 600 }}>022-61446300</a>
+                  For urgent help, call <a href="tel:02261446300" style={{ color: '#00AB4E', fontWeight: 600 }}>022-61446300</a>
                 </p>
               </div>
             </div>
