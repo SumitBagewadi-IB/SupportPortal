@@ -164,7 +164,7 @@ export default function AdminPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Failed');
-      setFormMsg(editingId ? '✓ Article updated successfully!' : '✓ Article added successfully!');
+      setFormMsg(editingId ? 'Article updated successfully!' : 'Article added successfully!');
       setForm(emptyForm);
       setEditingId(null);
       fetchArticles();
@@ -241,7 +241,7 @@ export default function AdminPage() {
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage the Knowledge Base content</p>
           <form onSubmit={handleLogin}>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#A0AEC0', fontSize: '0.875rem' }}>🔒</span>
+              <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#A0AEC0', fontSize: '0.875rem' }}></span>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={passwordInput}
@@ -251,22 +251,22 @@ export default function AdminPage() {
                 style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 2.75rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
               />
               <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
             {authError && (
               <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
-                ⚠ {authError}
+                Warning: {authError}
               </div>
             )}
             {isLocked && (
               <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {lockoutSecsLeft}s.</p>
             )}
             <button type="submit" disabled={isLocked} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.5 : 1 }}>
-              ➜ Sign In
+              Sign In
             </button>
           </form>
-          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>🛡 Indiabulls Securities Internal System · Authorized Access Only</p>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
         </div>
       </div>
     );
@@ -283,9 +283,9 @@ export default function AdminPage() {
         <div style={{ padding: '0.5rem 0.75rem', flex: 1 }}>
           <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Content</p>
           {[
-            { id: 'articles', label: 'FAQ Articles', icon: '📄' },
-            { id: 'add', label: editingId ? 'Edit Article' : 'Add Article', icon: '✏️' },
-            { id: 'tickets', label: 'Support Tickets', icon: '🎫' },
+            { id: 'articles', label: 'FAQ Articles', icon: '≡' },
+            { id: 'add', label: editingId ? 'Edit Article' : 'Add Article', icon: '+' },
+            { id: 'tickets', label: 'Support Tickets', icon: '✉' },
           ].map((item) => (
             <button
               key={item.id}
@@ -301,12 +301,12 @@ export default function AdminPage() {
           ))}
           <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Site</p>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#A0AEC0', fontSize: '0.875rem', fontWeight: 500, textDecoration: 'none' }}>
-            <span style={{ width: 16, textAlign: 'center' }}>🌐</span> View Site
+            <span style={{ width: 16, textAlign: 'center' }}>o</span> View Site
           </Link>
         </div>
         <div style={{ padding: '1rem 0.75rem', borderTop: '1px solid #2D3748' }}>
           <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#FC8181', background: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, border: 'none', width: '100%', textAlign: 'left' }}>
-            <span style={{ width: 16, textAlign: 'center' }}>🚪</span> Logout
+            <span style={{ width: 16, textAlign: 'center' }}>x</span> Logout
           </button>
           <p style={{ fontSize: '0.65rem', color: '#4A5568', textAlign: 'center', padding: '0.5rem' }}>v1.0 · Admin</p>
         </div>
@@ -346,10 +346,10 @@ export default function AdminPage() {
           {activeView === 'articles' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
               {[
-                { label: 'Total Articles', value: articles.length, icon: '📄', color: '#EFF6FF', iconColor: '#3B82F6' },
-                { label: 'Published', value: publishedCount, icon: '✅', color: '#F0FFF4', iconColor: '#38A169' },
-                { label: 'Drafts', value: draftCount, icon: '📝', color: '#FFFBEB', iconColor: '#D97706' },
-                { label: 'Open Tickets', value: openTickets, icon: '🎫', color: '#FAF5FF', iconColor: '#7C3AED' },
+                { label: 'Total Articles', value: articles.length, icon: 'i', color: '#EFF6FF', iconColor: '#3B82F6' },
+                { label: 'Published', value: publishedCount, icon: 'P', color: '#F0FFF4', iconColor: '#38A169' },
+                { label: 'Drafts', value: draftCount, icon: 'D', color: '#FFFBEB', iconColor: '#D97706' },
+                { label: 'Open Tickets', value: openTickets, icon: 't', color: '#FAF5FF', iconColor: '#7C3AED' },
               ].map((s) => (
                 <div key={s.label} style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '1.125rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', flexShrink: 0 }}>{s.icon}</div>
@@ -368,13 +368,12 @@ export default function AdminPage() {
               {/* Filter bar */}
               <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#A0AEC0', fontSize: '0.75rem' }}>🔍</span>
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                     placeholder="Search articles..."
-                    style={{ width: '100%', padding: '0.5rem 0.875rem 0.5rem 2.25rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.5rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
                 <select
@@ -386,7 +385,7 @@ export default function AdminPage() {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <button onClick={fetchArticles} style={{ padding: '0.5rem 1rem', background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>
-                  ↻ Refresh
+                  Refresh
                 </button>
               </div>
 
@@ -406,7 +405,7 @@ export default function AdminPage() {
                   </div>
                 ) : filtered.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#A0AEC0' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📄</div>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>i</div>
                     <p style={{ fontSize: '0.875rem' }}>{search || catFilter ? 'No articles match your filters.' : 'No articles yet. Add your first article!'}</p>
                   </div>
                 ) : (
@@ -457,9 +456,9 @@ export default function AdminPage() {
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 100 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>👁</button>
-                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>✏️</button>
-                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'white', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>🗑</button>
+                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>View</button>
+                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #E2E8F0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>e</button>
+                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'white', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>Del</button>
                                 </div>
                               </td>
                             </tr>
@@ -470,9 +469,9 @@ export default function AdminPage() {
                     {/* Pagination */}
                     {totalPages > 1 && (
                       <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === 1 ? 'not-allowed' : 'pointer', opacity: safePage === 1 ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>← Previous</button>
+                        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === 1 ? 'not-allowed' : 'pointer', opacity: safePage === 1 ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Previous</button>
                         <span style={{ fontSize: '0.8125rem', color: '#718096' }}>Page {safePage} of {totalPages}</span>
-                        <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === totalPages ? 'not-allowed' : 'pointer', opacity: safePage === totalPages ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Next →</button>
+                        <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid #E2E8F0', borderRadius: 8, background: 'white', cursor: safePage === totalPages ? 'not-allowed' : 'pointer', opacity: safePage === totalPages ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Next</button>
                       </div>
                     )}
                   </>
@@ -541,13 +540,13 @@ export default function AdminPage() {
                     </div>
                   </div>
                   {formMsg && (
-                    <div style={{ padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '1rem', background: formMsg.includes('✓') ? '#F0FFF4' : '#FFF5F5', border: `1px solid ${formMsg.includes('✓') ? '#9AE6B4' : '#FEB2B2'}`, color: formMsg.includes('✓') ? '#276749' : '#C53030', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '1rem', background: formMsg.includes('success') ? '#F0FFF4' : '#FFF5F5', border: `1px solid ${formMsg.includes('success') ? '#9AE6B4' : '#FEB2B2'}`, color: formMsg.includes('success') ? '#276749' : '#C53030', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {formMsg}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1.5rem', borderTop: '1px solid #EDF2F7' }}>
                     <button type="submit" disabled={submitting || contentLen > MAX_CONTENT} style={{ padding: '0.75rem 1.5rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 700, cursor: submitting || contentLen > MAX_CONTENT ? 'not-allowed' : 'pointer', opacity: submitting || contentLen > MAX_CONTENT ? 0.6 : 1 }}>
-                      {submitting ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? '✓ Update Article' : '+ Add Article')}
+                      {submitting ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? 'Update Article' : 'Add Article')}
                     </button>
                     <button type="button" onClick={() => setActiveView('articles')} style={{ padding: '0.75rem 1.5rem', background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>
                       Cancel
@@ -569,7 +568,7 @@ export default function AdminPage() {
                 </div>
                 {tickets.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#A0AEC0' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🎫</div>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>t</div>
                     <p style={{ fontSize: '0.875rem' }}>No support tickets yet</p>
                   </div>
                 ) : (
@@ -615,7 +614,7 @@ export default function AdminPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 540, width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
               <h3 style={{ fontWeight: 700, color: '#1A202C', fontSize: '1.0625rem', lineHeight: 1.4, paddingRight: '1rem' }}>{previewArticle.title || previewArticle.question || 'Untitled'}</h3>
-              <button onClick={() => setPreviewArticle(null)} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0', lineHeight: 1 }}>×</button>
+              <button onClick={() => setPreviewArticle(null)} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0', lineHeight: 1 }}>X</button>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: '#EFF6FF', color: '#3B82F6' }}>{previewArticle.category}</span>
@@ -632,7 +631,7 @@ export default function AdminPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 540, width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ fontWeight: 700, color: '#1A202C', fontSize: '1.0625rem' }}>Ticket Details</h3>
-              <button onClick={() => setPreviewTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0' }}>×</button>
+              <button onClick={() => setPreviewTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0' }}>X</button>
             </div>
             <dl style={{ marginBottom: '1.5rem' }}>
               {[['Ticket ID', previewTicket.id], ['Name', previewTicket.name], ['Email', previewTicket.email], ['Phone', previewTicket.phone], ['Category', previewTicket.category], ['Subject', previewTicket.subject], ['Status', previewTicket.status || 'open'], ['Date', previewTicket.date]].map(([label, value]) =>
@@ -652,10 +651,10 @@ export default function AdminPage() {
             </dl>
             {previewTicket.status !== 'resolved' ? (
               <button onClick={() => handleMarkResolved(previewTicket.id)} style={{ width: '100%', padding: '0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
-                ✓ Mark as Resolved
+                Mark as Resolved
               </button>
             ) : (
-              <p style={{ textAlign: 'center', color: '#38A169', fontWeight: 600, fontSize: '0.875rem' }}>✓ This ticket has been resolved.</p>
+              <p style={{ textAlign: 'center', color: '#38A169', fontWeight: 600, fontSize: '0.875rem' }}>This ticket has been resolved.</p>
             )}
           </div>
         </div>
