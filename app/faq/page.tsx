@@ -116,6 +116,50 @@ const FALLBACK_ARTICLES: Article[] = [
     content: `If your fund transfer is not reflecting, check the following:\n\n1. UPI Transfer:\n   - Check your UPI app for the transaction status.\n   - If successful at UPI end, funds reflect within 15–30 minutes.\n   - If UPI mandate is approved but funds not received, wait up to 1 hour.\n\n2. Net Banking Transfer:\n   - If the payment page returned an error, the transaction may have failed. Check your bank statement.\n   - Successful net banking transfers reflect within 30 minutes.\n\n3. NEFT/RTGS:\n   - NEFT batches process every 30 minutes during banking hours.\n   - RTGS: Reflects within 30 minutes if initiated before 4:30 PM.\n\nIf funds are still not showing after 2 hours:\n- Call us at 022-61446300 with your UTR/reference number.\n- Email helpdesk@indiabullssecurities.com with your bank transfer proof.`,
   },
 
+  // FUNDS - DEPOSITS
+  {
+    id: 'fn-dep-1', title: 'How to deposit funds via UPI?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on how to deposit funds via UPI. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-dep-2', title: 'How to deposit funds via Net Banking?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on how to deposit funds via Net Banking. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-dep-3', title: 'How to deposit funds via NEFT / RTGS?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on how to deposit funds via NEFT/RTGS. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-dep-4', title: 'What is the minimum deposit amount?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on minimum deposit limits. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-dep-5', title: 'How long does a deposit take to reflect in my account?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on deposit processing timelines. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+
+  // FUNDS - WITHDRAWALS
+  {
+    id: 'fn-wd-1', title: 'How to withdraw funds from my trading account?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on how to withdraw funds. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-wd-2', title: 'What is the maximum withdrawal limit per day?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on withdrawal limits. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-wd-3', title: 'How long does a withdrawal take to reach my bank account?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on withdrawal timelines. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-wd-4', title: 'Why is my withdrawal request pending or rejected?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on withdrawal issues and rejections. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+  {
+    id: 'fn-wd-5', title: 'Can I withdraw funds on weekends or holidays?', category: 'Funds', status: 'published',
+    content: `This article is coming soon.\n\nWe are currently preparing detailed information on weekend and holiday withdrawal processing. Please check back shortly or contact our support team at 022-61446300 for immediate assistance.`,
+  },
+
   // IPO
   {
     id: 'ipo-1', title: 'How to apply for an IPO via UPI mandate?', category: 'IPO', status: 'published',
