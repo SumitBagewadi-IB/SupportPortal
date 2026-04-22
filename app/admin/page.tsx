@@ -439,11 +439,6 @@ export default function AdminPage() {
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block', flexShrink: 0 }} />
               Admin
             </span>
-            {activeView === 'articles' && (
-              <button onClick={() => setActiveView('add')} style={{ padding: '0.5rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem', whiteSpace: 'nowrap' }}>
-                <i className="fas fa-plus" style={{ fontSize: '0.75rem' }}></i> Add Article
-              </button>
-            )}
           </div>
         </div>
 
