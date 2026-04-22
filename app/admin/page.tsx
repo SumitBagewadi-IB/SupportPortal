@@ -355,7 +355,7 @@ export default function AdminPage() {
 
   // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
-    <div className="admin-layout" style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", position: 'relative' }}>
+    <div className="admin-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", position: 'relative' }}>
 
       {/* MOBILE OVERLAY */}
       <div
