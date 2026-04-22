@@ -355,11 +355,21 @@ export default function AdminPage() {
 
   // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'clamp(56px, 20vw, 240px) 1fr', height: 'calc(100vh - 60px)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", position: 'relative' }}>
+    <div className="admin-layout" style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", position: 'relative' }}>
+
+      {/* MOBILE OVERLAY */}
+      <div
+        onClick={() => setSidebarOpen(false)}
+        className={`admin-sidebar-overlay${sidebarOpen ? ' active' : ''}`}
+      />
+
       {/* SIDEBAR */}
-      <aside style={{ background: '#1A202C', color: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', overflowY: 'auto' }}>
-        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', gap: '0.625rem', minHeight: 56 }}>
+      <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 }}>
           <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto', minWidth: 0, flexShrink: 1 }} />
+          <button onClick={() => setSidebarOpen(false)} className="admin-sidebar-close" style={{ background: 'none', border: 'none', color: '#A0AEC0', cursor: 'pointer', fontSize: '1rem', padding: '0.25rem', display: 'none', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="fas fa-times"></i>
+          </button>
         </div>
         <div style={{ padding: '0.5rem 0.75rem', flex: 1 }}>
           <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Content</p>
@@ -394,9 +404,18 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--admin-bg)' }}>
+      <main style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--admin-bg)', flex: 1, minWidth: 0 }}>
         {/* TOPBAR */}
         <div style={{ background: 'var(--admin-topbar)', borderBottom: '1px solid var(--admin-border)', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="admin-hamburger"
+              aria-label="Open menu"
+              style={{ display: 'none', width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', flexShrink: 0 }}
+            >
+              <i className="fas fa-bars"></i>
+            </button>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--admin-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {activeView === 'articles' && 'FAQ Articles'}
@@ -406,6 +425,7 @@ export default function AdminPage() {
             <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Content Management System · Indiabulls Securities
             </div>
+          </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
             <button

@@ -2175,3 +2175,69 @@ footer {
     background: #FEF3C7;
     text-decoration: none;
 }
+/* ===========================
+   Admin Portal — Mobile Responsive
+   =========================== */
+
+/* Sidebar: always visible on desktop, slide-in on mobile */
+.admin-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #1A202C;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  z-index: 40;
+  transition: transform 0.25s ease;
+}
+
+.admin-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 30;
+  backdrop-filter: blur(2px);
+}
+
+.admin-sidebar-close {
+  display: none !important;
+}
+
+.admin-hamburger {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    height: calc(100vh - 60px);
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+    z-index: 40;
+  }
+
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .admin-sidebar-overlay.active {
+    display: block;
+  }
+
+  .admin-sidebar-close {
+    display: flex !important;
+  }
+
+  .admin-hamburger {
+    display: flex !important;
+  }
+
+  .admin-layout {
+    overflow: hidden;
+  }
+}
