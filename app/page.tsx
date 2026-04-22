@@ -272,6 +272,72 @@ Tip: Use the cut-off price option for retail investors to maximise allotment cha
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
+// Local search index — covers all articles across the portal
+const LOCAL_SEARCH_INDEX = [
+  { id: 'acc-open', title: 'How to Open Demat account in Indiabulls Securities?', category: 'Account Opening' },
+  { id: 'gtt', title: 'How to place a GTT (Good Till Trigger) order?', category: 'Trading' },
+  { id: 'add-funds', title: 'How to add funds to my trading account?', category: 'Funds' },
+  { id: 'tpin', title: 'How to generate and use CDSL TPIN for selling shares?', category: 'Compliance & Safety' },
+  { id: 'brokerage', title: 'What are Indiabulls Securities brokerage charges and pricing plans?', category: 'Charges & Brokerage' },
+  { id: 'ipo-apply', title: 'How to apply for an IPO via UPI mandate?', category: 'IPO' },
+  { id: 'fo-ban', title: 'What is the F&O Ban Period and why does it happen?', category: 'F&O' },
+  { id: 'basket', title: 'How to execute a Basket Order?', category: 'Trading' },
+  { id: 'tax-pl', title: 'How to download my Tax P&L statement for ITR filing?', category: 'Reports' },
+  { id: 'algo', title: 'What is Indiabulls Securities Algo and how to use it?', category: 'Advanced' },
+  { id: 'sip', title: 'How to set up a SIP in Mutual Funds?', category: 'Mutual Funds' },
+  { id: 'withdraw', title: 'How long does fund withdrawal take?', category: 'Funds' },
+  { id: 'gs-open-account', title: 'How do I open an account with Indiabulls Securities?', category: 'Getting Started' },
+  { id: 'gs-kyc', title: 'What documents are required for KYC?', category: 'Getting Started' },
+  { id: 'gs-activate', title: 'How long does account activation take?', category: 'Getting Started' },
+  { id: 'trading-buy-sell', title: 'How do I place a buy or sell order?', category: 'Trading' },
+  { id: 'trading-gtt', title: 'What is a GTT order and how do I use it?', category: 'Trading' },
+  { id: 'trading-types', title: 'What order types are available?', category: 'Trading' },
+  { id: 'trading-basket', title: 'How to execute a Basket Order?', category: 'Trading' },
+  { id: 'funds-add', title: 'How do I add funds to my trading account?', category: 'Funds' },
+  { id: 'funds-withdraw', title: 'How do I withdraw funds?', category: 'Funds' },
+  { id: 'funds-timing', title: 'When are funds credited after selling shares?', category: 'Funds' },
+  { id: 'ipo-apply', title: 'How do I apply for an IPO?', category: 'IPO' },
+  { id: 'ipo-allotment', title: 'How is IPO allotment decided?', category: 'IPO' },
+  { id: 'ipo-cancel', title: 'Can I cancel my IPO application?', category: 'IPO' },
+  { id: 'fo-activate', title: 'How do I activate F&O trading?', category: 'F&O' },
+  { id: 'fo-margin', title: 'What is SPAN margin in F&O?', category: 'F&O' },
+  { id: 'fo-expiry', title: 'What happens on F&O expiry day?', category: 'F&O' },
+  { id: 'charges-brokerage', title: 'What are the brokerage charges?', category: 'Charges & Brokerage' },
+  { id: 'charges-dp', title: 'What is DP (Depository Participant) charge?', category: 'Charges & Brokerage' },
+  { id: 'account-password', title: 'How do I reset my trading password?', category: 'Account' },
+  { id: 'account-nominee', title: 'How do I add or update a nominee?', category: 'Account' },
+  { id: 'mtf-what', title: 'What is MTF (Margin Trade Funding)?', category: 'MTF' },
+  { id: 'pledging-how', title: 'How do I pledge shares for margin?', category: 'Pledging' },
+  { id: 'mf-invest', title: 'How do I invest in Mutual Funds?', category: 'Mutual Funds' },
+  { id: 'compliance-2fa', title: 'How do I enable two-factor authentication?', category: 'Compliance & Safety' },
+  { id: 'reports-pl', title: 'Where can I view my P&L report?', category: 'Reports' },
+  { id: 'kyc-update', title: 'How do I update my KYC details?', category: 'KYC' },
+  { id: 'contact-escalate', title: 'How do I escalate a complaint?', category: 'Contact & Escalation' },
+  { id: 'nri-account', title: 'Can NRIs open a trading account?', category: 'NRI/HUF Accounts' },
+  { id: 'tender-offer', title: 'How do I participate in a Tender Offer / Buyback?', category: 'Tender Offers' },
+];
+
+const CATEGORY_TO_SLUG: Record<string, string> = {
+  'Getting Started': 'getting-started',
+  'Account Opening': 'account-opening',
+  'Trading': 'trading',
+  'Funds': 'funds',
+  'IPO': 'ipo',
+  'F&O': 'fo',
+  'Charges & Brokerage': 'charges',
+  'Compliance & Safety': 'compliance',
+  'Mutual Funds': 'mutual-funds',
+  'Account': 'account',
+  'Reports': 'reports',
+  'MTF': 'mtf',
+  'Pledging': 'pledging',
+  'KYC': 'kyc',
+  'Contact & Escalation': 'contact-faq',
+  'NRI/HUF Accounts': 'nri',
+  'Tender Offers': 'tender-offers',
+  'Advanced': 'advanced',
+};
+
 function PopularArticleRow({ article }: { article: typeof POPULAR_ARTICLES[0] }) {
   const [open, setOpen] = useState(false);
   return (
@@ -303,26 +369,32 @@ export default function HomePage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const performSearch = async (q: string) => {
-    if (q.length < 3) {
+    if (q.length < 2) {
       setResults([]);
       setShowDropdown(false);
       return;
     }
+    const ql = q.toLowerCase();
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/faq`);
-      if (res.ok) {
-        const data = await res.json();
-        const articles = Array.isArray(data) ? data : (data.items || data.articles || []);
-        const filtered = articles.filter((a: { title?: string; category?: string }) =>
-          a.title?.toLowerCase().includes(q.toLowerCase()) ||
-          a.category?.toLowerCase().includes(q.toLowerCase())
-        ).slice(0, 6);
-        setResults(filtered);
-        setShowDropdown(filtered.length > 0);
-      }
-    } catch {
-      // silently fail
+      // Try API first, fall back to local index
+      let articles: { id: string; title: string; category: string }[] = [];
+      try {
+        const res = await fetch(`${API_BASE}/faq`);
+        if (res.ok) {
+          const data = await res.json();
+          articles = Array.isArray(data) ? data : (data.items || data.articles || []);
+        }
+      } catch { /* use local */ }
+
+      if (articles.length === 0) articles = LOCAL_SEARCH_INDEX;
+
+      const filtered = articles.filter((a) =>
+        a.title?.toLowerCase().includes(ql) ||
+        a.category?.toLowerCase().includes(ql)
+      ).slice(0, 8);
+      setResults(filtered);
+      setShowDropdown(filtered.length > 0);
     } finally {
       setLoading(false);
     }
@@ -355,22 +427,34 @@ export default function HomePage() {
           />
           {showDropdown && results.length > 0 && (
             <div id="searchResults" className="search-results-dropdown active">
-              {results.map((article, i) => (
-                <Link
-                  key={i}
-                  href={`/faq?cat=${encodeURIComponent(article.category)}`}
-                  className="search-result-item"
-                  onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); }}
-                >
-                  <div className="search-result-icon" style={{ background: 'var(--bg-subtle)' }}>
-                    <i className="fas fa-file-alt"></i>
-                  </div>
-                  <div className="search-result-info">
-                    <h4>{article.title}</h4>
-                    <p>{article.category}</p>
-                  </div>
-                </Link>
-              ))}
+              {results.map((article, i) => {
+                const slug = CATEGORY_TO_SLUG[article.category] || article.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                return (
+                  <Link
+                    key={i}
+                    href={`/faq/?cat=${slug}`}
+                    className="search-result-item"
+                    onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); }}
+                  >
+                    <div className="search-result-icon" style={{ background: 'var(--bg-subtle)' }}>
+                      <i className="fas fa-file-alt"></i>
+                    </div>
+                    <div className="search-result-info">
+                      <h4>{article.title}</h4>
+                      <p>{article.category}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+              <Link
+                href={`/faq/?q=${encodeURIComponent(query)}`}
+                className="search-result-item"
+                style={{ borderTop: '1px solid var(--border)', justifyContent: 'center', color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}
+                onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); }}
+              >
+                <i className="fas fa-search" style={{ marginRight: '0.5rem' }}></i>
+                View all results for &ldquo;{query}&rdquo;
+              </Link>
             </div>
           )}
           {!showDropdown && <div id="searchResults" className="search-results-dropdown"></div>}
