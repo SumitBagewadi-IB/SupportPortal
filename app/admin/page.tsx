@@ -115,10 +115,23 @@ export default function AdminPage() {
   // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
+  // Mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(false);
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState('');
+  // Sort
+  const [sortBy, setSortBy] = useState<'default' | 'title' | 'category'>('default');
+  // Delete confirm modal
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   // Auth effects
   useEffect(() => {
     const stored = sessionStorage.getItem('admin_auth');
     if (stored === 'true') setAuthed(true);
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark') setDarkMode(true);
   }, []);
 
   useEffect(() => {
@@ -228,13 +241,19 @@ export default function AdminPage() {
   const handleCancelEdit = () => { setForm(emptyForm); setEditingId(null); setFormMsg(''); setActiveView('articles'); };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this article? This cannot be undone.')) return;
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteConfirmId(null);
     setDeletingId(id);
     try {
       const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' } });
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
-    } catch { alert('Failed to delete article.'); }
+    } catch { setError('Failed to delete article. Please try again.'); }
     finally { setDeletingId(null); }
   };
 
@@ -258,10 +277,27 @@ export default function AdminPage() {
 
   const logout = () => { sessionStorage.removeItem('admin_auth'); setAuthed(false); };
 
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
   const filtered = articles.filter((a) => {
     const matchSearch = !search || (a.title || a.question || '').toLowerCase().includes(search.toLowerCase()) || a.category?.toLowerCase().includes(search.toLowerCase());
     const matchCat = !catFilter || a.category === catFilter;
-    return matchSearch && matchCat;
+    const matchStatus = !statusFilter || (statusFilter === 'published' ? (a.status === 'published' || a.status === 'active') : a.status === 'draft');
+    return matchSearch && matchCat && matchStatus;
+  }).sort((a, b) => {
+    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+    if (sortBy === 'category') return (a.category || '').localeCompare(b.category || '');
+    return 0;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -319,11 +355,11 @@ export default function AdminPage() {
 
   // ── DASHBOARD ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'clamp(56px, 20vw, 240px) 1fr', height: 'calc(100vh - 60px)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'clamp(56px, 20vw, 240px) 1fr', height: 'calc(100vh - 60px)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", position: 'relative' }}>
       {/* SIDEBAR */}
-      <aside style={{ background: '#1A202C', color: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '1.5rem 1.25rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto' }} />
+      <aside style={{ background: '#1A202C', color: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', overflowY: 'auto' }}>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', gap: '0.625rem', minHeight: 56 }}>
+          <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto', minWidth: 0, flexShrink: 1 }} />
         </div>
         <div style={{ padding: '0.5rem 0.75rem', flex: 1 }}>
           <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4A5568', padding: '1.25rem 0.5rem 0.5rem' }}>Content</p>
@@ -360,25 +396,32 @@ export default function AdminPage() {
       {/* MAIN CONTENT */}
       <main style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--admin-bg)' }}>
         {/* TOPBAR */}
-        <div style={{ background: 'var(--admin-topbar)', borderBottom: '1px solid var(--admin-border)', padding: '1rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <div>
-            <div style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
+        <div style={{ background: 'var(--admin-topbar)', borderBottom: '1px solid var(--admin-border)', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '0.75rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--admin-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {activeView === 'articles' && 'FAQ Articles'}
               {activeView === 'add' && (editingId ? 'Edit Article' : 'Add New Article')}
               {activeView === 'tickets' && 'Support Tickets'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Content Management System · Indiabulls Securities
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+            <button
+              onClick={toggleDarkMode}
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{ width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}
+            >
+              <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+            </button>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block' }} />
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block', flexShrink: 0 }} />
               Admin
             </span>
             {activeView === 'articles' && (
-              <button onClick={() => setActiveView('add')} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                + Add Article
+              <button onClick={() => setActiveView('add')} style={{ padding: '0.5rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem', whiteSpace: 'nowrap' }}>
+                <i className="fas fa-plus" style={{ fontSize: '0.75rem' }}></i> Add Article
               </button>
             )}
           </div>
@@ -412,13 +455,14 @@ export default function AdminPage() {
             <>
               {/* Filter bar */}
               <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+                <div style={{ flex: 1, minWidth: 160, position: 'relative' }}>
+                  <i className="fas fa-search" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', fontSize: '0.75rem', pointerEvents: 'none' }}></i>
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                     placeholder="Search articles..."
-                    style={{ width: '100%', padding: '0.5rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.5rem 0.875rem 0.5rem 2rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }}
                   />
                 </div>
                 <select
@@ -429,8 +473,26 @@ export default function AdminPage() {
                   <option value="">All Categories</option>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <button onClick={fetchArticles} style={{ padding: '0.5rem 1rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>
-                  Refresh
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', cursor: 'pointer' }}
+                >
+                  <option value="">All Status</option>
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'default' | 'title' | 'category')}
+                  style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', cursor: 'pointer' }}
+                >
+                  <option value="default">Default Order</option>
+                  <option value="title">Sort: Title A–Z</option>
+                  <option value="category">Sort: Category</option>
+                </select>
+                <button onClick={fetchArticles} title="Refresh" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', flexShrink: 0 }}>
+                  <i className="fas fa-rotate-right"></i>
                 </button>
               </div>
 
@@ -455,7 +517,8 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
                       <thead>
                         <tr style={{ background: 'var(--admin-row-hover)' }}>
                           {['#', 'Question / Title', 'Category', 'Status', 'Actions'].map((h) => (
@@ -501,9 +564,15 @@ export default function AdminPage() {
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 100 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>View</button>
-                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>e</button>
-                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'var(--admin-surface)', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', opacity: isDeleting ? 0.5 : 1 }}>Del</button>
+                                  <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)' }}>
+                                    <i className="fas fa-eye" style={{ fontSize: '0.8rem' }}></i>
+                                  </button>
+                                  <button onClick={() => handleEdit(article)} title="Edit" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                                    <i className="fas fa-pen" style={{ fontSize: '0.8rem' }}></i>
+                                  </button>
+                                  <button onClick={() => handleDelete(article.id)} disabled={isDeleting} title="Delete" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'var(--admin-surface)', cursor: isDeleting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E53E3E', opacity: isDeleting ? 0.5 : 1 }}>
+                                    <i className="fas fa-trash" style={{ fontSize: '0.8rem' }}></i>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -511,6 +580,7 @@ export default function AdminPage() {
                         })}
                       </tbody>
                     </table>
+                    </div>
                     {/* Pagination */}
                     {totalPages > 1 && (
                       <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -701,6 +771,35 @@ export default function AdminPage() {
             ) : (
               <p style={{ textAlign: 'center', color: '#38A169', fontWeight: 600, fontSize: '0.875rem' }}>This ticket has been resolved.</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRM MODAL */}
+      {deleteConfirmId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 400, width: '100%', padding: '2rem' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#FFF5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '1.25rem', color: '#E53E3E' }}>
+              <i className="fas fa-trash"></i>
+            </div>
+            <h3 style={{ textAlign: 'center', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.5rem', fontSize: '1.0625rem' }}>Delete Article?</h3>
+            <p style={{ textAlign: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              This action cannot be undone. The article will be permanently removed.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                style={{ flex: 1, padding: '0.75rem', background: '#E53E3E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
