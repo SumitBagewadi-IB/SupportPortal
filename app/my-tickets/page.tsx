@@ -122,13 +122,13 @@ export default function MyTicketsPage() {
       {/* Ticket detail modal */}
       {selectedTicket && (
         <div onClick={() => setSelectedTicket(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 12, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 600, width: '100%', overflow: 'hidden' }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', background: '#F9FFF9' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 12, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 600, width: '100%', overflow: 'hidden' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', background: 'var(--bg-subtle)' }}>
               <div>
-                <p style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: '#718096', marginBottom: '0.25rem' }}>{selectedTicket.id}</p>
-                <h3 style={{ fontWeight: 700, color: '#1A202C', fontSize: '1rem' }}>{selectedTicket.subject}</h3>
+                <p style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: 'var(--text-mid)', marginBottom: '0.25rem' }}>{selectedTicket.id}</p>
+                <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '1rem' }}>{selectedTicket.subject}</h3>
               </div>
-              <button onClick={() => setSelectedTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#A0AEC0', lineHeight: 1, padding: '0.25rem' }}>&times;</button>
+              <button onClick={() => setSelectedTicket(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--text-muted)', lineHeight: 1, padding: '0.25rem' }}>&times;</button>
             </div>
             <div style={{ padding: '1.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
@@ -140,17 +140,17 @@ export default function MyTicketsPage() {
                   ['Submitted', new Date(selectedTicket.createdAt).toLocaleString('en-IN')],
                 ].map(([label, value]) => (
                   <div key={String(label)}>
-                    <p style={{ fontSize: '0.7rem', color: '#718096', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</p>
-                    <p style={{ fontWeight: 500, color: '#1A202C' }}>{value}</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-mid)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</p>
+                    <p style={{ fontWeight: 500, color: 'var(--text-dark)' }}>{value}</p>
                   </div>
                 ))}
               </div>
               <div>
-                <p style={{ fontSize: '0.7rem', color: '#718096', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Description</p>
-                <p style={{ fontSize: '0.875rem', color: '#4A5568', background: '#F7FAFC', borderRadius: 8, padding: '1rem', lineHeight: 1.6 }}>{selectedTicket.description}</p>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-mid)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Description</p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-mid)', background: 'var(--bg-subtle)', borderRadius: 8, padding: '1rem', lineHeight: 1.6 }}>{selectedTicket.description}</p>
               </div>
-              <div style={{ borderTop: '1px solid #EDF2F7', marginTop: '1.25rem', paddingTop: '1rem', textAlign: 'center' }}>
-                <p style={{ fontSize: '0.75rem', color: '#A0AEC0' }}>
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: '1.25rem', paddingTop: '1rem', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   For urgent help, call <a href="tel:02261446300" style={{ color: '#00AB4E', fontWeight: 600 }}>022-61446300</a>
                 </p>
               </div>
