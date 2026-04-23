@@ -218,7 +218,7 @@ export default function AdminPage() {
       const body = editingId ? { ...form, id: editingId } : form;
       const res = await fetch(`${API_BASE}/faq`, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' },
+        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Failed');
@@ -250,7 +250,7 @@ export default function AdminPage() {
     setDeleteConfirmId(null);
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' } });
+      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD } });
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
     } catch { setError('Failed to delete article. Please try again.'); }
@@ -262,7 +262,7 @@ export default function AdminPage() {
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     try {
-      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0' }, body: JSON.stringify({ id: article.id, status: newStatus }) });
+      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD }, body: JSON.stringify({ id: article.id, status: newStatus }) });
       setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
     } catch { setError('Failed to update status. Please try again.'); }
     finally { setTogglingId(null); }
