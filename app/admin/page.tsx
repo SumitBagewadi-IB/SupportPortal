@@ -5,7 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
+// NEXT_PUBLIC_ADMIN_SECRET is the API gateway secret (sent as X-Admin-Secret header).
+// The UI login password is stored separately in NEXT_PUBLIC_ADMIN_UI_PASSWORD.
+// Neither is truly secret on a static export — the real enforcement is Lambda validating X-Admin-Secret.
+const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET || '';
+const ADMIN_UI_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_UI_PASSWORD || 'IBAdmin2025';
 
 // Local fallback articles — mirrors faq/page.tsx FALLBACK_ARTICLES
 // Used when the API is unavailable (same pattern as original admin.html reading faq.html)
@@ -114,6 +118,8 @@ export default function AdminPage() {
 
   // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState('');
 
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -153,18 +159,24 @@ export default function AdminPage() {
   }, [lockoutUntil]);
 
   useEffect(() => {
-    if (authed) {
-      try {
-        const raw = localStorage.getItem('is_tickets');
-        if (raw) setTickets(JSON.parse(raw) as Ticket[]);
-      } catch { setTickets([]); }
+    if (authed && API_BASE) {
+      setTicketsLoading(true);
+      setTicketsError('');
+      fetch(`${API_BASE}/tickets`, { headers: { 'X-Admin-Secret': ADMIN_SECRET } })
+        .then((r) => {
+          if (!r.ok) throw new Error(`${r.status}`);
+          return r.json();
+        })
+        .then((data) => setTickets(Array.isArray(data) ? data : []))
+        .catch(() => setTicketsError('Could not load tickets. Check your connection or API config.'))
+        .finally(() => setTicketsLoading(false));
     }
   }, [authed]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutUntil && Date.now() < lockoutUntil) return;
-    if (passwordInput === ADMIN_PASSWORD) {
+    if (passwordInput === ADMIN_UI_PASSWORD) {
       sessionStorage.setItem('admin_auth', 'true');
       setAuthed(true);
       setAttempts(0);
@@ -218,7 +230,7 @@ export default function AdminPage() {
       const body = editingId ? { ...form, id: editingId } : form;
       const res = await fetch(`${API_BASE}/faq`, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD },
+        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Failed');
@@ -250,7 +262,7 @@ export default function AdminPage() {
     setDeleteConfirmId(null);
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD } });
+      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET } });
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
     } catch { setError('Failed to delete article. Please try again.'); }
@@ -262,17 +274,34 @@ export default function AdminPage() {
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     try {
-      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_PASSWORD }, body: JSON.stringify({ id: article.id, status: newStatus }) });
+      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET }, body: JSON.stringify({ id: article.id, status: newStatus }) });
       setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
     } catch { setError('Failed to update status. Please try again.'); }
     finally { setTogglingId(null); }
   };
 
-  const handleMarkResolved = (ticketId: string) => {
-    const updated = tickets.map((t) => t.id === ticketId ? { ...t, status: 'resolved' } : t);
-    setTickets(updated);
-    localStorage.setItem('is_tickets', JSON.stringify(updated));
-    if (previewTicket?.id === ticketId) setPreviewTicket((prev) => prev ? { ...prev, status: 'resolved' } : prev);
+  const handleMarkResolved = async (ticketId: string) => {
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+    // Use 'solved' to match the system-wide ticket status schema (open → in_progress → solved)
+    const updated = { ...ticket, status: 'solved' };
+    setTickets((prev) => prev.map((t) => t.id === ticketId ? updated : t));
+    if (previewTicket?.id === ticketId) setPreviewTicket(updated);
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/tickets/${ticketId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+          body: JSON.stringify(updated),
+        });
+        if (!res.ok) throw new Error('Failed');
+      } catch {
+        // Roll back optimistic update on failure
+        setTickets((prev) => prev.map((t) => t.id === ticketId ? ticket : t));
+        if (previewTicket?.id === ticketId) setPreviewTicket(ticket);
+        setError('Failed to update ticket status. Please try again.');
+      }
+    }
   };
 
   const logout = () => { sessionStorage.removeItem('admin_auth'); setAuthed(false); };
@@ -307,7 +336,7 @@ export default function AdminPage() {
 
   const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
   const draftCount = articles.filter((a) => a.status === 'draft').length;
-  const openTickets = tickets.filter((t) => t.status !== 'resolved').length;
+  const openTickets = tickets.filter((t) => t.status !== 'solved' && t.status !== 'resolved').length;
 
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
   if (!authed) {
@@ -318,8 +347,8 @@ export default function AdminPage() {
           <div style={{ marginBottom: '2rem' }}>
             <Image src="/logo.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
           </div>
-          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Content Admin Portal</h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', marginBottom: '2rem' }}>Sign in to manage the Knowledge Base content</p>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Manager Portal</h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
           <form onSubmit={handleLogin}>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
               <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}></span>
@@ -399,7 +428,7 @@ export default function AdminPage() {
           <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#FC8181', background: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, border: 'none', width: '100%', textAlign: 'left' }}>
             <i className="fas fa-right-from-bracket" style={{ width: 16, textAlign: 'center' }}></i> Logout
           </button>
-          <p style={{ fontSize: '0.65rem', color: '#4A5568', textAlign: 'center', padding: '0.5rem' }}>v1.0 · Admin</p>
+          <p style={{ fontSize: '0.65rem', color: '#4A5568', textAlign: 'center', padding: '0.5rem' }}>v1.0 · Manager Portal</p>
         </div>
       </aside>
 
@@ -423,7 +452,7 @@ export default function AdminPage() {
               {activeView === 'tickets' && 'Support Tickets'}
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Content Management System · Indiabulls Securities
+              Manager Portal · Indiabulls Securities
             </div>
           </div>
           </div>
@@ -437,7 +466,7 @@ export default function AdminPage() {
             </button>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block', flexShrink: 0 }} />
-              Admin
+              Manager
             </span>
           </div>
         </div>
@@ -696,10 +725,28 @@ export default function AdminPage() {
                     Support Tickets <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({tickets.length} total, {openTickets} open)</span>
                   </h2>
                 </div>
-                {tickets.length === 0 ? (
+                {ticketsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
+                    <i className="fas fa-spinner fa-spin" style={{ fontSize: '1.5rem', marginBottom: '0.75rem', display: 'block' }}></i>
+                    <p style={{ fontSize: '0.875rem' }}>Loading tickets…</p>
+                  </div>
+                ) : ticketsError ? (
+                  <div style={{ textAlign: 'center', padding: '3rem' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.75rem', color: '#E53E3E' }}><i className="fas fa-exclamation-circle"></i></div>
+                    <p style={{ color: '#E53E3E', fontSize: '0.875rem', marginBottom: '1rem' }}>{ticketsError}</p>
+                    <button onClick={() => {
+                      setTicketsLoading(true); setTicketsError('');
+                      fetch(`${API_BASE}/tickets`, { headers: { 'X-Admin-Secret': ADMIN_SECRET } })
+                        .then(r => r.ok ? r.json() : Promise.reject())
+                        .then(data => setTickets(Array.isArray(data) ? data : []))
+                        .catch(() => setTicketsError('Could not load tickets. Check your connection or API config.'))
+                        .finally(() => setTicketsLoading(false));
+                    }} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
+                  </div>
+                ) : tickets.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--admin-text-muted)' }}><i className="fas fa-ticket"></i></div>
-                    <p style={{ fontSize: '0.875rem' }}>No support tickets yet</p>
+                    <p style={{ fontSize: '0.875rem' }}>No support tickets yet. Tickets submitted via the Contact page will appear here.</p>
                   </div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -719,8 +766,10 @@ export default function AdminPage() {
                           <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>{ticket.category}</td>
                           <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', color: 'var(--admin-text-primary)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.subject}</td>
                           <td style={{ padding: '0.875rem 1.25rem' }}>
-                            <span style={{ display: 'inline-flex', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: ticket.status === 'resolved' ? '#F0FFF4' : '#FFFBEB', color: ticket.status === 'resolved' ? '#276749' : '#744210' }}>
-                              {ticket.status || 'open'}
+                            <span style={{ display: 'inline-flex', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700,
+                              background: (ticket.status === 'solved' || ticket.status === 'resolved') ? '#F0FFF4' : ticket.status === 'in_progress' ? '#EFF6FF' : '#FFFBEB',
+                              color: (ticket.status === 'solved' || ticket.status === 'resolved') ? '#276749' : ticket.status === 'in_progress' ? '#1E40AF' : '#744210' }}>
+                              {ticket.status === 'in_progress' ? 'In Progress' : ticket.status === 'solved' || ticket.status === 'resolved' ? 'Solved' : ticket.status || 'Open'}
                             </span>
                           </td>
                           <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>{ticket.date}</td>
@@ -779,12 +828,15 @@ export default function AdminPage() {
                 </div>
               )}
             </dl>
-            {previewTicket.status !== 'resolved' ? (
+            {previewTicket.status !== 'solved' && previewTicket.status !== 'resolved' ? (
               <button onClick={() => handleMarkResolved(previewTicket.id)} style={{ width: '100%', padding: '0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
-                Mark as Resolved
+                Mark as Solved
               </button>
             ) : (
-              <p style={{ textAlign: 'center', color: '#38A169', fontWeight: 600, fontSize: '0.875rem' }}>This ticket has been resolved.</p>
+              <div style={{ textAlign: 'center', padding: '0.75rem', background: '#F0FFF4', borderRadius: 10, border: '1px solid #9AE6B4' }}>
+                <i className="fas fa-check-circle" style={{ color: '#38A169', marginRight: '0.5rem' }}></i>
+                <span style={{ color: '#276749', fontWeight: 600, fontSize: '0.875rem' }}>Ticket has been solved.</span>
+              </div>
             )}
           </div>
         </div>
