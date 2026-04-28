@@ -306,90 +306,118 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ─────────────────────────────────────────
        CMS STATUS: Hide pending articles on public faq.html
+       + fetch live articles from DynamoDB API
     ───────────────────────────────────────── */
     (function applyPublicCmsVisibility() {
         // Only run on the public FAQ page (not admin)
         if (!document.getElementById('articleContainer')) return;
 
-        const disabledCategories = JSON.parse(localStorage.getItem('cms_categories') || '{}');
+        const API_BASE = 'https://un1k0vx0ij.execute-api.ap-south-1.amazonaws.com/uat';
 
+        // Inject a single DynamoDB article card into the correct group
+        // Safe text sanitizer — prevents XSS when injecting user-supplied content into DOM
+        function escHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function injectDynamoArticle(article) {
+            if (!article.id || !article.question || !article.status || article.status !== 'approved') return;
+            // Sanitize id before using as DOM id — allow only alphanumeric, hyphen, underscore
+            const safeId = String(article.id).replace(/[^a-zA-Z0-9\-_]/g, '');
+            if (!safeId) return;
+            if (document.getElementById(safeId)) return; // already exists (static or duplicate)
+
+            const container = document.getElementById('articleContainer');
+            if (!container) return;
+
+            const safeCat = String(article.category || 'general').replace(/[^a-zA-Z0-9\-_]/g, '');
+            let targetGroup = container.querySelector(`.article-group[data-cat="${safeCat}"]`);
+            if (!targetGroup) {
+                // Create a new group for this category on-the-fly
+                targetGroup = document.createElement('div');
+                targetGroup.className = 'article-group';
+                targetGroup.dataset.cat = safeCat;
+                const heading = document.createElement('h2');
+                heading.className = 'group-heading';
+                heading.textContent = safeCat.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                targetGroup.appendChild(heading);
+                container.appendChild(targetGroup);
+            }
+
+            // Build card using DOM APIs to avoid innerHTML XSS — only safe attributes used
+            const card = document.createElement('div');
+            card.className = 'article-card';
+            card.id = safeId;
+            card.dataset.status = 'approved';
+            card.dataset.source = 'dynamodb';
+
+            const triggerBtn = document.createElement('button');
+            triggerBtn.className = 'article-trigger';
+
+            const triggerLeft = document.createElement('div');
+            triggerLeft.className = 'article-trigger-left';
+
+            const dot = document.createElement('span');
+            dot.className = 'article-cat-dot';
+
+            const textWrap = document.createElement('div');
+            const h3 = document.createElement('h3');
+            h3.textContent = article.question; // textContent — safe
+            const summary = document.createElement('p');
+            summary.textContent = article.summary || '';
+
+            textWrap.appendChild(h3);
+            textWrap.appendChild(summary);
+            triggerLeft.appendChild(dot);
+            triggerLeft.appendChild(textWrap);
+
+            const chevron = document.createElement('i');
+            chevron.className = 'fas fa-chevron-down article-chevron';
+
+            triggerBtn.appendChild(triggerLeft);
+            triggerBtn.appendChild(chevron);
+
+            const body = document.createElement('div');
+            body.className = 'article-body';
+            const answerP = document.createElement('p');
+            answerP.textContent = article.answer || '';
+            body.appendChild(answerP);
+
+            card.appendChild(triggerBtn);
+            card.appendChild(body);
+            targetGroup.appendChild(card);
+
+            triggerBtn.addEventListener('click', () => {
+                const isOpen = triggerBtn.classList.contains('open');
+                document.querySelectorAll('.article-trigger.open').forEach(t => {
+                    t.classList.remove('open');
+                    if (t.nextElementSibling) t.nextElementSibling.classList.remove('open');
+                });
+                if (!isOpen) {
+                    triggerBtn.classList.add('open');
+                    body.classList.add('open');
+                }
+            });
+        }
+
+        // Fetch all approved articles from DynamoDB — cloud is the single source of truth
+        fetch(API_BASE + '/faq')
+            .then(r => r.ok ? r.json() : [])
+            .then(items => { items.forEach(injectDynamoArticle); })
+            .catch(() => {}); // silently degrade — static content still works
+
+        // Hide static articles that are marked as pending in their HTML
         document.querySelectorAll('.article-card').forEach(card => {
-            const cardId = card.id;
-            if (!cardId) return; // skip if no ID somehow
-
-            // Check category-level disable
-            const group = card.closest('.article-group');
-            if (group) {
-                const cat = group.dataset.cat;
-                if (disabledCategories[cat] === false) {
-                    card.style.display = 'none';
-                    return;
-                }
-            }
-
-            // Check article-level status override from CMS
-            const storedStatus = localStorage.getItem('cms_status_' + cardId);
             const defaultStatus = card.dataset.status || 'approved';
-
-            const effectiveStatus = storedStatus || defaultStatus;
-
-            if (effectiveStatus === 'pending') {
-                card.style.display = 'none';
-            }
+            if (defaultStatus === 'pending') card.style.display = 'none';
         });
 
-        // Also inject any new articles from CMS into the page (read-only display)
-        // New articles added in admin are not shown on public page until they have approved status
-        const newArticles = JSON.parse(localStorage.getItem('cms_new_articles') || '[]');
-        newArticles.forEach(article => {
-            if (!article.id) return;
-            const storedStatus = localStorage.getItem('cms_status_' + article.id) || article.status || 'pending';
-            if (storedStatus !== 'approved') return;
-
-            // Find the target group
-            const groups = document.querySelectorAll('.article-group');
-            let targetGroup = null;
-            groups.forEach(g => { if (g.dataset.cat === article.category) targetGroup = g; });
-            if (!targetGroup) return;
-
-            const cardHtml = `
-            <div class="article-card" id="${article.id}" data-status="approved">
-                <button class="article-trigger">
-                    <div class="article-trigger-left">
-                        <span class="article-cat-dot"></span>
-                        <div>
-                            <h3>${article.question}</h3>
-                            <p>${article.summary || ''}</p>
-                        </div>
-                    </div>
-                    <i class="fas fa-chevron-down article-chevron"></i>
-                </button>
-                <div class="article-body">
-                    <p>${article.answer}</p>
-                </div>
-            </div>`;
-            targetGroup.insertAdjacentHTML('beforeend', cardHtml);
-
-            // Bind accordion for this new card
-            const newCard = targetGroup.querySelector('#' + article.id);
-            if (newCard) {
-                const trigger = newCard.querySelector('.article-trigger');
-                if (trigger) {
-                    trigger.addEventListener('click', () => {
-                        const body = trigger.nextElementSibling;
-                        const isOpen = trigger.classList.contains('open');
-                        document.querySelectorAll('.article-trigger.open').forEach(t => {
-                            t.classList.remove('open');
-                            if (t.nextElementSibling) t.nextElementSibling.classList.remove('open');
-                        });
-                        if (!isOpen) {
-                            trigger.classList.add('open');
-                            if (body) body.classList.add('open');
-                        }
-                    });
-                }
-            }
-        });
     })();
 
     /* ─────────────────────────────────────────

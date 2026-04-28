@@ -869,6 +869,9 @@
                 <div class="topbar-breadcrumb" id="topbarBreadcrumb">Manage all Knowledge Base articles</div>
             </div>
             <div class="topbar-actions">
+                <button class="btn btn-outline" id="syncCloudBtn" title="Refresh articles from DynamoDB cloud">
+                    <i class="fas fa-cloud-arrow-up"></i> Refresh from Cloud
+                </button>
                 <button class="btn btn-outline" id="exportBtn">
                     <i class="fas fa-download"></i> Export Config
                 </button>
@@ -1092,8 +1095,8 @@
                     <div class="about-section">
                         <p><strong>Content Management System</strong> — Indiabulls Securities Support Portal</p>
                         <p>Version 2.0.0 · Built for the Support Admin Team</p>
-                        <p>This dashboard reads all articles directly from <strong>faq.html</strong> and persists status changes in <strong>localStorage</strong>. To permanently publish changes, use the Export Config feature and update the source files.</p>
-                        <p style="margin-top:1rem; font-size:0.75rem; color:#A0AEC0;">localStorage keys: <code>cms_status_{id}</code>, <code>cms_categories</code>, <code>cms_new_articles</code>, <code>ibulls_admin_auth</code>, <code>ibulls_admin_pass</code></p>
+                        <p>This dashboard reads static articles from <strong>faq.html</strong> and all dynamic articles from <strong>DynamoDB</strong> via the cloud API. All writes (add, edit, status change, delete) go directly to DynamoDB — no localStorage is used in the content pipeline.</p>
+                        <p style="margin-top:1rem; font-size:0.75rem; color:#A0AEC0;">Session keys (browser only): <code>ibulls_admin_auth</code>, <code>ibulls_admin_pass</code> — used for local admin login session only, not content storage.</p>
                     </div>
                 </div>
 
@@ -1257,7 +1260,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 ════════════════════════════════ */
 function initDashboard() {
     categoryDisabled = JSON.parse(localStorage.getItem(LS_CATEGORIES) || '{}');
-    newArticles = JSON.parse(localStorage.getItem(LS_NEW_ARTICLES) || '[]');
+    newArticles = [];
     loadArticlesFromFaq();
     loadArticlesFromDynamoDB();
 }
@@ -1272,7 +1275,7 @@ async function loadArticlesFromDynamoDB() {
         const items = await resp.json();
         if (!Array.isArray(items) || items.length === 0) return;
 
-        // Merge DynamoDB articles into newArticles (avoid duplicates)
+        // Merge DynamoDB articles into newArticles (cloud is source of truth)
         const existingIds = new Set(newArticles.map(a => a.id));
         let added = 0;
         items.forEach(item => {
@@ -1284,13 +1287,11 @@ async function loadArticlesFromDynamoDB() {
         });
 
         if (added > 0) {
-            localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
             renderNewArticlesList();
             updateStats();
-            showToast(`Synced ${added} article(s) from DynamoDB`, 'success');
         }
     } catch (e) {
-        // Silently fail — DynamoDB is optional enhancement
+        showToast('Could not reach cloud — check your connection', 'error');
     }
 }
 
@@ -1328,10 +1329,6 @@ async function loadArticlesFromFaq() {
                 const defaultStatus = card.dataset.status || 'approved';
                 originalStatuses[id] = defaultStatus;
 
-                // Get current status (localStorage override or default)
-                const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + id);
-                const effectiveStatus = storedStatus || defaultStatus;
-
                 const summaryEl = card.querySelector('h3 + p') || card.querySelector('.article-trigger-left p');
                 const summary = summaryEl ? summaryEl.textContent.trim() : '';
 
@@ -1340,27 +1337,14 @@ async function loadArticlesFromFaq() {
                     question: questionRaw,
                     summary,
                     cat,
-                    status: effectiveStatus,
+                    status: defaultStatus,
                     defaultStatus,
                     isNew: false,
                 });
             });
         });
 
-        // Inject new articles from localStorage
-        newArticles.forEach(na => {
-            const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + na.id) || na.status || 'pending';
-            allArticles.push({
-                id: na.id,
-                question: na.question,
-                summary: na.summary || '',
-                cat: na.category,
-                status: storedStatus,
-                defaultStatus: na.status,
-                isNew: true,
-            });
-            originalStatuses[na.id] = na.status;
-        });
+        // DynamoDB articles will be merged in by loadArticlesFromDynamoDB after this
 
         populateCatFilter();
         populateAddArticleCats();
@@ -1430,24 +1414,24 @@ function renderTable() {
                 <div class="toggle-wrap">
                     <label class="toggle">
                         <input type="checkbox" ${isChecked}
-                            data-id="${a.id}"
-                            onchange="toggleStatus(this, '${a.id}')">
+                            data-id="${escapeHtml(a.id)}"
+                            onchange="toggleStatus(this, this.dataset.id)">
                         <span class="toggle-slider"></span>
                     </label>
-                    <span class="toggle-label" id="status-label-${a.id}" style="font-size:0.75rem; font-weight:600; color:${a.status === 'approved' ? '#38A169' : '#E53E3E'};">
+                    <span class="toggle-label" id="status-label-${escapeHtml(a.id)}" style="font-size:0.75rem; font-weight:600; color:${a.status === 'approved' ? '#38A169' : '#E53E3E'};">
                         ${a.status === 'approved' ? 'Approved' : 'Pending'}
                     </span>
                 </div>
             </td>
             <td class="col-actions">
                 <div class="action-btns">
-                    <button class="action-btn edit" title="Edit" onclick="openEditModal('${a.id}')">
+                    <button class="action-btn edit" title="Edit" data-edit-id="${escapeHtml(a.id)}">
                         <i class="fas fa-pencil"></i>
                     </button>
                     <a class="action-btn preview" title="Preview on site" href="faq.html#${a.id}" target="_blank" style="text-decoration:none;">
                         <i class="fas fa-eye"></i>
                     </a>
-                    ${a.isNew ? `<button class="action-btn delete" title="Delete" onclick="deleteNewArticle('${a.id}')"><i class="fas fa-trash"></i></button>` : ''}
+                    ${a.isNew ? `<button class="action-btn delete" title="Delete" data-delete-id="${escapeHtml(a.id)}"><i class="fas fa-trash"></i></button>` : ''}
                 </div>
             </td>
         </tr>`;
@@ -1457,15 +1441,39 @@ function renderTable() {
 /* ════════════════════════════════
    TOGGLE STATUS
 ════════════════════════════════ */
-function toggleStatus(checkbox, id) {
+async function toggleStatus(checkbox, id) {
     const newStatus = checkbox.checked ? 'approved' : 'pending';
-    localStorage.setItem(LS_STATUS_PREFIX + id, newStatus);
+    checkbox.disabled = true;
 
-    // Update in-memory state
     const art = allArticles.find(a => a.id === id);
-    if (art) art.status = newStatus;
+    if (!art) { checkbox.disabled = false; return; }
 
-    // Update label
+    // For cloud articles: re-POST with updated status (DynamoDB put_item is upsert)
+    const payload = art.isNew
+        ? { ...newArticles.find(a => a.id === id), status: newStatus }
+        : { id, status: newStatus, question: art.question, summary: art.summary, category: art.cat };
+
+    try {
+        const resp = await fetch(API_BASE + '/faq', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+    } catch (err) {
+        checkbox.checked = !checkbox.checked; // revert toggle
+        checkbox.disabled = false;
+        showToast('Status update failed — ' + err.message, 'error');
+        return;
+    }
+
+    checkbox.disabled = false;
+    art.status = newStatus;
+    if (art.isNew) {
+        const na = newArticles.find(a => a.id === id);
+        if (na) na.status = newStatus;
+    }
+
     const label = document.getElementById('status-label-' + id);
     if (label) {
         label.textContent = newStatus === 'approved' ? 'Approved' : 'Pending';
@@ -1496,17 +1504,13 @@ function updateStats() {
    PENDING BANNER
 ════════════════════════════════ */
 function checkPendingBanner() {
-    let changed = 0;
-    allArticles.forEach(a => {
-        const stored = localStorage.getItem(LS_STATUS_PREFIX + a.id);
-        if (stored && stored !== a.defaultStatus) changed++;
-    });
-    unsavedChanges = changed;
+    const pending = allArticles.filter(a => a.status === 'pending').length;
+    unsavedChanges = pending;
     const banner = document.getElementById('pendingBanner');
-    if (changed > 0) {
+    if (pending > 0) {
         banner.classList.remove('hidden');
         document.getElementById('pendingBannerText').textContent =
-            `${changed} article${changed > 1 ? 's have' : ' has'} status overrides from their original values.`;
+            `${pending} article${pending > 1 ? 's are' : ' is'} currently in Pending (draft) status — not visible to users.`;
     } else {
         banner.classList.add('hidden');
     }
@@ -1578,10 +1582,10 @@ document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
    EXPORT CONFIG
 ════════════════════════════════ */
 function exportConfig() {
+    // Build status overrides from in-memory state (cloud is source of truth — not localStorage)
     const overrides = {};
     allArticles.forEach(a => {
-        const stored = localStorage.getItem(LS_STATUS_PREFIX + a.id);
-        if (stored) overrides[a.id] = stored;
+        if (a.status) overrides[a.id] = a.status;
     });
 
     const config = {
@@ -1607,19 +1611,39 @@ function exportConfig() {
 document.getElementById('exportBtn').addEventListener('click', exportConfig);
 document.getElementById('exportConfigBtn2').addEventListener('click', exportConfig);
 
+/* ── REFRESH FROM CLOUD ── */
+document.getElementById('syncCloudBtn').addEventListener('click', refreshFromCloud);
+
+async function refreshFromCloud() {
+    const btn = document.getElementById('syncCloudBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing…';
+
+    try {
+        const resp = await fetch(API_BASE + '/faq');
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+        const items = await resp.json();
+
+        // Rebuild newArticles entirely from cloud
+        newArticles = Array.isArray(items) ? items : [];
+        renderNewArticlesList();
+        updateStats();
+        showToast(`Cloud data refreshed — ${newArticles.length} article(s) loaded`, 'success');
+    } catch (err) {
+        showToast('Refresh failed — ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Refresh from Cloud';
+}
+
 /* ════════════════════════════════
    RESET CHANGES
 ════════════════════════════════ */
 document.getElementById('resetChangesBtn').addEventListener('click', () => {
-    if (!confirm('Reset all status overrides to their defaults? This cannot be undone.')) return;
-    allArticles.forEach(a => {
-        localStorage.removeItem(LS_STATUS_PREFIX + a.id);
-        a.status = a.defaultStatus;
-    });
-    renderTable();
-    updateStats();
-    checkPendingBanner();
-    showToast('All status overrides cleared', 'success');
+    if (!confirm('Refresh data from cloud? This will reload all articles from DynamoDB.')) return;
+    initDashboard();
+    showToast('Refreshing from cloud…', 'success');
 });
 
 /* ════════════════════════════════
@@ -1652,7 +1676,7 @@ document.getElementById('editModal').addEventListener('click', e => {
         document.getElementById('editModal').classList.remove('open');
 });
 
-document.getElementById('editModalSave').addEventListener('click', () => {
+document.getElementById('editModalSave').addEventListener('click', async () => {
     const id = document.getElementById('editArticleId').value;
     const newQ = document.getElementById('editArticleQuestion').value.trim();
     const newStatus = document.querySelector('input[name="editStatus"]:checked')?.value || 'approved';
@@ -1662,26 +1686,42 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const art = allArticles.find(a => a.id === id);
     if (!art) return;
 
+    const saveBtn = document.getElementById('editModalSave');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+    const na = newArticles.find(a => a.id === id);
+    const payload = na
+        ? { ...na, question: newQ, status: newStatus }
+        : { id, question: newQ, status: newStatus, summary: art.summary, category: art.cat };
+
+    try {
+        const resp = await fetch(API_BASE + '/faq', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+    } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        showToast('Update failed — ' + err.message, 'error');
+        return;
+    }
+
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+
     art.question = newQ;
     art.status = newStatus;
-    localStorage.setItem(LS_STATUS_PREFIX + id, newStatus);
-
-    // If it's a new article, update in localStorage too
-    if (art.isNew) {
-        const idx = newArticles.findIndex(n => n.id === id);
-        if (idx !== -1) {
-            newArticles[idx].question = newQ;
-            newArticles[idx].status = newStatus;
-            localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-        }
-    }
+    if (na) { na.question = newQ; na.status = newStatus; }
 
     document.getElementById('editModal').classList.remove('open');
     renderTable();
     updateStats();
     checkPendingBanner();
     renderNewArticlesList();
-    showToast('Article updated', 'success');
+    showToast('Article updated in cloud', 'success');
 });
 
 /* ════════════════════════════════
@@ -1690,7 +1730,7 @@ document.getElementById('editModalSave').addEventListener('click', () => {
 document.getElementById('saveArticleBtn').addEventListener('click', saveNewArticle);
 document.getElementById('clearFormBtn').addEventListener('click', clearArticleForm);
 
-function saveNewArticle() {
+async function saveNewArticle() {
     const cat = document.getElementById('newArticleCat').value;
     const question = document.getElementById('newArticleQuestion').value.trim();
     const summary = document.getElementById('newArticleSummary').value.trim();
@@ -1708,18 +1748,31 @@ function saveNewArticle() {
         .substring(0, 50) + '-' + Date.now().toString(36);
 
     const article = { id, category: cat, question, summary, answer, status, createdAt: new Date().toISOString() };
+
+    // Disable button while saving
+    const saveBtn = document.getElementById('saveArticleBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+    try {
+        const resp = await fetch(API_BASE + '/faq', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(article)
+        });
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+    } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Article';
+        showToast('Failed to save — ' + err.message, 'error');
+        return;
+    }
+
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Article';
+
+    // Add to in-memory state (cloud is source of truth — no localStorage write)
     newArticles.push(article);
-    localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-    localStorage.setItem(LS_STATUS_PREFIX + id, status);
-
-    // Persist to DynamoDB via API
-    fetch(API_BASE + '/faq', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(article)
-    }).catch(() => {}); // fire-and-forget; local state is source of truth for now
-
-    // Add to allArticles — use `cat` (not `category`) here
     allArticles.push({
         id, question, summary, cat, status,
         defaultStatus: status, isNew: true,
@@ -1734,7 +1787,7 @@ function saveNewArticle() {
     renderNewArticlesList();
     updateStats();
     checkPendingBanner();
-    showToast('Article saved successfully', 'success');
+    showToast('Article saved to cloud successfully', 'success');
 }
 
 function clearArticleForm() {
@@ -1759,7 +1812,7 @@ function renderNewArticlesList() {
     }
 
     container.innerHTML = newArticles.map(a => {
-        const storedStatus = localStorage.getItem(LS_STATUS_PREFIX + a.id) || a.status;
+        const storedStatus = a.status || 'pending';
         const catMeta = CAT_META[a.category] || { label: a.category };
         return `<div style="padding:0.875rem; border-bottom:1px solid #EDF2F7; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
             <div style="flex:1;">
@@ -1769,22 +1822,25 @@ function renderNewArticlesList() {
             <span style="font-size:0.75rem; font-weight:700; color:${storedStatus === 'approved' ? '#38A169' : '#E53E3E'}; flex-shrink:0;">
                 ${storedStatus === 'approved' ? '● Approved' : '○ Pending'}
             </span>
-            <button class="btn btn-sm btn-outline" onclick="deleteNewArticle('${a.id}')">
+            <button class="btn btn-sm btn-outline" data-delete-id="${escapeHtml(a.id)}">
                 <i class="fas fa-trash"></i>
             </button>
         </div>`;
     }).join('');
 }
 
-function deleteNewArticle(id) {
+async function deleteNewArticle(id) {
     if (!confirm('Delete this article? This cannot be undone.')) return;
-    newArticles = newArticles.filter(a => a.id !== id);
-    localStorage.setItem(LS_NEW_ARTICLES, JSON.stringify(newArticles));
-    localStorage.removeItem(LS_STATUS_PREFIX + id);
 
-    // Delete from DynamoDB via API
-    fetch(API_BASE + '/faq/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
-    // Remove from allArticles
+    try {
+        const resp = await fetch(API_BASE + '/faq/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+    } catch (err) {
+        showToast('Failed to delete — ' + err.message, 'error');
+        return;
+    }
+
+    newArticles = newArticles.filter(a => a.id !== id);
     const idx = allArticles.findIndex(a => a.id === id);
     if (idx !== -1) allArticles.splice(idx, 1);
     renderTable();
@@ -1908,6 +1964,23 @@ function escapeHtml(str) {
               .replace(/>/g, '&gt;')
               .replace(/"/g, '&quot;');
 }
+
+/* ════════════════════════════════
+   EVENT DELEGATION — delete buttons use data-delete-id to avoid onclick injection
+════════════════════════════════ */
+document.addEventListener('click', (e) => {
+    const deleteBtn = e.target.closest('[data-delete-id]');
+    if (deleteBtn) {
+        const id = deleteBtn.dataset.deleteId;
+        if (id) deleteNewArticle(id);
+        return;
+    }
+    const editBtn = e.target.closest('[data-edit-id]');
+    if (editBtn) {
+        const id = editBtn.dataset.editId;
+        if (id) openEditModal(id);
+    }
+});
 
 /* ════════════════════════════════
    INIT
