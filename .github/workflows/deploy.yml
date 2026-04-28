@@ -59,18 +59,26 @@ jobs:
           echo "✅ UAT deploy complete"
 
       - name: Invalidate CloudFront cache (Production)
-        if: github.ref == 'refs/heads/main' && secrets.CF_DISTRIBUTION_PROD != ''
+        if: github.ref == 'refs/heads/main'
+        env:
+          CF_DIST: ${{ secrets.CF_DISTRIBUTION_PROD }}
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_PROD }} \
-            --paths "/*"
-          echo "✅ Production CDN cache cleared"
+          if [ -n "$CF_DIST" ]; then
+            aws cloudfront create-invalidation --distribution-id "$CF_DIST" --paths "/*"
+            echo "✅ Production CDN cache cleared"
+          else
+            echo "⏭️ No CF_DISTRIBUTION_PROD set, skipping"
+          fi
 
       - name: Invalidate CloudFront cache (UAT)
-        if: github.ref == 'refs/heads/uat' && secrets.CF_DISTRIBUTION_UAT != ''
+        if: github.ref == 'refs/heads/uat'
+        env:
+          CF_DIST: ${{ secrets.CF_DISTRIBUTION_UAT }}
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_UAT }} \
-            --paths "/*"
-          echo "✅ UAT CDN cache cleared"
+          if [ -n "$CF_DIST" ]; then
+            aws cloudfront create-invalidation --distribution-id "$CF_DIST" --paths "/*"
+            echo "✅ UAT CDN cache cleared"
+          else
+            echo "⏭️ No CF_DISTRIBUTION_UAT set, skipping"
+          fi
 
