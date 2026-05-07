@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET || '';
-const MASTER_PASSWORD = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || 'IBMaster2025!';
+const MASTER_PASSWORD = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +104,7 @@ export default function MasterAdminPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (lockedUntil && Date.now() < lockedUntil) return;
+    if (!MASTER_PASSWORD) { setAuthError('System misconfiguration. Contact administrator.'); return; }
     if (passwordInput === MASTER_PASSWORD) {
       setAuthed(true);
       setAuthError('');

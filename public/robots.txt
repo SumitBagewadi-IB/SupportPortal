@@ -2,4 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /admin/
+Disallow: /masteradmin
+Disallow: /masteradmin/
 Sitemap: https://support.indiabulls.com/sitemap.xml
