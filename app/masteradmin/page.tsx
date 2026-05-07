@@ -25,7 +25,7 @@ interface Ticket {
   email: string;
   category: string;
   subject: string;
-  status: 'open' | 'in_progress' | 'solved';
+  status: 'open' | 'in_progress' | 'solved' | 'resolved';
   createdAt: string;
   description?: string;
   phone?: string;
