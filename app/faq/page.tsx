@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { trackEvent } from '@/lib/analytics';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
@@ -330,6 +331,8 @@ function FAQContent() {
   const [selectedCat, setSelectedCat] = useState(catParam);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackGivenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const validated = VALID_CATEGORIES.includes(rawCat) ? rawCat : 'all';
@@ -496,7 +499,16 @@ function FAQContent() {
                 autoComplete="off"
                 maxLength={200}
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearch(val);
+                  if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                  if (val.length >= 3) {
+                    searchDebounceRef.current = setTimeout(() => {
+                      trackEvent({ eventType: 'search', searchTerm: val, searchResultCount: filtered.length });
+                    }, 800);
+                  }
+                }}
                 style={{ fontSize: '16px' }}
               />
             </div>
@@ -528,7 +540,13 @@ function FAQContent() {
                   <div key={article.id} className="article-card" id={article.id}>
                     <button
                       className={`article-trigger${openId === article.id ? ' open' : ''}`}
-                      onClick={() => setOpenId(openId === article.id ? null : article.id)}
+                      onClick={() => {
+                        const isOpening = openId !== article.id;
+                        setOpenId(isOpening ? article.id : null);
+                        if (isOpening) {
+                          trackEvent({ eventType: 'article_view', articleId: article.id, articleTitle: article.title || article.question, category: article.category });
+                        }
+                      }}
                     >
                       <div className="article-trigger-left">
                         <span className="article-cat-dot"></span>
@@ -544,10 +562,26 @@ function FAQContent() {
                       <div className="article-feedback">
                         <span>Was this helpful?</span>
                         <div className="feedback-buttons">
-                          <button className="feedback-btn" data-type="yes">
+                          <button
+                            className="feedback-btn"
+                            data-type="yes"
+                            onClick={() => {
+                              if (feedbackGivenRef.current.has(article.id)) return;
+                              feedbackGivenRef.current.add(article.id);
+                              trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'helpful' });
+                            }}
+                          >
                             <i className="far fa-thumbs-up"></i> Yes
                           </button>
-                          <button className="feedback-btn" data-type="no">
+                          <button
+                            className="feedback-btn"
+                            data-type="no"
+                            onClick={() => {
+                              if (feedbackGivenRef.current.has(article.id)) return;
+                              feedbackGivenRef.current.add(article.id);
+                              trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'not_helpful' });
+                            }}
+                          >
                             <i className="far fa-thumbs-down"></i> No
                           </button>
                         </div>

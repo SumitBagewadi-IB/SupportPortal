@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { trackEvent, getSession } from '@/lib/analytics';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
@@ -87,8 +88,13 @@ export default function ContactPage() {
       localStorage.setItem('is_tickets', JSON.stringify(existing));
     } catch { /* ignore */ }
     if (API_BASE) {
-      fetch(`${API_BASE}/tickets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticket) }).catch(() => {});
+      fetch(`${API_BASE}/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...ticket, sessionId: getSession() }),
+      }).catch(() => {});
     }
+    trackEvent({ eventType: 'ticket_submit', ticketCategory: form.category, category: form.category });
     setTicketId(id);
     setSubmitted(true);
   };

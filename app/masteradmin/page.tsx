@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET || '';
 const MASTER_PASSWORD = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,12 +10,38 @@ const MASTER_PASSWORD = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
 interface AuditLog {
   id: string;
   timestamp: string;
-  action: 'CREATE_FAQ' | 'UPDATE_FAQ' | 'DELETE_FAQ' | 'UPDATE_TICKET' | 'CREATE_TICKET' | 'LOGIN';
-  entity: 'faq' | 'ticket' | 'auth';
+  action: string;
+  entity: string;
   entityId: string;
   entityTitle?: string;
   performedBy: string;
   meta?: Record<string, string>;
+}
+
+interface Manager {
+  managerId: string;
+  username: string;
+  displayName: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+interface AnalyticsSummary {
+  period_days: number;
+  article_views: number;
+  searches: number;
+  chatbot_opens: number;
+  chatbot_messages: number;
+  ticket_submits: number;
+  faq_feedback_helpful: number;
+  faq_feedback_not_helpful: number;
+  top_articles: [string, number][];
+  top_searches: [string, number][];
+  persona_counts: Record<string, number>;
+  tickets_by_category: Record<string, number>;
 }
 
 interface Ticket {
@@ -38,7 +63,7 @@ interface Article {
   status: string;
 }
 
-type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq';
+type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics';
 
 const ACTION_CONFIG: Record<AuditLog['action'], { label: string; icon: string; color: string; bg: string }> = {
   CREATE_FAQ:     { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
@@ -83,10 +108,22 @@ export default function MasterAdminPage() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [ticketFilter, setTicketFilter] = useState<string>('all');
-  // Per-tab search queries — cleared independently so switching tabs doesn't bleed search state
   const [auditSearch, setAuditSearch] = useState('');
   const [ticketSearch, setTicketSearch] = useState('');
   const [faqSearch, setFaqSearch] = useState('');
+
+  // Managers CRUD
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [managersLoading, setManagersLoading] = useState(false);
+  const [showCreateManager, setShowCreateManager] = useState(false);
+  const [managerForm, setManagerForm] = useState({ username: '', displayName: '', email: '', role: 'manager', password: '' });
+  const [managerFormMsg, setManagerFormMsg] = useState('');
+  const [managerFormSaving, setManagerFormSaving] = useState(false);
+
+  // Analytics
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(30);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -122,7 +159,29 @@ export default function MasterAdminPage() {
     setPasswordInput('');
   };
 
-  const authHeaders = { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET };
+  const masterHeaders = { 'Content-Type': 'application/json', 'X-Admin-Secret': MASTER_PASSWORD };
+
+  const fetchManagers = useCallback(async () => {
+    if (!API_BASE) return;
+    setManagersLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/managers`, { headers: masterHeaders });
+      if (res.ok) setManagers(await res.json());
+    } catch { /* silently ignore */ }
+    finally { setManagersLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchAnalytics = useCallback(async (days: number) => {
+    if (!API_BASE) return;
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: masterHeaders });
+      if (res.ok) setAnalytics(await res.json());
+    } catch { /* silently ignore */ }
+    finally { setAnalyticsLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!API_BASE) { setLoadError('API not configured.'); return; }
@@ -130,9 +189,9 @@ export default function MasterAdminPage() {
     setLoadError('');
     try {
       const [ticketsRes, faqRes, auditRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/tickets`, { headers: authHeaders }),
+        fetch(`${API_BASE}/tickets`, { headers: masterHeaders }),
         fetch(`${API_BASE}/faq`),
-        fetch(`${API_BASE}/audit-log`, { headers: authHeaders }),
+        fetch(`${API_BASE}/audit-log`, { headers: masterHeaders }),
       ]);
 
       if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
@@ -155,8 +214,12 @@ export default function MasterAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (authed) fetchAll();
-  }, [authed, fetchAll]);
+    if (authed) {
+      fetchAll();
+      fetchManagers();
+      fetchAnalytics(analyticsDays);
+    }
+  }, [authed, fetchAll, fetchManagers, fetchAnalytics, analyticsDays]);
 
   // ── Derived stats ────────────────────────────────────────────────────────
   const stats = {
@@ -254,11 +317,12 @@ export default function MasterAdminPage() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'overview',  label: 'Overview',        icon: 'fa-tachometer-alt' },
-    { id: 'managers',  label: 'Managers',         icon: 'fa-users-cog' },
-    { id: 'audit',     label: 'Audit Log',        icon: 'fa-history' },
-    { id: 'tickets',   label: 'Tickets',          icon: 'fa-ticket-alt' },
-    { id: 'faq',       label: 'FAQ Articles',     icon: 'fa-book' },
+    { id: 'overview',   label: 'Overview',        icon: 'fa-tachometer-alt' },
+    { id: 'managers',   label: 'Manager Accounts', icon: 'fa-users-cog' },
+    { id: 'audit',      label: 'Audit Log',        icon: 'fa-history' },
+    { id: 'analytics',  label: 'Analytics',        icon: 'fa-chart-bar' },
+    { id: 'tickets',    label: 'Tickets',          icon: 'fa-ticket-alt' },
+    { id: 'faq',        label: 'FAQ Articles',     icon: 'fa-book' },
   ];
 
   // Derive manager activity summary from audit logs
@@ -423,46 +487,105 @@ export default function MasterAdminPage() {
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Admin Managers</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Activity summary of all managers derived from the audit log.</p>
+                <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Manager Accounts</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Create, deactivate and manage admin manager accounts.</p>
               </div>
+              <button onClick={() => { setShowCreateManager(true); setManagerFormMsg(''); setManagerForm({ username: '', displayName: '', email: '', role: 'manager', password: '' }); }} style={{ padding: '0.5rem 1rem', background: '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fas fa-plus"></i> Create Manager
+              </button>
             </div>
 
-            {managerSummary.length === 0 ? (
+            {/* Create Manager Modal */}
+            {showCreateManager && (
+              <div onClick={() => setShowCreateManager(false)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 14, padding: '2rem', maxWidth: 440, width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
+                  <h3 style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '1.25rem' }}>Create New Manager</h3>
+                  {(['username', 'displayName', 'email', 'password'] as const).map(field => (
+                    <div key={field} style={{ marginBottom: '0.875rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'capitalize' }}>{field === 'displayName' ? 'Display Name' : field}</label>
+                      <input
+                        type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
+                        value={managerForm[field]}
+                        onChange={e => setManagerForm(f => ({ ...f, [field]: e.target.value }))}
+                        style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  ))}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Role</label>
+                    <select value={managerForm.role} onChange={e => setManagerForm(f => ({ ...f, role: e.target.value }))} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}>
+                      <option value="manager">Manager</option>
+                      <option value="senior_manager">Senior Manager</option>
+                    </select>
+                  </div>
+                  {managerFormMsg && <p style={{ fontSize: '0.8125rem', color: managerFormMsg.startsWith('✓') ? '#065F46' : '#B91C1C', marginBottom: '0.75rem' }}>{managerFormMsg}</p>}
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={() => setShowCreateManager(false)} style={{ flex: 1, padding: '0.75rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', color: 'var(--text-dark)' }}>Cancel</button>
+                    <button disabled={managerFormSaving} onClick={async () => {
+                      const { username, displayName, email, role, password } = managerForm;
+                      if (!username || !displayName || !email || !password) { setManagerFormMsg('All fields required.'); return; }
+                      setManagerFormSaving(true); setManagerFormMsg('');
+                      try {
+                        const res = await fetch(`${API_BASE}/managers`, { method: 'POST', headers: masterHeaders, body: JSON.stringify({ username, displayName, email, role, password }) });
+                        const data = await res.json();
+                        if (res.ok) { setManagerFormMsg('✓ Manager created!'); fetchManagers(); setTimeout(() => setShowCreateManager(false), 1200); }
+                        else setManagerFormMsg(data.error || 'Failed to create manager.');
+                      } catch { setManagerFormMsg('Network error.'); }
+                      finally { setManagerFormSaving(false); }
+                    }} style={{ flex: 1, padding: '0.75rem', background: '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: managerFormSaving ? 'not-allowed' : 'pointer', opacity: managerFormSaving ? 0.6 : 1 }}>
+                      {managerFormSaving ? 'Creating…' : 'Create Manager'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {managersLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin"></i> Loading…</div>
+            ) : managers.length === 0 ? (
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '4rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                {loading ? <><i className="fas fa-spinner fa-spin"></i> Loading…</> : 'No manager activity recorded yet. Activity will appear here once managers start using the Admin portal.'}
+                No manager accounts yet. Click "Create Manager" to add the first one.
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                {managerSummary.map((mgr) => (
-                  <div key={mgr.name} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 10, background: 'linear-gradient(135deg,#00AB4E,#007a37)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <i className="fas fa-user-tie" style={{ color: '#fff', fontSize: '1rem' }}></i>
-                        </div>
-                        <div>
-                          <p style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem' }}>{mgr.name}</p>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Last active: {new Date(mgr.lastSeen).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        {[
-                          { label: 'Total Actions', value: mgr.actions, color: '#374151', bg: '#F3F4F6' },
-                          { label: 'FAQ Created',   value: mgr.faqCreated,      color: '#065F46', bg: '#D1FAE5' },
-                          { label: 'FAQ Updated',   value: mgr.faqUpdated,      color: '#1E40AF', bg: '#DBEAFE' },
-                          { label: 'FAQ Deleted',   value: mgr.faqDeleted,      color: '#991B1B', bg: '#FEE2E2' },
-                          { label: 'Tickets Updated', value: mgr.ticketsUpdated, color: '#92400E', bg: '#FEF3C7' },
-                        ].map(stat => (
-                          <div key={stat.label} style={{ textAlign: 'center', background: stat.bg, borderRadius: 10, padding: '0.5rem 0.875rem', minWidth: 80 }}>
-                            <p style={{ fontSize: '1.375rem', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</p>
-                            <p style={{ fontSize: '0.65rem', color: stat.color, fontWeight: 600, marginTop: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</p>
-                          </div>
+              <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
+                        {['Username', 'Display Name', 'Email', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
+                          <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {managers.map((mgr, i) => (
+                        <tr key={mgr.managerId} style={{ borderBottom: i < managers.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <td style={{ padding: '0.875rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mgr.username}</td>
+                          <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: 'var(--text-dark)' }}>{mgr.displayName}</td>
+                          <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)' }}>{mgr.email}</td>
+                          <td style={{ padding: '0.875rem 1rem' }}><span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 20, fontWeight: 600, background: mgr.role === 'senior_manager' ? '#DBEAFE' : '#F3F4F6', color: mgr.role === 'senior_manager' ? '#1E40AF' : '#374151' }}>{mgr.role === 'senior_manager' ? 'Senior Manager' : 'Manager'}</span></td>
+                          <td style={{ padding: '0.875rem 1rem' }}><span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 20, fontWeight: 600, background: mgr.status === 'active' ? '#D1FAE5' : '#FEE2E2', color: mgr.status === 'active' ? '#065F46' : '#991B1B' }}>{mgr.status}</span></td>
+                          <td style={{ padding: '0.875rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{mgr.lastLoginAt ? new Date(mgr.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Never'}</td>
+                          <td style={{ padding: '0.875rem 1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              {mgr.status === 'active' ? (
+                                <button onClick={async () => {
+                                  await fetch(`${API_BASE}/managers/${mgr.managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: 'deactivated' }) });
+                                  fetchManagers();
+                                }} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Deactivate</button>
+                              ) : (
+                                <button onClick={async () => {
+                                  await fetch(`${API_BASE}/managers/${mgr.managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: 'active' }) });
+                                  fetchManagers();
+                                }} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#D1FAE5', color: '#065F46', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Reactivate</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </>
@@ -526,6 +649,111 @@ export default function MasterAdminPage() {
                 })
               )}
             </div>
+          </>
+        )}
+
+        {/* ── ANALYTICS TAB ── */}
+        {activeTab === 'analytics' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)' }}>Public Portal Analytics</h2>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <select value={analyticsDays} onChange={e => { const d = Number(e.target.value); setAnalyticsDays(d); fetchAnalytics(d); }} style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)' }}>
+                  <option value={7}>Last 7 days</option>
+                  <option value={30}>Last 30 days</option>
+                  <option value={90}>Last 90 days</option>
+                </select>
+                <button onClick={() => fetchAnalytics(analyticsDays)} disabled={analyticsLoading} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <i className={`fas fa-sync-alt ${analyticsLoading ? 'fa-spin' : ''}`}></i> Refresh
+                </button>
+              </div>
+            </div>
+            {analyticsLoading ? (
+              <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin" style={{ fontSize: '1.5rem' }}></i></div>
+            ) : !analytics ? (
+              <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No analytics data yet. Events are tracked as users visit the portal.</div>
+            ) : (
+              <>
+                {/* KPI row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                  {[
+                    { label: 'Article Views',    value: analytics.article_views,    icon: 'fa-eye',            color: '#00AB4E', bg: '#D1FAE5' },
+                    { label: 'Searches',          value: analytics.searches,          icon: 'fa-search',         color: '#1E40AF', bg: '#DBEAFE' },
+                    { label: 'Chatbot Opens',     value: analytics.chatbot_opens,     icon: 'fa-comment-dots',   color: '#5B21B6', bg: '#EDE9FE' },
+                    { label: 'Chatbot Messages',  value: analytics.chatbot_messages,  icon: 'fa-paper-plane',    color: '#92400E', bg: '#FEF3C7' },
+                    { label: 'Tickets Submitted', value: analytics.ticket_submits,    icon: 'fa-ticket-alt',     color: '#991B1B', bg: '#FEE2E2' },
+                    { label: 'Helpful Feedback',  value: analytics.faq_feedback_helpful, icon: 'fa-thumbs-up',  color: '#065F46', bg: '#D1FAE5' },
+                    { label: 'Not Helpful',       value: analytics.faq_feedback_not_helpful, icon: 'fa-thumbs-down', color: '#374151', bg: '#F3F4F6' },
+                  ].map(kpi => (
+                    <div key={kpi.label} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.125rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 9, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`fas ${kpi.icon}`} style={{ color: kpi.color, fontSize: '1rem' }}></i>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.15rem' }}>{kpi.label}</p>
+                        <p style={{ fontSize: '1.625rem', fontWeight: 800, color: 'var(--text-dark)', lineHeight: 1 }}>{kpi.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+                  {/* Top Articles */}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Top Articles by Views</h3>
+                    {analytics.top_articles.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : analytics.top_articles.map(([title, count]) => (
+                      <div key={title} style={{ marginBottom: '0.625rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
+                          <span style={{ color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>{title}</span>
+                          <span style={{ color: 'var(--text-muted)', flexShrink: 0, marginLeft: '0.5rem' }}>{count}</span>
+                        </div>
+                        <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
+                          <div style={{ height: 4, background: '#00AB4E', borderRadius: 2, width: `${Math.round((count / (analytics.top_articles[0]?.[1] || 1)) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Top Searches */}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Top Search Terms</h3>
+                    {analytics.top_searches.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : analytics.top_searches.slice(0, 10).map(([term, count]) => (
+                      <div key={term} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
+                        <span style={{ color: 'var(--text-dark)' }}>{term}</span>
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Chatbot Personas */}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Chatbot Persona Usage</h3>
+                    {Object.keys(analytics.persona_counts).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : Object.entries(analytics.persona_counts).map(([persona, count]) => (
+                      <div key={persona} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
+                        <span style={{ color: 'var(--text-dark)', textTransform: 'capitalize' }}>{persona}</span>
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tickets by Category */}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Tickets by Category</h3>
+                    {Object.keys(analytics.tickets_by_category).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : Object.entries(analytics.tickets_by_category).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
+                      <div key={cat} style={{ marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
+                          <span style={{ color: 'var(--text-dark)' }}>{cat}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{count}</span>
+                        </div>
+                        <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
+                          <div style={{ height: 4, background: '#5B21B6', borderRadius: 2, width: `${Math.round((count / Math.max(...Object.values(analytics.tickets_by_category))) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
 

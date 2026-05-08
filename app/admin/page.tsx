@@ -5,11 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-// NEXT_PUBLIC_ADMIN_SECRET is the API gateway secret (sent as X-Admin-Secret header).
-// The UI login password is stored separately in NEXT_PUBLIC_ADMIN_UI_PASSWORD.
-// Neither is truly secret on a static export — the real enforcement is Lambda validating X-Admin-Secret.
-const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET || '';
-const ADMIN_UI_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_UI_PASSWORD || 'IBAdmin2025';
 
 // Local fallback articles — mirrors faq/page.tsx FALLBACK_ARTICLES
 // Used when the API is unavailable (same pattern as original admin.html reading faq.html)
@@ -85,9 +80,13 @@ const emptyForm = { title: '', category: '', content: '', status: 'published' };
 export default function AdminPage() {
   // Auth
   const [authed, setAuthed] = useState(false);
+  const [managerToken, setManagerToken] = useState('');
+  const [managerInfo, setManagerInfo] = useState<{ managerId: string; displayName: string; role: string } | null>(null);
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutSecsLeft, setLockoutSecsLeft] = useState(0);
@@ -114,7 +113,11 @@ export default function AdminPage() {
   const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
 
   // Sidebar view
-  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets'>('articles');
+  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets' | 'audit'>('articles');
+
+  // Audit log
+  const [auditLogs, setAuditLogs] = useState<{ id: string; timestamp: string; action: string; entity: string; entityId: string; entityTitle: string; performedBy: string; meta?: Record<string, string> }[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -132,10 +135,24 @@ export default function AdminPage() {
   // Delete confirm modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Auth effects
+  // Auth effects — restore JWT session
   useEffect(() => {
-    const stored = sessionStorage.getItem('admin_auth');
-    if (stored === 'true') setAuthed(true);
+    const token = sessionStorage.getItem('mgr_token');
+    const info = sessionStorage.getItem('mgr_info');
+    if (token && info) {
+      try {
+        // Decode JWT payload (base64url middle segment) to check expiry
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
+          setManagerToken(token);
+          setManagerInfo(JSON.parse(info));
+          setAuthed(true);
+        } else {
+          sessionStorage.removeItem('mgr_token');
+          sessionStorage.removeItem('mgr_info');
+        }
+      } catch { /* stale token */ }
+    }
     const theme = localStorage.getItem('theme');
     if (theme === 'dark') setDarkMode(true);
   }, []);
@@ -158,38 +175,75 @@ export default function AdminPage() {
     }
   }, [lockoutUntil]);
 
-  useEffect(() => {
-    if (authed && API_BASE) {
-      setTicketsLoading(true);
-      setTicketsError('');
-      fetch(`${API_BASE}/tickets`, { headers: { 'X-Admin-Secret': ADMIN_SECRET } })
-        .then((r) => {
-          if (!r.ok) throw new Error(`${r.status}`);
-          return r.json();
-        })
-        .then((data) => setTickets(Array.isArray(data) ? data : []))
-        .catch(() => setTicketsError('Could not load tickets. Check your connection or API config.'))
-        .finally(() => setTicketsLoading(false));
-    }
-  }, [authed]);
+  const authHeaders = useCallback((token: string) => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  }), []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const fetchTickets = useCallback((token: string) => {
+    if (!API_BASE) return;
+    setTicketsLoading(true);
+    setTicketsError('');
+    fetch(`${API_BASE}/tickets`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+      .then((data) => setTickets(Array.isArray(data) ? data : []))
+      .catch(() => setTicketsError('Could not load tickets. Check your connection or API config.'))
+      .finally(() => setTicketsLoading(false));
+  }, []);
+
+  const fetchAuditLogs = useCallback((token: string) => {
+    if (!API_BASE) return;
+    setAuditLoading(true);
+    fetch(`${API_BASE}/audit-log`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setAuditLogs(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setAuditLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (authed && managerToken) {
+      fetchTickets(managerToken);
+      fetchAuditLogs(managerToken);
+    }
+  }, [authed, managerToken, fetchTickets, fetchAuditLogs]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutUntil && Date.now() < lockoutUntil) return;
-    if (passwordInput === ADMIN_UI_PASSWORD) {
-      sessionStorage.setItem('admin_auth', 'true');
-      setAuthed(true);
-      setAttempts(0);
-    } else {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      if (newAttempts >= MAX_ATTEMPTS) {
-        const until = Date.now() + LOCKOUT_SECONDS * 1000;
-        setLockoutUntil(until);
-        setAuthError(`Too many failed attempts. Login disabled for ${LOCKOUT_SECONDS}s.`);
+    if (!usernameInput || !passwordInput) { setAuthError('Enter your username and password.'); return; }
+    setLoginLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameInput, password: passwordInput }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        sessionStorage.setItem('mgr_token', data.token);
+        sessionStorage.setItem('mgr_info', JSON.stringify({ managerId: data.managerId, displayName: data.displayName, role: data.role }));
+        setManagerToken(data.token);
+        setManagerInfo({ managerId: data.managerId, displayName: data.displayName, role: data.role });
+        setAuthed(true);
+        setAttempts(0);
       } else {
-        setAuthError(`Incorrect password. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_SECONDS * 1000;
+          setLockoutUntil(until);
+          setAuthError(`Too many failed attempts. Login disabled for ${LOCKOUT_SECONDS}s.`);
+        } else {
+          setAuthError(`Invalid credentials. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
+        }
       }
+    } catch {
+      setAuthError('Connection error. Please try again.');
+    } finally {
+      setLoginLoading(false);
+      setPasswordInput('');
     }
   };
 
@@ -227,10 +281,11 @@ export default function AdminPage() {
     setFormMsg('');
     try {
       const method = editingId ? 'PUT' : 'POST';
-      const body = editingId ? { ...form, id: editingId } : form;
-      const res = await fetch(`${API_BASE}/faq`, {
+      const url = editingId ? `${API_BASE}/faq/${editingId}` : `${API_BASE}/faq`;
+      const body = editingId ? { ...form } : form;
+      const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET },
+        headers: authHeaders(managerToken),
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Failed');
@@ -262,7 +317,7 @@ export default function AdminPage() {
     setDeleteConfirmId(null);
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: { 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET } });
+      const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: authHeaders(managerToken) });
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
     } catch { setError('Failed to delete article. Please try again.'); }
@@ -274,7 +329,7 @@ export default function AdminPage() {
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     try {
-      await fetch(`${API_BASE}/faq`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Time': new Date().toISOString(), 'X-Client-Version': '1.0', 'X-Admin-Secret': ADMIN_SECRET }, body: JSON.stringify({ id: article.id, status: newStatus }) });
+      await fetch(`${API_BASE}/faq/${article.id}`, { method: 'PUT', headers: authHeaders(managerToken), body: JSON.stringify({ status: newStatus }) });
       setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
     } catch { setError('Failed to update status. Please try again.'); }
     finally { setTogglingId(null); }
@@ -291,8 +346,8 @@ export default function AdminPage() {
       try {
         const res = await fetch(`${API_BASE}/tickets/${ticketId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
-          body: JSON.stringify(updated),
+          headers: authHeaders(managerToken),
+          body: JSON.stringify({ status: 'solved' }),
         });
         if (!res.ok) throw new Error('Failed');
       } catch {
@@ -304,7 +359,16 @@ export default function AdminPage() {
     }
   };
 
-  const logout = () => { sessionStorage.removeItem('admin_auth'); setAuthed(false); };
+  const logout = () => {
+    if (API_BASE && managerToken) {
+      fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: authHeaders(managerToken) }).catch(() => {});
+    }
+    sessionStorage.removeItem('mgr_token');
+    sessionStorage.removeItem('mgr_info');
+    setManagerToken('');
+    setManagerInfo(null);
+    setAuthed(false);
+  };
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -350,15 +414,26 @@ export default function AdminPage() {
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Manager Portal</h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
           <form onSubmit={handleLogin}>
+            <div style={{ marginBottom: '0.875rem' }}>
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="Username"
+                disabled={isLocked || loginLoading}
+                autoComplete="username"
+                style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}></span>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter admin password"
-                disabled={isLocked}
-                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 2.75rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
+                placeholder="Password"
+                disabled={isLocked || loginLoading}
+                autoComplete="current-password"
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
               />
               <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}>
                 {showPassword ? 'Hide' : 'Show'}
@@ -366,14 +441,14 @@ export default function AdminPage() {
             </div>
             {authError && (
               <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
-                Warning: {authError}
+                {authError}
               </div>
             )}
             {isLocked && (
               <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {lockoutSecsLeft}s.</p>
             )}
-            <button type="submit" disabled={isLocked} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.5 : 1 }}>
-              Sign In
+            <button type="submit" disabled={isLocked || loginLoading} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked || loginLoading ? 'not-allowed' : 'pointer', opacity: isLocked || loginLoading ? 0.5 : 1 }}>
+              {loginLoading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
           <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
@@ -406,6 +481,7 @@ export default function AdminPage() {
             { id: 'articles', label: 'FAQ Articles', icon: 'fa-list' },
             { id: 'add', label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
             { id: 'tickets', label: 'Support Tickets', icon: 'fa-envelope' },
+            { id: 'audit', label: 'Audit Log', icon: 'fa-scroll' },
           ].map((item) => (
             <button
               key={item.id}
@@ -450,6 +526,7 @@ export default function AdminPage() {
               {activeView === 'articles' && 'FAQ Articles'}
               {activeView === 'add' && (editingId ? 'Edit Article' : 'Add New Article')}
               {activeView === 'tickets' && 'Support Tickets'}
+              {activeView === 'audit' && 'Audit Log'}
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Manager Portal · Indiabulls Securities
@@ -466,7 +543,7 @@ export default function AdminPage() {
             </button>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block', flexShrink: 0 }} />
-              Manager
+              {managerInfo?.displayName || 'Manager'}
             </span>
           </div>
         </div>
@@ -734,14 +811,7 @@ export default function AdminPage() {
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.75rem', color: '#E53E3E' }}><i className="fas fa-exclamation-circle"></i></div>
                     <p style={{ color: '#E53E3E', fontSize: '0.875rem', marginBottom: '1rem' }}>{ticketsError}</p>
-                    <button onClick={() => {
-                      setTicketsLoading(true); setTicketsError('');
-                      fetch(`${API_BASE}/tickets`, { headers: { 'X-Admin-Secret': ADMIN_SECRET } })
-                        .then(r => r.ok ? r.json() : Promise.reject())
-                        .then(data => setTickets(Array.isArray(data) ? data : []))
-                        .catch(() => setTicketsError('Could not load tickets. Check your connection or API config.'))
-                        .finally(() => setTicketsLoading(false));
-                    }} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
+                    <button onClick={() => fetchTickets(managerToken)} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
                   </div>
                 ) : tickets.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
@@ -782,6 +852,49 @@ export default function AdminPage() {
                   </table>
                 )}
               </div>
+            </div>
+          )}
+          {/* AUDIT LOG VIEW */}
+          {activeView === 'audit' && (
+            <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
+              <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid var(--admin-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
+                  Audit Log <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({auditLogs.length} entries — your actions only)</span>
+                </h2>
+                <button onClick={() => fetchAuditLogs(managerToken)} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}>
+                  <i className="fas fa-rotate-right"></i>
+                </button>
+              </div>
+              {auditLoading ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
+                  <i className="fas fa-spinner fa-spin" style={{ fontSize: '1.25rem', marginBottom: '0.5rem', display: 'block' }}></i> Loading…
+                </div>
+              ) : auditLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}>No audit entries yet. Your actions will appear here.</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--admin-row-hover)' }}>
+                        {['Time', 'Action', 'Entity', 'Title / ID', 'Details'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1.25rem', borderBottom: '2px solid #EDF2F7', color: 'var(--admin-text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log) => (
+                        <tr key={log.id} style={{ borderBottom: '1px solid var(--admin-border-subtle)' }}>
+                          <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleString('en-IN')}</td>
+                          <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--admin-text-primary)', whiteSpace: 'nowrap' }}>{log.action}</td>
+                          <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.8rem', color: 'var(--admin-text-secondary)' }}>{log.entity}</td>
+                          <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.8rem', color: 'var(--admin-text-primary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.entityTitle || log.entityId || '—'}</td>
+                          <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>{log.meta ? Object.entries(log.meta).map(([k, v]) => `${k}: ${v}`).join(', ') : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

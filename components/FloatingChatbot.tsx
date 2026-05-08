@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { trackEvent } from '@/lib/analytics';
 
 type Persona = 'general' | 'technical' | 'billing';
 
@@ -127,6 +128,7 @@ export default function FloatingChatbot() {
   const handlePersonaSelect = (p: Persona) => {
     setPersona(p);
     setShowInput(true);
+    trackEvent({ eventType: 'chatbot_persona_select', persona: p });
     const info = personas[p];
     addMessage(`Switched to ${info.name}. I'm ready to help with your ${p} queries!`, 'bot', ['GTT Issues', 'Funds Help', 'Open Account']);
   };
@@ -136,6 +138,7 @@ export default function FloatingChatbot() {
     if (!text) return;
     addMessage(text, 'user');
     setInputVal('');
+    trackEvent({ eventType: 'chatbot_message', chatInput: text.slice(0, 200), persona: persona || undefined });
     showTyping();
     setTimeout(() => handleResponse(text), 1200);
   };
@@ -145,7 +148,7 @@ export default function FloatingChatbot() {
   return (
     <div className="chatbot-container">
       {/* Floating bubble */}
-      <button className="chatbot-bubble" onClick={() => setOpen(o => !o)} aria-label="Open support chat">
+      <button className="chatbot-bubble" onClick={() => { const opening = !open; setOpen(o => !o); if (opening) trackEvent({ eventType: 'chatbot_open' }); }} aria-label="Open support chat">
         <i className="fas fa-comment-dots"></i>
         <span className="bubble-ping"></span>
       </button>
