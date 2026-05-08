@@ -39,7 +39,7 @@ if (existsSync(envFile)) {
 }
 
 const REGION          = process.env.AWS_REGION        || 'ap-south-1';
-const FUNCTION_NAME   = process.env.LAMBDA_FUNCTION   || 'ib-support-portal-api';
+const FUNCTION_NAME   = process.env.LAMBDA_FUNCTION   || 'ib-faq-handler';
 const LAMBDA_SRC      = join(ROOT, 'lambda', 'index.mjs');
 const ZIP_PATH        = join(tmpdir(), 'lambda-deploy.zip');
 
