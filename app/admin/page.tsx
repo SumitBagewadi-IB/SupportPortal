@@ -273,6 +273,13 @@ export default function AdminPage() {
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
+  const handleSessionExpired = useCallback(() => {
+    setManagerToken('');
+    setAuthed(false);
+    sessionStorage.removeItem('managerToken');
+    setAuthError('Your session has expired. Please log in again.');
+  }, []);
+
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.category || !form.content) { setFormMsg('All fields are required.'); return; }
@@ -288,6 +295,7 @@ export default function AdminPage() {
         headers: authHeaders(managerToken),
         body: JSON.stringify(body),
       });
+      if (res.status === 401) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error('Failed');
       setFormMsg(editingId ? 'Article updated successfully!' : 'Article added successfully!');
       setForm(emptyForm);
@@ -318,6 +326,7 @@ export default function AdminPage() {
     setDeletingId(id);
     try {
       const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: authHeaders(managerToken) });
+      if (res.status === 401) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
     } catch { setError('Failed to delete article. Please try again.'); }
@@ -329,7 +338,8 @@ export default function AdminPage() {
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     try {
-      await fetch(`${API_BASE}/faq/${article.id}`, { method: 'PUT', headers: authHeaders(managerToken), body: JSON.stringify({ status: newStatus }) });
+      const res = await fetch(`${API_BASE}/faq/${article.id}`, { method: 'PUT', headers: authHeaders(managerToken), body: JSON.stringify({ status: newStatus }) });
+      if (res.status === 401) { handleSessionExpired(); return; }
       setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
     } catch { setError('Failed to update status. Please try again.'); }
     finally { setTogglingId(null); }
