@@ -61,25 +61,32 @@ const MANAGERS_TABLE    = process.env.MANAGERS_TABLE    || 'ib-managers';
 
 const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
-const JWT_SECRET          = process.env.JWT_SECRET          || 'change-me-in-prod';
+const JWT_SECRET          = process.env.JWT_SECRET          || (() => { throw new Error('JWT_SECRET env var is required'); })();
 
 const TOKEN_TTL_SECS = 7200; // 2 hours
 
 const client = new DynamoDBClient({ region: REGION });
 const ddb    = DynamoDBDocumentClient.from(client);
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,Authorization',
-};
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+function corsHeaders(event) {
+  const origin = event.headers?.origin || event.headers?.Origin || '';
+  const allowed = ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin':  allowed || '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function resp(status, body, extra = {}) {
+function resp(status, body, extra = {}, event = {}) {
   return {
     statusCode: status,
-    headers: { 'Content-Type': 'application/json', ...CORS, ...extra },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(event), ...extra },
     body: JSON.stringify(body),
   };
 }
@@ -195,22 +202,24 @@ async function writeAudit({ action, entity, entityId, entityTitle, performedBy, 
 // ─── Router ────────────────────────────────────────────────────────────────
 
 export async function handler(event) {
+  const r = (status, body, extra = {}) => resp(status, body, extra, event);
+
   const method = event.requestContext?.http?.method || event.httpMethod || 'GET';
   const rawPath = event.rawPath || event.path || '/';
   const path = rawPath.replace(/\/$/, '') || '/';
 
-  if (method === 'OPTIONS') return resp(200, {});
+  if (method === 'OPTIONS') return r(200, {});
 
   let body = {};
   if (event.body) {
     try { body = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body); }
-    catch { return resp(400, { error: 'Invalid JSON body' }); }
+    catch { return r(400, { error: 'Invalid JSON body' }); }
   }
 
   // ── POST /auth/login ─────────────────────────────────────────────────────
   if (method === 'POST' && path === '/auth/login') {
     const { username, password } = body;
-    if (!username || !password) return resp(400, { error: 'username and password required' });
+    if (!username || !password) return r(400, { error: 'username and password required' });
 
     const ip = sourceIp(event);
     const ua = userAgent(event);
@@ -226,19 +235,47 @@ export async function handler(event) {
       manager = res.Items?.[0];
     } catch (e) {
       console.error('Login query failed:', e);
-      return resp(500, { error: 'Login temporarily unavailable' });
+      return r(500, { error: 'Login temporarily unavailable' });
     }
 
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_SECS = 900; // 15 minutes
+
     const fail = async (reason) => {
+      if (manager) {
+        const attempts = (manager.failedLoginAttempts || 0) + 1;
+        const lockedUntil = attempts >= MAX_ATTEMPTS ? new Date(Date.now() + LOCKOUT_SECS * 1000).toISOString() : null;
+        const updateExpr = lockedUntil
+          ? 'SET failedLoginAttempts = :a, lockedUntil = :l'
+          : 'SET failedLoginAttempts = :a';
+        const exprVals = lockedUntil
+          ? { ':a': attempts, ':l': lockedUntil }
+          : { ':a': attempts };
+        await ddb.send(new UpdateCommand({
+          TableName: MANAGERS_TABLE,
+          Key: { managerId: manager.managerId },
+          UpdateExpression: updateExpr,
+          ExpressionAttributeValues: exprVals,
+        }));
+      }
       await writeAudit({
         action: 'LOGIN_FAIL', entity: 'manager', entityId: username,
         entityTitle: username, performedBy: 'system',
         meta: { ip, userAgent: ua, reason },
       });
-      return resp(401, { error: 'Invalid credentials' });
+      return r(401, { error: 'Invalid credentials' }, {});
     };
 
     if (!manager || manager.status !== 'active') return fail('not_found_or_inactive');
+
+    if (manager.lockedUntil && new Date(manager.lockedUntil) > new Date()) {
+      await writeAudit({
+        action: 'LOGIN_BLOCKED', entity: 'manager', entityId: username,
+        entityTitle: username, performedBy: 'system',
+        meta: { ip, userAgent: ua, lockedUntil: manager.lockedUntil },
+      });
+      return r(429, { error: 'Account temporarily locked. Try again in 15 minutes.' }, {});
+    }
 
     const valid = await verifyPassword(password, manager.passwordHash || '');
     if (!valid) return fail('wrong_password');
@@ -248,8 +285,8 @@ export async function handler(event) {
     await ddb.send(new UpdateCommand({
       TableName: MANAGERS_TABLE,
       Key: { managerId: manager.managerId },
-      UpdateExpression: 'SET lastLoginAt = :t',
-      ExpressionAttributeValues: { ':t': new Date().toISOString() },
+      UpdateExpression: 'SET lastLoginAt = :t, failedLoginAttempts = :z REMOVE lockedUntil',
+      ExpressionAttributeValues: { ':t': new Date().toISOString(), ':z': 0 },
     }));
 
     await writeAudit({
@@ -258,26 +295,26 @@ export async function handler(event) {
       performedBy: manager.managerId, meta: { ip, userAgent: ua },
     });
 
-    return resp(200, { token, managerId: manager.managerId, displayName: manager.displayName, role: manager.role });
+    return r(200, { token, managerId: manager.managerId, displayName: manager.displayName, role: manager.role });
   }
 
   // ── POST /auth/logout ────────────────────────────────────────────────────
   if (method === 'POST' && path === '/auth/logout') {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     await writeAudit({
       action: 'LOGOUT', entity: 'manager', entityId: auth.performedBy,
       entityTitle: auth.displayName || auth.performedBy, performedBy: auth.performedBy,
       meta: { ip: sourceIp(event) },
     });
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── POST /analytics ──────────────────────────────────────────────────────
   if (method === 'POST' && path === '/analytics') {
     const ALLOWED_TYPES = ['article_view','search','chatbot_open','chatbot_persona_select','chatbot_message','ticket_submit','faq_feedback','admin_login_fail'];
     const { eventType, sessionId, articleId, articleTitle, category, searchTerm, searchResultCount, feedbackType, persona, chatInput, ticketCategory } = body;
-    if (!ALLOWED_TYPES.includes(eventType)) return resp(400, { error: 'Invalid eventType' });
+    if (!ALLOWED_TYPES.includes(eventType)) return r(400, { error: 'Invalid eventType' });
     await ddb.send(new PutCommand({
       TableName: ANALYTICS_TABLE,
       Item: {
@@ -298,12 +335,12 @@ export async function handler(event) {
         userAgent: userAgent(event),
       },
     }));
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── GET /analytics/summary ───────────────────────────────────────────────
   if (method === 'GET' && path === '/analytics/summary') {
-    if (!requireMaster(event)) return resp(403, { error: 'Forbidden' });
+    if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const days = parseInt(event.queryStringParameters?.days || '30', 10);
     const since = new Date(Date.now() - days * 86400000).toISOString();
     try {
@@ -352,30 +389,30 @@ export async function handler(event) {
       // Sort and top-N
       summary.top_articles = Object.entries(summary.top_articles).sort((a, b) => b[1] - a[1]).slice(0, 10);
       summary.top_searches = Object.entries(summary.top_searches).sort((a, b) => b[1] - a[1]).slice(0, 20);
-      return resp(200, summary);
+      return r(200, summary);
     } catch (e) {
       console.error('Analytics summary error:', e);
-      return resp(500, { error: 'Failed to load analytics' });
+      return r(500, { error: 'Failed to load analytics' });
     }
   }
 
   // ── GET /managers ─────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/managers') {
-    if (!requireMaster(event)) return resp(403, { error: 'Forbidden' });
+    if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const res = await ddb.send(new ScanCommand({
       TableName: MANAGERS_TABLE,
       ProjectionExpression: 'managerId, username, displayName, email, #r, #s, createdAt, lastLoginAt, deactivatedAt, createdBy',
       ExpressionAttributeNames: { '#r': 'role', '#s': 'status' },
     }));
-    return resp(200, res.Items || []);
+    return r(200, res.Items || []);
   }
 
   // ── POST /managers ────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/managers') {
-    if (!requireMaster(event)) return resp(403, { error: 'Forbidden' });
+    if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const { username, displayName, email, role, password } = body;
-    if (!username || !displayName || !email || !password) return resp(400, { error: 'username, displayName, email, password required' });
-    if (password.length < 8) return resp(400, { error: 'Password must be at least 8 characters' });
+    if (!username || !displayName || !email || !password) return r(400, { error: 'username, displayName, email, password required' });
+    if (password.length < 8) return r(400, { error: 'Password must be at least 8 characters' });
     const allowed_roles = ['manager', 'senior_manager'];
     const managerRole = allowed_roles.includes(role) ? role : 'manager';
 
@@ -386,7 +423,7 @@ export async function handler(event) {
       KeyConditionExpression: 'username = :u',
       ExpressionAttributeValues: { ':u': username },
     }));
-    if (existing.Items?.length > 0) return resp(409, { error: 'Username already exists' });
+    if (existing.Items?.length > 0) return r(409, { error: 'Username already exists' });
 
     const managerId = `mgr_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const passwordHash = await hashPassword(password);
@@ -408,13 +445,13 @@ export async function handler(event) {
       performedBy: 'masteradmin', meta: { username, email, role: managerRole },
     });
 
-    return resp(201, { managerId, ok: true });
+    return r(201, { managerId, ok: true });
   }
 
   // ── PUT /managers/{id} ────────────────────────────────────────────────────
   const managerPutMatch = path.match(/^\/managers\/([^/]+)$/);
   if (method === 'PUT' && managerPutMatch) {
-    if (!requireMaster(event)) return resp(403, { error: 'Forbidden' });
+    if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const managerId = managerPutMatch[1];
     const updates = {};
     const exprParts = [];
@@ -423,7 +460,7 @@ export async function handler(event) {
 
     if (body.status) {
       const allowed = ['active', 'deactivated'];
-      if (!allowed.includes(body.status)) return resp(400, { error: 'Invalid status' });
+      if (!allowed.includes(body.status)) return r(400, { error: 'Invalid status' });
       exprParts.push('#s = :s');
       exprNames['#s'] = 'status';
       exprVals[':s'] = body.status;
@@ -434,7 +471,7 @@ export async function handler(event) {
       updates.status = body.status;
     }
     if (body.password) {
-      if (body.password.length < 8) return resp(400, { error: 'Password too short' });
+      if (body.password.length < 8) return r(400, { error: 'Password too short' });
       exprParts.push('passwordHash = :ph');
       exprVals[':ph'] = await hashPassword(body.password);
       updates.passwordReset = true;
@@ -446,13 +483,13 @@ export async function handler(event) {
     }
     if (body.role) {
       const allowed = ['manager', 'senior_manager'];
-      if (!allowed.includes(body.role)) return resp(400, { error: 'Invalid role' });
+      if (!allowed.includes(body.role)) return r(400, { error: 'Invalid role' });
       exprParts.push('#r = :r');
       exprNames['#r'] = 'role';
       exprVals[':r'] = body.role;
       updates.role = body.role;
     }
-    if (!exprParts.length) return resp(400, { error: 'Nothing to update' });
+    if (!exprParts.length) return r(400, { error: 'Nothing to update' });
 
     await ddb.send(new UpdateCommand({
       TableName: MANAGERS_TABLE,
@@ -468,7 +505,7 @@ export async function handler(event) {
       performedBy: 'masteradmin', meta: updates,
     });
 
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── GET /faq ──────────────────────────────────────────────────────────────
@@ -483,19 +520,19 @@ export async function handler(event) {
         meta: { count: items.length },
       });
     }
-    return resp(200, items);
+    return r(200, items);
   }
 
   // ── POST /faq ─────────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/faq') {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const { title, category, content, status = 'published', id } = body;
 
     if (id && !title && !content) {
       // Status-only toggle
       const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
-      if (!existing.Item) return resp(404, { error: 'Article not found' });
+      if (!existing.Item) return r(404, { error: 'Article not found' });
       await ddb.send(new UpdateCommand({
         TableName: FAQ_TABLE,
         Key: { id },
@@ -504,10 +541,10 @@ export async function handler(event) {
         ExpressionAttributeValues: { ':s': body.status || 'published', ':t': new Date().toISOString() },
       }));
       await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: existing.Item.title, performedBy: auth.performedBy, meta: { newStatus: body.status } });
-      return resp(200, { ok: true });
+      return r(200, { ok: true });
     }
 
-    if (!title || !category || !content) return resp(400, { error: 'title, category, content required' });
+    if (!title || !category || !content) return r(400, { error: 'title, category, content required' });
     const newId = id || `art-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
     await ddb.send(new PutCommand({
@@ -515,14 +552,14 @@ export async function handler(event) {
       Item: { id: newId, title, category, content, status, createdAt: now, updatedAt: now },
     }));
     await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: title, performedBy: auth.performedBy, meta: { category, status } });
-    return resp(201, { id: newId, ok: true });
+    return r(201, { id: newId, ok: true });
   }
 
   // ── PUT /faq/{id} ─────────────────────────────────────────────────────────
   const faqPutMatch = path.match(/^\/faq\/([^/]+)$/);
   if (method === 'PUT' && faqPutMatch) {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const id = faqPutMatch[1];
     const { title, category, content, status } = body;
     const exprParts = ['updatedAt = :t'];
@@ -542,26 +579,26 @@ export async function handler(event) {
       ExpressionAttributeValues: exprVals,
     }));
     await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existing.Item?.title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── DELETE /faq/{id} ──────────────────────────────────────────────────────
   const faqDeleteMatch = path.match(/^\/faq\/([^/]+)$/);
   if (method === 'DELETE' && faqDeleteMatch) {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const id = faqDeleteMatch[1];
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
     const title = existing.Item?.title || id;
     await ddb.send(new DeleteCommand({ TableName: FAQ_TABLE, Key: { id } }));
     await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy });
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── GET /tickets ──────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/tickets') {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const res = await ddb.send(new ScanCommand({ TableName: TICKETS_TABLE }));
     const items = (res.Items || []).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     await writeAudit({
@@ -569,13 +606,13 @@ export async function handler(event) {
       entityTitle: `${items.length} tickets`, performedBy: auth.performedBy,
       meta: { count: items.length },
     });
-    return resp(200, items);
+    return r(200, items);
   }
 
   // ── POST /tickets ─────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/tickets') {
     const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId } = body;
-    if (!name || !email || !subject) return resp(400, { error: 'name, email, subject required' });
+    if (!name || !email || !subject) return r(400, { error: 'name, email, subject required' });
     const ticketId = id || `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
     const now = createdAt || new Date().toISOString();
     await ddb.send(new PutCommand({
@@ -594,17 +631,17 @@ export async function handler(event) {
       entityId: ticketId, entityTitle: subject,
       performedBy: 'public', meta: { name, email, category, ip: sourceIp(event) },
     });
-    return resp(201, { id: ticketId, ok: true });
+    return r(201, { id: ticketId, ok: true });
   }
 
   // ── PUT /tickets/{id} ─────────────────────────────────────────────────────
   const ticketPutMatch = path.match(/^\/tickets\/([^/]+)$/);
   if (method === 'PUT' && ticketPutMatch) {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const id = ticketPutMatch[1];
     const existing = await ddb.send(new GetCommand({ TableName: TICKETS_TABLE, Key: { id } }));
-    if (!existing.Item) return resp(404, { error: 'Ticket not found' });
+    if (!existing.Item) return r(404, { error: 'Ticket not found' });
     const oldStatus = existing.Item.status;
     const newStatus = body.status || oldStatus;
     await ddb.send(new UpdateCommand({
@@ -620,13 +657,13 @@ export async function handler(event) {
       performedBy: auth.performedBy,
       meta: { oldStatus, newStatus },
     });
-    return resp(200, { ok: true });
+    return r(200, { ok: true });
   }
 
   // ── GET /audit-log ─────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/audit-log') {
     const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return resp(401, { error: 'Unauthorized' });
+    if (!auth.ok) return r(401, { error: 'Unauthorized' });
 
     let items;
     if (auth.role === 'manager') {
@@ -644,8 +681,8 @@ export async function handler(event) {
     }
 
     items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    return resp(200, items);
+    return r(200, items);
   }
 
-  return resp(404, { error: 'Not found' });
+  return r(404, { error: 'Not found' });
 }
