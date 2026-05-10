@@ -539,6 +539,10 @@ export async function handler(event) {
     const categoryFilter = event.queryStringParameters?.category;
     const res = await ddb.send(new ScanCommand({ TableName: FAQ_TABLE }));
     let items = res.Items || [];
+    // Public users only see published articles; managers/master see all
+    if (!auth.ok) {
+      items = items.filter(i => !i.status || i.status === 'published');
+    }
     if (categoryFilter) {
       items = items.filter(i => i.category?.toLowerCase() === categoryFilter.toLowerCase());
     }
