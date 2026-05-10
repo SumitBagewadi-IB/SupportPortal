@@ -330,6 +330,38 @@ export default function MasterAdminPage() {
     URL.revokeObjectURL(url);
   };
 
+  // ── Must be defined before any early return (Rules of Hooks) ─────────────
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'overview',   label: 'Overview',        icon: 'fa-tachometer-alt' },
+    { id: 'managers',   label: 'Manager Accounts', icon: 'fa-users-cog' },
+    { id: 'audit',      label: 'Audit Log',        icon: 'fa-history' },
+    { id: 'analytics',  label: 'Analytics',        icon: 'fa-chart-bar' },
+    { id: 'tickets',    label: 'Tickets',          icon: 'fa-ticket-alt' },
+    { id: 'faq',        label: 'FAQ Articles',     icon: 'fa-book' },
+  ];
+
+  const managerSummary = useMemo(() => {
+    const map: Record<string, { name: string; actions: number; lastSeen: string; faqCreated: number; faqUpdated: number; faqDeleted: number; ticketsUpdated: number }> = {};
+    for (const log of auditLogs) {
+      const who = log.performedBy || 'admin';
+      if (who === 'public') continue;
+      if (!map[who]) map[who] = { name: who, actions: 0, lastSeen: log.timestamp, faqCreated: 0, faqUpdated: 0, faqDeleted: 0, ticketsUpdated: 0 };
+      map[who].actions++;
+      if (new Date(log.timestamp) > new Date(map[who].lastSeen)) map[who].lastSeen = log.timestamp;
+      if (log.action === 'CREATE_FAQ') map[who].faqCreated++;
+      if (log.action === 'UPDATE_FAQ') map[who].faqUpdated++;
+      if (log.action === 'DELETE_FAQ') map[who].faqDeleted++;
+      if (log.action === 'UPDATE_TICKET') map[who].ticketsUpdated++;
+    }
+    return Object.values(map).sort((a, b) => b.actions - a.actions);
+  }, [auditLogs]);
+
+  const filteredManagers = useMemo(() => {
+    if (!managerSearch) return managers;
+    const q = managerSearch.toLowerCase();
+    return managers.filter(m => m.username?.toLowerCase().includes(q) || m.displayName?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q));
+  }, [managers, managerSearch]);
+
   if (!mounted) return null;
 
   // ── Login screen ──────────────────────────────────────────────────────────
@@ -377,40 +409,6 @@ export default function MasterAdminPage() {
       </div>
     );
   }
-
-  // ── Dashboard ─────────────────────────────────────────────────────────────
-  const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'overview',   label: 'Overview',        icon: 'fa-tachometer-alt' },
-    { id: 'managers',   label: 'Manager Accounts', icon: 'fa-users-cog' },
-    { id: 'audit',      label: 'Audit Log',        icon: 'fa-history' },
-    { id: 'analytics',  label: 'Analytics',        icon: 'fa-chart-bar' },
-    { id: 'tickets',    label: 'Tickets',          icon: 'fa-ticket-alt' },
-    { id: 'faq',        label: 'FAQ Articles',     icon: 'fa-book' },
-  ];
-
-  // Derive manager activity summary from audit logs (memoized — O(n) scan, skips on re-renders)
-  const managerSummary = useMemo(() => {
-    const map: Record<string, { name: string; actions: number; lastSeen: string; faqCreated: number; faqUpdated: number; faqDeleted: number; ticketsUpdated: number }> = {};
-    for (const log of auditLogs) {
-      const who = log.performedBy || 'admin';
-      if (who === 'public') continue;
-      if (!map[who]) map[who] = { name: who, actions: 0, lastSeen: log.timestamp, faqCreated: 0, faqUpdated: 0, faqDeleted: 0, ticketsUpdated: 0 };
-      map[who].actions++;
-      if (new Date(log.timestamp) > new Date(map[who].lastSeen)) map[who].lastSeen = log.timestamp;
-      if (log.action === 'CREATE_FAQ') map[who].faqCreated++;
-      if (log.action === 'UPDATE_FAQ') map[who].faqUpdated++;
-      if (log.action === 'DELETE_FAQ') map[who].faqDeleted++;
-      if (log.action === 'UPDATE_TICKET') map[who].ticketsUpdated++;
-    }
-    return Object.values(map).sort((a, b) => b.actions - a.actions);
-  }, [auditLogs]);
-
-  // Manager search filter
-  const filteredManagers = useMemo(() => {
-    if (!managerSearch) return managers;
-    const q = managerSearch.toLowerCase();
-    return managers.filter(m => m.username?.toLowerCase().includes(q) || m.displayName?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q));
-  }, [managers, managerSearch]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-subtle)' }}>
