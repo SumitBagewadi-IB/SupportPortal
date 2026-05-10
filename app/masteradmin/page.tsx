@@ -29,6 +29,7 @@ interface Manager {
   lastLoginAt?: string;
 }
 
+interface ArticleFeedback { title: string; category: string; helpful: number; not_helpful: number; total: number; pct: number; }
 interface AnalyticsSummary {
   period_days: number;
   article_views: number;
@@ -42,6 +43,8 @@ interface AnalyticsSummary {
   top_searches: [string, number][];
   persona_counts: Record<string, number>;
   tickets_by_category: Record<string, number>;
+  article_feedback: ArticleFeedback[];
+  zero_result_searches: number;
 }
 
 interface Ticket {
@@ -794,14 +797,18 @@ export default function MasterAdminPage() {
                 </button>
                 {analytics && (
                   <button onClick={() => {
+                    const totalFb = analytics.faq_feedback_helpful + analytics.faq_feedback_not_helpful;
                     const rows = [
                       { metric: 'Article Views', value: analytics.article_views },
                       { metric: 'Searches', value: analytics.searches },
+                      { metric: 'Zero-Result Searches', value: analytics.zero_result_searches ?? 0 },
                       { metric: 'Chatbot Opens', value: analytics.chatbot_opens },
                       { metric: 'Chatbot Messages', value: analytics.chatbot_messages },
+                      { metric: 'Avg Messages/Session', value: analytics.chatbot_opens > 0 ? (analytics.chatbot_messages / analytics.chatbot_opens).toFixed(1) : 0 },
                       { metric: 'Tickets Submitted', value: analytics.ticket_submits },
                       { metric: 'Helpful Feedback', value: analytics.faq_feedback_helpful },
                       { metric: 'Not Helpful Feedback', value: analytics.faq_feedback_not_helpful },
+                      { metric: 'Overall Satisfaction %', value: totalFb > 0 ? `${Math.round((analytics.faq_feedback_helpful / totalFb) * 100)}%` : '—' },
                     ];
                     exportCSV(rows as unknown as Record<string, unknown>[], `analytics-${analyticsDays}d.csv`);
                   }} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
@@ -817,37 +824,46 @@ export default function MasterAdminPage() {
             ) : (
               <>
                 {/* KPI row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                  {[
-                    { label: 'Article Views',    value: analytics.article_views,    icon: 'fa-eye',            color: '#00AB4E', bg: '#D1FAE5' },
-                    { label: 'Searches',          value: analytics.searches,          icon: 'fa-search',         color: '#1E40AF', bg: '#DBEAFE' },
-                    { label: 'Chatbot Opens',     value: analytics.chatbot_opens,     icon: 'fa-comment-dots',   color: '#5B21B6', bg: '#EDE9FE' },
-                    { label: 'Chatbot Messages',  value: analytics.chatbot_messages,  icon: 'fa-paper-plane',    color: '#92400E', bg: '#FEF3C7' },
-                    { label: 'Tickets Submitted', value: analytics.ticket_submits,    icon: 'fa-ticket-alt',     color: '#991B1B', bg: '#FEE2E2' },
-                    { label: 'Helpful Feedback',  value: analytics.faq_feedback_helpful, icon: 'fa-thumbs-up',  color: '#065F46', bg: '#D1FAE5' },
-                    { label: 'Not Helpful',       value: analytics.faq_feedback_not_helpful, icon: 'fa-thumbs-down', color: '#374151', bg: '#F3F4F6' },
-                  ].map(kpi => (
-                    <div key={kpi.label} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.125rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 9, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <i className={`fas ${kpi.icon}`} style={{ color: kpi.color, fontSize: '1rem' }}></i>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                  {(() => {
+                    const totalFeedback = analytics.faq_feedback_helpful + analytics.faq_feedback_not_helpful;
+                    const satisfactionPct = totalFeedback > 0 ? Math.round((analytics.faq_feedback_helpful / totalFeedback) * 100) : null;
+                    return [
+                      { label: 'Article Views',    value: analytics.article_views,    icon: 'fa-eye',            color: '#00AB4E', bg: '#D1FAE5' },
+                      { label: 'Searches',          value: analytics.searches,          icon: 'fa-search',         color: '#1E40AF', bg: '#DBEAFE' },
+                      { label: 'Zero-Result Searches', value: analytics.zero_result_searches ?? 0, icon: 'fa-exclamation-circle', color: '#B45309', bg: '#FEF3C7' },
+                      { label: 'Chatbot Opens',     value: analytics.chatbot_opens,     icon: 'fa-comment-dots',   color: '#5B21B6', bg: '#EDE9FE' },
+                      { label: 'Chatbot Messages',  value: analytics.chatbot_messages,  icon: 'fa-paper-plane',    color: '#92400E', bg: '#FEF3C7' },
+                      { label: 'Tickets Submitted', value: analytics.ticket_submits,    icon: 'fa-ticket-alt',     color: '#991B1B', bg: '#FEE2E2' },
+                      { label: 'Helpful Feedback',  value: analytics.faq_feedback_helpful, icon: 'fa-thumbs-up',  color: '#065F46', bg: '#D1FAE5' },
+                      { label: 'Not Helpful',       value: analytics.faq_feedback_not_helpful, icon: 'fa-thumbs-down', color: '#991B1B', bg: '#FEE2E2' },
+                      { label: 'Satisfaction',      value: satisfactionPct !== null ? `${satisfactionPct}%` : '—', icon: 'fa-star', color: '#D97706', bg: '#FEF3C7' },
+                    ];
+                  })().map(kpi => (
+                    <div key={kpi.label} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`fas ${kpi.icon}`} style={{ color: kpi.color, fontSize: '0.9rem' }}></i>
                       </div>
                       <div>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.15rem' }}>{kpi.label}</p>
-                        <p style={{ fontSize: '1.625rem', fontWeight: 800, color: 'var(--text-dark)', lineHeight: 1 }}>{kpi.value}</p>
+                        <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.15rem' }}>{kpi.label}</p>
+                        <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-dark)', lineHeight: 1 }}>{kpi.value}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-                  {/* Top Articles */}
+                {/* Row 1: Top Articles + Top Searches */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                  {/* Top Articles by Views */}
                   <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Top Articles by Views</h3>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                      <i className="fas fa-eye" style={{ color: '#00AB4E', marginRight: '0.5rem' }}></i>Top Articles by Views
+                    </h3>
                     {analytics.top_articles.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : analytics.top_articles.map(([title, count]) => (
                       <div key={title} style={{ marginBottom: '0.625rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
-                          <span style={{ color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>{title}</span>
-                          <span style={{ color: 'var(--text-muted)', flexShrink: 0, marginLeft: '0.5rem' }}>{count}</span>
+                          <span style={{ color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }} title={title}>{title}</span>
+                          <span style={{ color: 'var(--text-muted)', flexShrink: 0, marginLeft: '0.5rem', fontWeight: 600 }}>{count}</span>
                         </div>
                         <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
                           <div style={{ height: 4, background: '#00AB4E', borderRadius: 2, width: `${Math.round((count / (analytics.top_articles[0]?.[1] || 1)) * 100)}%` }} />
@@ -856,43 +872,118 @@ export default function MasterAdminPage() {
                     ))}
                   </div>
 
-                  {/* Top Searches */}
+                  {/* Top Search Terms */}
                   <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Top Search Terms</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem' }}>
+                        <i className="fas fa-search" style={{ color: '#1E40AF', marginRight: '0.5rem' }}></i>Top Search Terms
+                      </h3>
+                      {(analytics.zero_result_searches ?? 0) > 0 && (
+                        <span style={{ fontSize: '0.7rem', background: '#FEF3C7', color: '#B45309', padding: '0.2rem 0.5rem', borderRadius: 6, fontWeight: 600 }}>
+                          {analytics.zero_result_searches} zero-result
+                        </span>
+                      )}
+                    </div>
                     {analytics.top_searches.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : analytics.top_searches.slice(0, 10).map(([term, count]) => (
-                      <div key={term} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
+                      <div key={term} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
                         <span style={{ color: 'var(--text-dark)' }}>{term}</span>
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 600, background: 'var(--bg-subtle)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>{count}</span>
                       </div>
                     ))}
                   </div>
+                </div>
 
-                  {/* Chatbot Personas */}
-                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Chatbot Persona Usage</h3>
-                    {Object.keys(analytics.persona_counts).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : Object.entries(analytics.persona_counts).map(([persona, count]) => (
-                      <div key={persona} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
-                        <span style={{ color: 'var(--text-dark)', textTransform: 'capitalize' }}>{persona}</span>
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
-                      </div>
-                    ))}
-                  </div>
-
+                {/* Row 2: Tickets by Category + Chatbot Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
                   {/* Tickets by Category */}
                   <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
-                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>Tickets by Category</h3>
-                    {Object.keys(analytics.tickets_by_category).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : Object.entries(analytics.tickets_by_category).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
-                      <div key={cat} style={{ marginBottom: '0.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
-                          <span style={{ color: 'var(--text-dark)' }}>{cat}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{count}</span>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                      <i className="fas fa-ticket-alt" style={{ color: '#991B1B', marginRight: '0.5rem' }}></i>Tickets by Category
+                    </h3>
+                    {Object.keys(analytics.tickets_by_category).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No data yet.</p> : (() => {
+                      const entries = Object.entries(analytics.tickets_by_category).sort((a, b) => b[1] - a[1]);
+                      const max = entries[0]?.[1] || 1;
+                      return entries.map(([cat, count]) => (
+                        <div key={cat} style={{ marginBottom: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
+                            <span style={{ color: 'var(--text-dark)' }}>{cat}</span>
+                            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count} <span style={{ fontSize: '0.7rem' }}>({Math.round((count / analytics.ticket_submits) * 100)}%)</span></span>
+                          </div>
+                          <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
+                            <div style={{ height: 4, background: '#5B21B6', borderRadius: 2, width: `${Math.round((count / max) * 100)}%` }} />
+                          </div>
                         </div>
-                        <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
-                          <div style={{ height: 4, background: '#5B21B6', borderRadius: 2, width: `${Math.round((count / Math.max(...Object.values(analytics.tickets_by_category))) * 100)}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
+
+                  {/* Chatbot Stats */}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                      <i className="fas fa-comment-dots" style={{ color: '#5B21B6', marginRight: '0.5rem' }}></i>Chatbot Usage
+                    </h3>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem' }}>
+                      {[
+                        { label: 'Sessions Opened', value: analytics.chatbot_opens, color: '#5B21B6', bg: '#EDE9FE' },
+                        { label: 'Messages Sent', value: analytics.chatbot_messages, color: '#92400E', bg: '#FEF3C7' },
+                        { label: 'Msgs / Session', value: analytics.chatbot_opens > 0 ? (analytics.chatbot_messages / analytics.chatbot_opens).toFixed(1) : '—', color: '#065F46', bg: '#D1FAE5' },
+                      ].map(s => (
+                        <div key={s.label} style={{ flex: 1, background: s.bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
+                          <p style={{ fontSize: '1.375rem', fontWeight: 800, color: s.color, lineHeight: 1, marginBottom: '0.25rem' }}>{s.value}</p>
+                          <p style={{ fontSize: '0.65rem', color: s.color, fontWeight: 600, textTransform: 'uppercase', opacity: 0.8 }}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <h4 style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.8125rem', marginBottom: '0.625rem' }}>Persona Breakdown</h4>
+                    {Object.keys(analytics.persona_counts).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No persona data yet.</p> : (() => {
+                      const total = Object.values(analytics.persona_counts).reduce((a, b) => a + b, 0);
+                      return Object.entries(analytics.persona_counts).sort((a, b) => b[1] - a[1]).map(([persona, count]) => (
+                        <div key={persona} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.375rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.8125rem' }}>
+                          <span style={{ color: 'var(--text-dark)', textTransform: 'capitalize' }}>{persona}</span>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count} <span style={{ fontSize: '0.7rem' }}>({Math.round((count / total) * 100)}%)</span></span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Row 3: Per-Article Feedback Breakdown */}
+                <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                  <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                    <i className="fas fa-thumbs-up" style={{ color: '#065F46', marginRight: '0.5rem' }}></i>Per-Article Feedback
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '0.5rem' }}>sorted by most feedback received</span>
+                  </h3>
+                  {!analytics.article_feedback || analytics.article_feedback.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No article feedback yet. Users rate articles on the FAQ page.</p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                            {['Article', 'Category', '👍 Helpful', '👎 Not Helpful', 'Total', 'Satisfaction'].map(h => (
+                              <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Article' || h === 'Category' ? 'left' : 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analytics.article_feedback.map((row) => (
+                            <tr key={row.title} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '0.625rem 0.75rem', color: 'var(--text-dark)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.title}>{row.title}</td>
+                              <td style={{ padding: '0.625rem 0.75rem', color: 'var(--text-muted)' }}>{row.category || '—'}</td>
+                              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center', color: '#065F46', fontWeight: 600 }}>{row.helpful}</td>
+                              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center', color: '#991B1B', fontWeight: 600 }}>{row.not_helpful}</td>
+                              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center', color: 'var(--text-muted)' }}>{row.total}</td>
+                              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center' }}>
+                                <span style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 6, fontWeight: 700, fontSize: '0.8125rem', background: row.pct >= 70 ? '#D1FAE5' : row.pct >= 40 ? '#FEF3C7' : '#FEE2E2', color: row.pct >= 70 ? '#065F46' : row.pct >= 40 ? '#92400E' : '#991B1B' }}>
+                                  {row.pct}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </>
             )}

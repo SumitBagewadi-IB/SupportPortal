@@ -462,6 +462,8 @@ async function _handler(event) {
         top_searches: {},
         persona_counts: {},
         tickets_by_category: {},
+        article_feedback: {},
+        zero_result_searches: 0,
       };
       for (const item of items) {
         if (item.eventType === 'article_view') {
@@ -470,6 +472,7 @@ async function _handler(event) {
         } else if (item.eventType === 'search') {
           summary.searches++;
           if (item.searchTerm) summary.top_searches[item.searchTerm] = (summary.top_searches[item.searchTerm] || 0) + 1;
+          if (item.searchResultCount === 0) summary.zero_result_searches++;
         } else if (item.eventType === 'chatbot_open') {
           summary.chatbot_opens++;
         } else if (item.eventType === 'chatbot_message') {
@@ -480,12 +483,21 @@ async function _handler(event) {
         } else if (item.eventType === 'faq_feedback') {
           if (item.feedbackType === 'helpful') summary.faq_feedback_helpful++;
           else summary.faq_feedback_not_helpful++;
+          if (item.articleTitle) {
+            if (!summary.article_feedback[item.articleTitle]) summary.article_feedback[item.articleTitle] = { helpful: 0, not_helpful: 0, category: item.category || '' };
+            if (item.feedbackType === 'helpful') summary.article_feedback[item.articleTitle].helpful++;
+            else summary.article_feedback[item.articleTitle].not_helpful++;
+          }
         } else if (item.eventType === 'chatbot_persona_select') {
           if (item.persona) summary.persona_counts[item.persona] = (summary.persona_counts[item.persona] || 0) + 1;
         }
       }
       summary.top_articles = Object.entries(summary.top_articles).sort((a, b) => b[1] - a[1]).slice(0, 10);
       summary.top_searches = Object.entries(summary.top_searches).sort((a, b) => b[1] - a[1]).slice(0, 20);
+      summary.article_feedback = Object.entries(summary.article_feedback)
+        .map(([title, d]) => ({ title, category: d.category, helpful: d.helpful, not_helpful: d.not_helpful, total: d.helpful + d.not_helpful, pct: Math.round((d.helpful / (d.helpful + d.not_helpful)) * 100) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 20);
       return r(200, summary);
     } catch (e) {
       console.error('Analytics summary error:', e);
