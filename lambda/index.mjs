@@ -859,18 +859,23 @@ export async function handler(event) {
 
     let items;
     if (auth.role === 'manager') {
-      const res = await ddb.send(new ScanCommand({
+      // Use GSI performedBy-timestamp-index for O(1) manager-scoped lookup
+      const res = await ddb.send(new QueryCommand({
         TableName: AUDIT_TABLE,
-        FilterExpression: 'performedBy = :p',
+        IndexName: 'performedBy-timestamp-index',
+        KeyConditionExpression: 'performedBy = :p',
         ExpressionAttributeValues: { ':p': auth.performedBy },
+        ScanIndexForward: false, // newest first
+        Limit: 500,
       }));
       items = res.Items || [];
     } else {
-      const res = await ddb.send(new ScanCommand({ TableName: AUDIT_TABLE }));
+      // Master admin: full scan with a safety cap — fine for operational use
+      const res = await ddb.send(new ScanCommand({ TableName: AUDIT_TABLE, Limit: 1000 }));
       items = res.Items || [];
+      items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
 
-    items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return r(200, items);
   }
 
