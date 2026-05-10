@@ -64,6 +64,7 @@ export default function AdminPage() {
   // Articles
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [error, setError] = useState('');
 
   // Form
@@ -246,6 +247,7 @@ export default function AdminPage() {
       setArticles([]);
     }
     setLoading(false);
+    setLastRefreshed(new Date());
   }, []);
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
@@ -535,16 +537,20 @@ export default function AdminPage() {
               <i className="fas fa-bars"></i>
             </button>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: '#00AB4E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <i className="fas fa-shield-halved" style={{ color: '#fff', fontSize: '0.875rem' }}></i>
+              <i className="fas fa-shield-alt" style={{ color: '#fff', fontSize: '0.875rem' }}></i>
             </div>
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--admin-text-primary)', whiteSpace: 'nowrap' }}>Manager Portal</span>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: 20, background: '#00AB4E22', color: '#00AB4E', border: '1px solid #00AB4E55', whiteSpace: 'nowrap' }}>{managerInfo?.role?.toUpperCase() || 'MANAGER'}</span>
+            <span style={{ fontWeight: 800, color: 'var(--admin-text-primary)', fontSize: '0.9375rem', whiteSpace: 'nowrap' }}>Manager Portal</span>
+            <span className="hide-mobile" style={{ fontSize: '0.7rem', background: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.5rem', borderRadius: 20, fontWeight: 600, whiteSpace: 'nowrap' }}>{managerInfo?.role?.toUpperCase() || 'MANAGER'}</span>
           </div>
-          <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center', flexShrink: 0 }}>
-            <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={fetchArticles} disabled={loading} title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
+              <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
+              <span className="hide-mobile">{lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}</span>
+            </button>
+            <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
               <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
-            <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.4rem 0.75rem', borderRadius: 8, border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600 }}>
+            <button onClick={logout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
               <i className="fas fa-right-from-bracket"></i>
               <span className="hide-mobile">Sign out</span>
             </button>
