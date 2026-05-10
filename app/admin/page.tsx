@@ -488,7 +488,7 @@ export default function AdminPage() {
       {/* SIDEBAR */}
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 }}>
-          <Image src="/logo.svg" alt="Indiabulls Securities" width={110} height={39} style={{ width: 110, height: 'auto', minWidth: 0, flexShrink: 1 }} />
+          <Image src="/logo.svg" alt="Indiabulls Securities" width={110} height={42} style={{ width: 110, height: 'auto', minWidth: 0, flexShrink: 1, display: 'block' }} />
           <button onClick={() => setSidebarOpen(false)} className="admin-sidebar-close" style={{ background: 'none', border: 'none', color: '#A0AEC0', cursor: 'pointer', fontSize: '1rem', padding: '0.25rem', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fas fa-times"></i>
           </button>
@@ -582,7 +582,11 @@ export default function AdminPage() {
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', flexShrink: 0, color: s.iconColor }}><i className={`fas ${s.icon}`}></i></div>
                   <div>
                     <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--admin-text-secondary)', marginBottom: '0.25rem' }}>{s.label}</div>
-                    <div style={{ fontSize: '1.625rem', fontWeight: 800, color: 'var(--admin-text-primary)', lineHeight: 1 }}>{s.value}</div>
+                    {loading ? (
+                      <div style={{ width: 48, height: 26, borderRadius: 6, background: 'var(--admin-border)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                    ) : (
+                      <div style={{ fontSize: '1.625rem', fontWeight: 800, color: 'var(--admin-text-primary)', lineHeight: 1 }}>{s.value}</div>
+                    )}
                   </div>
                 </div>
               ))}
