@@ -34,7 +34,6 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               <a href="https://indiabullssecurities.com/terms-and-conditions" target="_blank" rel="noopener noreferrer">Terms of Service</a>
               <a href="https://indiabullssecurities.com/disclaimer" target="_blank" rel="noopener noreferrer">Disclosures</a>
               <a href="https://indiabullssecurities.com/disclaimer" target="_blank" rel="noopener noreferrer">Risk Disclosure</a>
-              <a href="https://indiabullssecurities.com/cookie-policy" target="_blank" rel="noopener noreferrer">Cookie Policy</a>
             </div>
             <div className="footer-col">
               <p className="footer-col-title">Regulatory</p>
