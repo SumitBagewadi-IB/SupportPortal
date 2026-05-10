@@ -636,7 +636,7 @@ export default function AdminPage() {
                 </select>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'default' | 'title' | 'category')}
+                  onChange={(e) => { setSortBy(e.target.value as 'default' | 'title' | 'category'); setPage(1); }}
                   style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', cursor: 'pointer' }}
                 >
                   <option value="default">Default Order</option>

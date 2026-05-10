@@ -139,7 +139,7 @@ export default function ContactPage() {
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/my-tickets" className="btn-primary">View My Tickets</Link>
             <button
-              onClick={() => { setSubmitted(false); setForm({ name: '', email: '', category: '', subject: '', description: '' }); }}
+              onClick={() => { setSubmitted(false); setForm({ name: '', email: '', category: '', subject: '', description: '' }); setSuggestions([]); }}
               style={{ padding: '0.625rem 1.25rem', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-mid)', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}
             >Submit Another</button>
           </div>
