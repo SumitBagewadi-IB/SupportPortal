@@ -40,17 +40,14 @@ export function trackEvent(payload: AnalyticsEvent): void {
   try {
     const sessionId = getSessionId();
     const body = JSON.stringify({ ...payload, sessionId });
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      navigator.sendBeacon(`${API_BASE}/analytics`, blob);
-    } else {
-      fetch(`${API_BASE}/analytics`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => {});
-    }
+    // Always use fetch — sendBeacon with application/json Blob triggers CORS preflight
+    // which API Gateway may reject. keepalive:true preserves fire-and-forget behaviour.
+    fetch(`${API_BASE}/analytics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {});
   } catch { /* fire-and-forget, never throw */ }
 }
 
