@@ -46,7 +46,8 @@ interface Ticket {
 const emptyForm = { title: '', category: '', content: '', status: 'published' };
 
 export default function AdminPage() {
-  // Auth
+  // Auth — lazy-init from sessionStorage to avoid login flash on hard refresh
+  const [authChecked, setAuthChecked] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [managerToken, setManagerToken] = useState('');
   const [managerInfo, setManagerInfo] = useState<{ managerId: string; displayName: string; role: string } | null>(null);
@@ -109,13 +110,12 @@ export default function AdminPage() {
   const [ticketSearch, setTicketSearch] = useState('');
   const [ticketPage, setTicketPage] = useState(1);
 
-  // Auth effects — restore JWT session
+  // Auth effects — restore JWT session synchronously before first paint
   useEffect(() => {
     const token = sessionStorage.getItem('mgr_token');
     const info = sessionStorage.getItem('mgr_info');
     if (token && info) {
       try {
-        // Decode JWT payload (base64url middle segment) to check expiry
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
           setManagerToken(token);
@@ -129,6 +129,7 @@ export default function AdminPage() {
     }
     const theme = localStorage.getItem('theme');
     if (theme === 'dark') setDarkMode(true);
+    setAuthChecked(true);
   }, []);
 
   useEffect(() => {
@@ -416,6 +417,10 @@ export default function AdminPage() {
   const openTickets = tickets.filter((t) => t.status !== 'solved' && t.status !== 'resolved').length;
 
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
+  if (!authChecked) {
+    return <div style={{ position: 'fixed', inset: 0, background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="fas fa-spinner fa-spin" style={{ color: '#00AB4E', fontSize: '2rem' }}></i></div>;
+  }
+
   if (!authed) {
     const isLocked = lockoutUntil !== null && Date.now() < lockoutUntil;
     return (

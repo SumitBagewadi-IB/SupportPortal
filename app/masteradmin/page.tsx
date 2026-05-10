@@ -390,7 +390,7 @@ export default function MasterAdminPage() {
     return managers.filter(m => m.username?.toLowerCase().includes(q) || m.displayName?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q));
   }, [managers, managerSearch]);
 
-  if (!mounted) return null;
+  if (!mounted) return <div style={{ position: 'fixed', inset: 0, background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="fas fa-spinner fa-spin" style={{ color: '#00AB4E', fontSize: '2rem' }}></i></div>;
 
   // ── Login screen ──────────────────────────────────────────────────────────
   if (!authed) {
