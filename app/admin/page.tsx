@@ -104,6 +104,7 @@ export default function AdminPage() {
   const [sortBy, setSortBy] = useState<'default' | 'title' | 'category'>('default');
   const [orderChanged, setOrderChanged] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [reorderCategory, setReorderCategory] = useState<string>('');
   // Delete confirm modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Toast notification
@@ -273,6 +274,7 @@ export default function AdminPage() {
     setArticles(next);
     setOrderChanged(true);
     setSortBy('default');
+    if (category) setReorderCategory(category);
   };
 
   const showToast = useCallback((msg: string) => {
@@ -284,7 +286,11 @@ export default function AdminPage() {
   const saveOrder = useCallback(async () => {
     setSavingOrder(true);
     try {
-      await Promise.all(articles.map((a, i) =>
+      // Only update articles in the category being reordered, with sortOrder = position within that category
+      const toUpdate = reorderCategory
+        ? articles.filter(a => a.category === reorderCategory)
+        : articles;
+      await Promise.all(toUpdate.map((a, i) =>
         fetch(`${API_BASE}/faq/${a.id}`, {
           method: 'PUT',
           headers: { ...authHeaders(managerToken), 'Content-Type': 'application/json' },
@@ -292,12 +298,13 @@ export default function AdminPage() {
         })
       ));
       setOrderChanged(false);
+      setReorderCategory('');
       showToast('Order saved!');
     } catch {
       showToast('Failed to save order.');
     }
     setSavingOrder(false);
-  }, [articles, managerToken, showToast]);
+  }, [articles, managerToken, reorderCategory, showToast]);
 
   const handleSessionExpired = useCallback(() => {
     setManagerToken('');
