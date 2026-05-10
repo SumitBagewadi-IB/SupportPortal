@@ -253,7 +253,7 @@ export async function handler(event) {
           : { ':a': attempts };
         await ddb.send(new UpdateCommand({
           TableName: MANAGERS_TABLE,
-          Key: { managerId: manager.managerId },
+          Key: { id: manager.managerId },
           UpdateExpression: updateExpr,
           ExpressionAttributeValues: exprVals,
         }));
@@ -431,7 +431,7 @@ export async function handler(event) {
     await ddb.send(new PutCommand({
       TableName: MANAGERS_TABLE,
       Item: {
-        managerId, username, displayName, email, role: managerRole,
+        id: managerId, managerId, username, displayName, email, role: managerRole,
         status: 'active', passwordHash,
         createdAt: new Date().toISOString(),
         createdBy: 'masteradmin',
@@ -493,7 +493,7 @@ export async function handler(event) {
 
     await ddb.send(new UpdateCommand({
       TableName: MANAGERS_TABLE,
-      Key: { managerId },
+      Key: { id: managerId },
       UpdateExpression: `SET ${exprParts.join(', ')}`,
       ExpressionAttributeNames: Object.keys(exprNames).length ? exprNames : undefined,
       ExpressionAttributeValues: exprVals,
