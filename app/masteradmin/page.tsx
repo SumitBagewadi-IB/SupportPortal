@@ -135,7 +135,23 @@ export default function MasterAdminPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsDays, setAnalyticsDays] = useState(30);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    // Validate stored master token expiry on mount — don't wait for first API call
+    const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') : null;
+    if (stored) {
+      try {
+        const payload = JSON.parse(atob(stored.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
+          setAuthed(true);
+        } else {
+          sessionStorage.removeItem('master_token');
+        }
+      } catch {
+        sessionStorage.removeItem('master_token');
+      }
+    }
+  }, []);
 
   // Lockout countdown
   useEffect(() => {
@@ -184,12 +200,19 @@ export default function MasterAdminPage() {
     }
   };
 
+  const handleSessionExpired = useCallback(() => {
+    sessionStorage.removeItem('master_token');
+    setAuthed(false);
+    setAuthError('Your session has expired. Please log in again.');
+  }, []);
+
   const fetchManagers = useCallback(async () => {
     if (!API_BASE) return;
     setManagersLoading(true);
     setManagersError('');
     try {
       const res = await fetch(`${API_BASE}/managers`, { headers: getMasterHeaders() });
+      if (res.status === 401) { handleSessionExpired(); return; }
       if (res.ok) setManagers(await res.json());
       else setManagersError(`Failed to load managers (${res.status}). Try refreshing.`);
     } catch { setManagersError('Could not reach the API. Check your connection.'); }
@@ -201,10 +224,11 @@ export default function MasterAdminPage() {
     setAnalyticsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: getMasterHeaders() });
+      if (res.status === 401) { handleSessionExpired(); return; }
       if (res.ok) setAnalytics(await res.json());
     } catch { /* silently ignore — main loadError covers connectivity failures */ }
     finally { setAnalyticsLoading(false); }
-  }, []);
+  }, [handleSessionExpired]);
 
   const fetchAll = useCallback(async () => {
     if (!API_BASE) { setLoadError('API not configured.'); return; }
@@ -216,6 +240,12 @@ export default function MasterAdminPage() {
         fetch(`${API_BASE}/faq`),
         fetch(`${API_BASE}/audit-log`, { headers: getMasterHeaders() }),
       ]);
+
+      // Any 401 on authenticated resources means the master session expired
+      if (
+        (ticketsRes.status === 'fulfilled' && ticketsRes.value.status === 401) ||
+        (auditRes.status === 'fulfilled' && auditRes.value.status === 401)
+      ) { handleSessionExpired(); return; }
 
       if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
         setTickets(await ticketsRes.value.json());
@@ -233,7 +263,7 @@ export default function MasterAdminPage() {
       setLoading(false);
       setLastRefreshed(new Date());
     }
-  }, []);
+  }, [handleSessionExpired]);
 
   useEffect(() => {
     if (authed) {
@@ -386,7 +416,7 @@ export default function MasterAdminPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {lastRefreshed && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'none' }} className="refresh-ts">
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -591,6 +621,7 @@ export default function MasterAdminPage() {
                       setManagerFormSaving(true); setManagerFormMsg('');
                       try {
                         const res = await fetch(`${API_BASE}/managers`, { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email, role, password }) });
+                        if (res.status === 401) { handleSessionExpired(); return; }
                         const data = await res.json();
                         if (res.ok) { setManagerFormMsg('✓ Manager created!'); fetchManagers(); setTimeout(() => setShowCreateManager(false), 1200); }
                         else setManagerFormMsg(data.error || 'Failed to create manager.');
@@ -971,7 +1002,8 @@ export default function MasterAdminPage() {
               <button onClick={async () => {
                 const { managerId, newStatus } = confirmManagerAction;
                 setConfirmManagerAction(null);
-                await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
+                const r = await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
+                if (r.status === 401) { handleSessionExpired(); return; }
                 fetchManagers();
               }} style={{ flex: 1, padding: '0.75rem', background: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
                 {confirmManagerAction.newStatus === 'deactivated' ? 'Deactivate' : 'Reactivate'}

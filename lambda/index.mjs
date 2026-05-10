@@ -65,6 +65,10 @@ const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
 const JWT_SECRET          = process.env.JWT_SECRET          || (() => { throw new Error('JWT_SECRET env var is required'); })();
 
+// Fail-fast: warn loudly if privileged secrets are missing — prevents silent open-door scenarios
+if (!ADMIN_SECRET)        console.error('[STARTUP] WARNING: ADMIN_SECRET is not set — manager header auth is disabled');
+if (!MASTER_ADMIN_SECRET) console.error('[STARTUP] WARNING: MASTER_ADMIN_SECRET is not set — /auth/masterlogin will return 503');
+
 const TOKEN_TTL_SECS        = 7200;  // 2 hours — manager JWT
 const MASTER_TOKEN_TTL_SECS = 28800; // 8 hours — master session token
 
