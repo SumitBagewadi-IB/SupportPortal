@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+
 interface Ticket {
   id: string;
   name: string;
@@ -27,12 +29,28 @@ export default function MyTicketsPage() {
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const stored = JSON.parse(localStorage.getItem('is_tickets') || '[]');
-      setTickets(stored);
-    } catch {
-      setTickets([]);
-    }
+    // Load from localStorage first for instant display
+    let stored: Ticket[] = [];
+    try { stored = JSON.parse(localStorage.getItem('is_tickets') || '[]'); } catch { /* ignore */ }
+    setTickets(stored);
+
+    // Sync live status from API for each stored ticket
+    if (!API_BASE || stored.length === 0) return;
+    const ids = stored.map(t => t.id);
+    Promise.allSettled(
+      ids.map(id => fetch(`${API_BASE}/tickets/${id}`).then(r => r.ok ? r.json() : null))
+    ).then(results => {
+      const updated = stored.map((t, i) => {
+        const res = results[i];
+        if (res.status === 'fulfilled' && res.value?.id) {
+          return { ...t, status: res.value.status ?? t.status };
+        }
+        return t;
+      });
+      setTickets(updated);
+      // Persist updated statuses back to localStorage
+      try { localStorage.setItem('is_tickets', JSON.stringify(updated)); } catch { /* ignore */ }
+    });
   }, []);
 
   const stats = {
@@ -41,7 +59,16 @@ export default function MyTicketsPage() {
     solved: tickets.filter((t) => t.status === 'solved').length,
   };
 
-  if (!mounted) return null;
+  if (!mounted) return (
+    <div className="page-wrap">
+      <div className="container" style={{ maxWidth: 860 }}>
+        <div style={{ height: 60, background: 'var(--border)', borderRadius: 8, marginBottom: '2rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {[1,2,3].map(i => <div key={i} style={{ height: 80, background: 'var(--border)', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />)}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page-wrap">

@@ -109,16 +109,21 @@ export default function HomePage() {
             autoComplete="off"
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 300)}
             onFocus={() => results.length > 0 && setShowDropdown(true)}
+            aria-label="Search help articles"
+            aria-autocomplete="list"
+            aria-expanded={showDropdown}
           />
           {showDropdown && results.length > 0 && (
-            <div id="searchResults" className="search-results-dropdown active">
+            <div id="searchResults" className="search-results-dropdown active" role="listbox">
               {results.map((article, i) => (
                 <Link
                   key={i}
                   href={`/faq/?q=${encodeURIComponent(article.title)}`}
                   className="search-result-item"
+                  role="option"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); }}
                 >
                   <div className="search-result-icon" style={{ background: 'var(--bg-subtle)' }}>
@@ -134,6 +139,7 @@ export default function HomePage() {
                 href={`/faq/?q=${encodeURIComponent(query)}`}
                 className="search-result-item"
                 style={{ borderTop: '1px solid var(--border)', justifyContent: 'center', color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); }}
               >
                 <i className="fas fa-search" style={{ marginRight: '0.5rem' }}></i>
@@ -255,6 +261,10 @@ export default function HomePage() {
               <a href="tel:02261446300" style={{ color: 'var(--accent)', fontWeight: 600 }}>022-61446300</a>{' '}
               or email{' '}
               <a href="mailto:helpdesk@indiabullssecurities.com" style={{ color: 'var(--accent)', fontWeight: 600 }}>helpdesk@indiabullssecurities.com</a>
+              <br /><br />
+              <button onClick={fetchArticles} style={{ background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 8, padding: '0.5rem 1.25rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>
+                <i className="fas fa-rotate-right" style={{ marginRight: '0.4rem' }}></i>Try again
+              </button>
             </div>
           ) : popularArticles.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)' }}>

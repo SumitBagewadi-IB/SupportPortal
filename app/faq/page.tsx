@@ -59,10 +59,11 @@ function FAQContent() {
   const [selectedCat, setSelectedCat] = useState(catParam);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const feedbackGivenRef = useRef<Set<string>>(new Set(
+  const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set(
     (() => { try { return JSON.parse(localStorage.getItem('faq_feedback_given') || '[]'); } catch { return []; } })()
   ));
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackGivenRef = feedbackGiven;
 
   useEffect(() => {
     const validated = VALID_CATEGORIES.includes(rawCat) ? rawCat : 'all';
@@ -253,6 +254,7 @@ function FAQContent() {
                 type="text"
                 className="search-input"
                 placeholder="Search Knowledge Base..."
+                aria-label="Search knowledge base articles"
                 autoComplete="off"
                 maxLength={200}
                 value={search}
@@ -319,13 +321,18 @@ function FAQContent() {
                       <div className="article-feedback">
                         <span>Was this helpful?</span>
                         <div className="feedback-buttons">
+                          {feedbackGivenRef.has(article.id) ? (
+                            <span style={{ fontSize: '0.8rem', color: '#38A169', fontWeight: 600 }}>
+                              <i className="fas fa-check" style={{ marginRight: '0.3rem' }}></i>Thanks for your feedback!
+                            </span>
+                          ) : (<>
                           <button
                             className="feedback-btn"
                             data-type="yes"
                             onClick={() => {
-                              if (feedbackGivenRef.current.has(article.id)) return;
-                              feedbackGivenRef.current.add(article.id);
-                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...feedbackGivenRef.current])); } catch { /* ignore */ }
+                              const next = new Set(feedbackGivenRef); next.add(article.id);
+                              setFeedbackGiven(next);
+                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...next])); } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'helpful' });
                             }}
                           >
@@ -335,14 +342,15 @@ function FAQContent() {
                             className="feedback-btn"
                             data-type="no"
                             onClick={() => {
-                              if (feedbackGivenRef.current.has(article.id)) return;
-                              feedbackGivenRef.current.add(article.id);
-                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...feedbackGivenRef.current])); } catch { /* ignore */ }
+                              const next = new Set(feedbackGivenRef); next.add(article.id);
+                              setFeedbackGiven(next);
+                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...next])); } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'not_helpful' });
                             }}
                           >
                             <i className="far fa-thumbs-down"></i> No
                           </button>
+                          </>)}
                         </div>
                       </div>
                     </div>
