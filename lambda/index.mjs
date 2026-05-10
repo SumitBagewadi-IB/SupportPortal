@@ -413,13 +413,21 @@ async function _handler(event) {
     const ALLOWED_TYPES = ['article_view','search','chatbot_open','chatbot_persona_select','chatbot_message','ticket_submit','faq_feedback','admin_login_fail'];
     const { eventType, sessionId, articleId, articleTitle, category, searchTerm, searchResultCount, feedbackType, persona, chatInput, ticketCategory } = body;
     if (!ALLOWED_TYPES.includes(eventType)) return r(400, { error: 'Invalid eventType' });
+
+    // faq_feedback: use deterministic id = sessionId#articleId so a session can
+    // only cast one vote per article — second write silently overwrites (idempotent).
+    const resolvedSessionId = sessionId || 'unknown';
+    const itemId = (eventType === 'faq_feedback' && resolvedSessionId !== 'unknown' && articleId)
+      ? `fb#${resolvedSessionId}#${articleId}`
+      : randomUUID();
+
     await ddb.send(new PutCommand({
       TableName: ANALYTICS_TABLE,
       Item: {
-        id: randomUUID(),
+        id: itemId,
         eventType,
         timestamp: new Date().toISOString(),
-        sessionId: sessionId || 'unknown',
+        sessionId: resolvedSessionId,
         articleId: articleId || null,
         articleTitle: articleTitle || null,
         category: category || null,

@@ -6,8 +6,8 @@ import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
-const MAX_ATTEMPTS = 3;
-const LOCKOUT_SECONDS = 30;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_SECONDS = 900; // 15 minutes — matches server-side lockout
 const PAGE_SIZE = 10;
 const MAX_CONTENT = 50000;
 const WARN_CONTENT = 45000;
@@ -245,7 +245,7 @@ export default function AdminPage() {
         if (newAttempts >= MAX_ATTEMPTS) {
           const until = Date.now() + LOCKOUT_SECONDS * 1000;
           setLockoutUntil(until);
-          setAuthError(`Too many failed attempts. Login disabled for ${LOCKOUT_SECONDS}s.`);
+          setAuthError(`Too many failed attempts. Login disabled for 15 minutes.`);
         } else {
           setAuthError(`Invalid credentials. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
         }
@@ -547,7 +547,7 @@ export default function AdminPage() {
               </div>
             )}
             {isLocked && (
-              <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {lockoutSecsLeft}s.</p>
+              <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {Math.floor(lockoutSecsLeft / 60)}m {lockoutSecsLeft % 60}s.</p>
             )}
             <button type="submit" disabled={isLocked || loginLoading} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked || loginLoading ? 'not-allowed' : 'pointer', opacity: isLocked || loginLoading ? 0.5 : 1 }}>
               {loginLoading ? 'Signing in…' : 'Sign In'}
