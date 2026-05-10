@@ -664,10 +664,10 @@ async function _handler(event) {
       items = items.filter(i => i.status === 'published');
     }
     if (categoryFilter) {
-      // Exact case-insensitive match on category field
       const filterLower = categoryFilter.toLowerCase();
       items = items.filter(i => i.category?.toLowerCase() === filterLower);
     }
+    items.sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
     return r(200, items);
   }
 
@@ -675,7 +675,7 @@ async function _handler(event) {
   if (method === 'POST' && path === '/faq') {
     const auth = await requireManagerOrMaster(event);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
-    const { title, category, content, status = 'published', id } = body;
+    const { title, category, content, status = 'published', id, sortOrder } = body;
 
     if (id && !title && !content) {
       // Status-only toggle
@@ -701,7 +701,7 @@ async function _handler(event) {
     const now = new Date().toISOString();
     await ddb.send(new PutCommand({
       TableName: FAQ_TABLE,
-      Item: { id: newId, title, category, content, status, createdAt: now, updatedAt: now },
+      Item: { id: newId, title, category, content, status, createdAt: now, updatedAt: now, ...(sortOrder !== undefined && { sortOrder }) },
     }));
     await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: title, performedBy: auth.performedBy, meta: { category, status } });
     return r(201, { id: newId, ok: true });
@@ -713,10 +713,10 @@ async function _handler(event) {
     const auth = await requireManagerOrMaster(event);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const id = faqPutMatch[1];
-    const { title, category, content, status } = body;
+    const { title, category, content, status, sortOrder } = body;
 
     // Reject empty body PUTs
-    if (!title && !category && !content && status === undefined) return r(400, { error: 'Nothing to update' });
+    if (!title && !category && !content && status === undefined && sortOrder === undefined) return r(400, { error: 'Nothing to update' });
 
     if (status !== undefined && !VALID_FAQ_STATUSES.includes(status)) {
       return r(400, { error: `Invalid status. Allowed: ${VALID_FAQ_STATUSES.join(', ')}` });
@@ -729,6 +729,7 @@ async function _handler(event) {
     if (category) { exprParts.push('category = :ca'); exprVals[':ca'] = category; }
     if (content) { exprParts.push('content = :co'); exprVals[':co'] = content; }
     if (status !== undefined) { exprParts.push('#s = :s'); exprNames['#s'] = 'status'; exprVals[':s'] = status; }
+    if (sortOrder !== undefined) { exprParts.push('sortOrder = :so'); exprVals[':so'] = sortOrder; }
 
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
     if (!existing.Item) return r(404, { error: 'Article not found' });

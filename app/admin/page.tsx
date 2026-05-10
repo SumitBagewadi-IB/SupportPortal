@@ -387,15 +387,15 @@ export default function AdminPage() {
   const confirmDelete = async () => {
     if (!deleteConfirmId) return;
     const id = deleteConfirmId;
-    setDeleteConfirmId(null);
     setDeletingId(id);
     try {
       const res = await fetch(`${API_BASE}/faq/${id}`, { method: 'DELETE', headers: authHeaders(managerToken) });
       if (res.status === 401) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
+      setDeleteConfirmId(null);
       showToast('Article deleted successfully.');
-    } catch { setError('Failed to delete article. Please try again.'); }
+    } catch { showToast('Failed to delete article. Please try again.'); }
     finally { setDeletingId(null); }
   };
 
@@ -1172,9 +1172,10 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={confirmDelete}
-                style={{ flex: 1, padding: '0.75rem', background: '#E53E3E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}
+                disabled={!!deletingId}
+                style={{ flex: 1, padding: '0.75rem', background: '#E53E3E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: deletingId ? 'wait' : 'pointer', opacity: deletingId ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
               >
-                Delete
+                {deletingId ? <><i className="fas fa-spinner fa-spin" style={{ fontSize: '0.875rem' }}></i> Deleting...</> : 'Delete'}
               </button>
             </div>
           </div>
