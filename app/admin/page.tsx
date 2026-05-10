@@ -187,11 +187,15 @@ export default function AdminPage() {
     if (!API_BASE) return;
     setAuditLoading(true);
     fetch(`${API_BASE}/audit-log`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => setAuditLogs(Array.isArray(data) ? data : []))
+      .then((r) => {
+        if (r.status === 401) { handleSessionExpired(); return []; }
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
+      .then((data) => { if (data) setAuditLogs(Array.isArray(data) ? data : []); })
       .catch(() => {})
       .finally(() => setAuditLoading(false));
-  }, []);
+  }, [handleSessionExpired]);
 
   useEffect(() => {
     if (authed && managerToken) {
@@ -1166,7 +1170,8 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}
+                disabled={!!deletingId}
+                style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: deletingId ? 'not-allowed' : 'pointer', color: 'var(--admin-text-primary)', opacity: deletingId ? 0.5 : 1 }}
               >
                 Cancel
               </button>

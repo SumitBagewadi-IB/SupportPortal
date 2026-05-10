@@ -47,6 +47,8 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', category: '', subject: '', description: '' });
   const [suggestions, setSuggestions] = useState<ArticleSuggestion[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [ticketId, setTicketId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,6 +96,9 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
 
     let confirmedId = generateTicketId();
     const localTicket: Ticket = { id: confirmedId, ...form, status: 'open', createdAt: new Date().toISOString() };
@@ -108,8 +113,16 @@ export default function ContactPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.id) confirmedId = data.id;
+        } else {
+          setSubmitError('Failed to submit your ticket. Please try again or call us directly.');
+          setSubmitting(false);
+          return;
         }
-      } catch { /* offline — use locally generated ID */ }
+      } catch {
+        setSubmitError('Could not reach our servers. Please check your connection and try again.');
+        setSubmitting(false);
+        return;
+      }
     }
 
     const ticket: Ticket = { ...localTicket, id: confirmedId };
@@ -121,6 +134,7 @@ export default function ContactPage() {
 
     trackEvent({ eventType: 'ticket_submit', ticketCategory: form.category, category: form.category });
     setTicketId(confirmedId);
+    setSubmitting(false);
     setSubmitted(true);
   };
 
@@ -223,8 +237,14 @@ export default function ContactPage() {
             {errors.description && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.description}</p>}
           </div>
 
-          <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem', marginTop: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <i className="fas fa-paper-plane" style={{ fontSize: '0.9rem' }}></i> Send Message
+          {submitError && (
+            <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', borderRadius: 8, padding: '0.75rem 1rem', marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-exclamation-circle" style={{ color: '#E53E3E', fontSize: '0.875rem', flexShrink: 0 }}></i>
+              <span style={{ fontSize: '0.8125rem', color: '#C53030' }}>{submitError}</span>
+            </div>
+          )}
+          <button type="submit" disabled={submitting} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem', marginTop: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+            {submitting ? <><i className="fas fa-spinner fa-spin" style={{ fontSize: '0.9rem' }}></i> Submitting...</> : <><i className="fas fa-paper-plane" style={{ fontSize: '0.9rem' }}></i> Send Message</>}
           </button>
           <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             <i className="fas fa-shield-alt" style={{ marginRight: 4 }}></i> Your data is handled securely and in accordance with our Privacy Policy

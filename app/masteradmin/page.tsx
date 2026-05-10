@@ -154,6 +154,7 @@ export default function MasterAdminPage() {
   // Analytics
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsDays, setAnalyticsDays] = useState(30);
 
   useEffect(() => {
@@ -260,11 +261,13 @@ export default function MasterAdminPage() {
   const fetchAnalytics = useCallback(async (days: number) => {
     if (!API_BASE) return;
     setAnalyticsLoading(true);
+    setAnalyticsError('');
     try {
       const res = await fetch(masterUrl(`/analytics/summary?days=${days}`), { headers: getMasterHeaders() });
       if (res.status === 401) { handleSessionExpired(); return; }
       if (res.ok) setAnalytics(await res.json());
-    } catch { /* silently ignore — main loadError covers connectivity failures */ }
+      else setAnalyticsError('Failed to load analytics. Try refreshing.');
+    } catch { setAnalyticsError('Could not reach the API. Check your connection.'); }
     finally { setAnalyticsLoading(false); }
   }, [handleSessionExpired]);
 
@@ -819,6 +822,12 @@ export default function MasterAdminPage() {
             </div>
             {analyticsLoading ? (
               <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin" style={{ fontSize: '1.5rem' }}></i></div>
+            ) : analyticsError ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <i className="fas fa-exclamation-triangle" style={{ fontSize: '1.5rem', color: '#D97706', marginBottom: '0.75rem', display: 'block' }}></i>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>{analyticsError}</p>
+                <button onClick={() => fetchAnalytics(analyticsDays)} style={{ padding: '0.5rem 1.25rem', background: '#00AB4E', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>Retry</button>
+              </div>
             ) : !analytics ? (
               <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No analytics data yet. Events are tracked as users visit the portal.</div>
             ) : (
@@ -1122,10 +1131,13 @@ export default function MasterAdminPage() {
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button onClick={() => setConfirmManagerAction(null)} style={{ flex: 1, padding: '0.75rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', color: 'var(--text-dark)' }}>Cancel</button>
               <button onClick={async () => {
-                const { managerId, newStatus } = confirmManagerAction;
+                const { managerId, newStatus, displayName } = confirmManagerAction;
                 setConfirmManagerAction(null);
-                const r = await fetch(masterUrl(`/managers/${managerId}`), { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
-                if (r.status === 401) { handleSessionExpired(); return; }
+                try {
+                  const r = await fetch(masterUrl(`/managers/${managerId}`), { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
+                  if (r.status === 401) { handleSessionExpired(); return; }
+                  if (!r.ok) { alert(`Failed to ${newStatus === 'deactivated' ? 'deactivate' : 'reactivate'} ${displayName}. Please try again.`); return; }
+                } catch { alert('Network error. Please try again.'); return; }
                 fetchManagers();
               }} style={{ flex: 1, padding: '0.75rem', background: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
                 {confirmManagerAction.newStatus === 'deactivated' ? 'Deactivate' : 'Reactivate'}
