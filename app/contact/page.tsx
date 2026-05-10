@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { trackEvent, getSession } from '@/lib/analytics';
 
@@ -13,23 +13,10 @@ const CATEGORIES = [
   'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
 ];
 
-const ARTICLE_SUGGESTIONS: Record<string, string[]> = {
-  gtt: ['How to place a GTT order?', 'GTT order not triggering'],
-  fund: ['How to add funds?', 'Fund withdrawal process', 'Fund transfer failed'],
-  margin: ['What is margin requirement?', 'How to increase margin?'],
-  password: ['How to reset password?', 'Forgot client ID'],
-  brokerage: ['Brokerage charges for equity', 'F&O brokerage details'],
-  tpin: ['What is TPIN?', 'How to generate TPIN?', 'TPIN not working'],
-  sip: ['How to start a SIP?', 'SIP modification process'],
-  ipo: ['How to apply for IPO?', 'IPO allotment status'],
-};
-
-function getSuggestions(subject: string): string[] {
-  const lower = subject.toLowerCase();
-  for (const [key, suggestions] of Object.entries(ARTICLE_SUGGESTIONS)) {
-    if (lower.includes(key)) return suggestions;
-  }
-  return [];
+interface ArticleSuggestion {
+  id: string;
+  title: string;
+  category: string;
 }
 
 function generateTicketId(): string {
@@ -58,12 +45,39 @@ const labelStyle: React.CSSProperties = {
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', category: '', subject: '', description: '' });
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<ArticleSuggestion[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setSuggestions(getSuggestions(form.subject)); }, [form.subject]);
+  useEffect(() => {
+    const subject = form.subject.trim();
+    if (subject.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    suggestDebounceRef.current = setTimeout(async () => {
+      if (!API_BASE) return;
+      try {
+        const res = await fetch(`${API_BASE}/faq?search=${encodeURIComponent(subject)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const items: ArticleSuggestion[] = Array.isArray(data) ? data : (data.items || data.articles || []);
+        const published = items
+          .filter(a => !('status' in a) || (a as { status?: string }).status === 'published')
+          .slice(0, 3)
+          .map(a => ({ id: a.id, title: a.title, category: a.category }));
+        setSuggestions(published);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 400);
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    };
+  }, [form.subject]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -180,9 +194,11 @@ export default function ContactPage() {
                   <i className="fas fa-lightbulb" style={{ marginRight: '0.375rem' }}></i>Recommended Articles
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {suggestions.map((s, i) => (
-                    <li key={i}>
-                      <Link href="/faq" style={{ fontSize: '0.8125rem', color: '#276749', textDecoration: 'none' }}>→ {s}</Link>
+                  {suggestions.map((s) => (
+                    <li key={s.id}>
+                      <Link href={`/faq#${s.id}`} style={{ fontSize: '0.8125rem', color: '#276749', textDecoration: 'none' }}>
+                        → {s.title}
+                      </Link>
                     </li>
                   ))}
                 </ul>
