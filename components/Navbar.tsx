@@ -46,7 +46,6 @@ export default function Navbar() {
 
         {/* Desktop nav links */}
         <ul className="nav-links">
-          <li><Link href="/" className={pathname === '/' ? 'active' : ''}>Home</Link></li>
           <li><Link href="/faq" className={pathname === '/faq' ? 'active' : ''}>Knowledge Base</Link></li>
           <li><Link href="/contact" className={pathname === '/contact' ? 'active' : ''}>Contact Us</Link></li>
           <li><Link href="/my-tickets" className={pathname === '/my-tickets' ? 'active' : ''}>My Tickets</Link></li>
@@ -80,7 +79,6 @@ export default function Navbar() {
       {menuOpen && (
         <div className="mobile-menu" role="dialog" aria-label="Mobile navigation">
           <ul>
-            <li><Link href="/" className={pathname === '/' ? 'active' : ''}>Home</Link></li>
             <li><Link href="/faq" className={pathname === '/faq' ? 'active' : ''}>Knowledge Base</Link></li>
             <li><Link href="/contact" className={pathname === '/contact' ? 'active' : ''}>Contact Us</Link></li>
             <li><Link href="/my-tickets" className={pathname === '/my-tickets' ? 'active' : ''}>My Tickets</Link></li>
