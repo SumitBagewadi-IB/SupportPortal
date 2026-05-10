@@ -107,6 +107,7 @@ const LOCKOUT_SECONDS = 60;
 export default function MasterAdminPage() {
   const [mounted, setMounted] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -147,6 +148,11 @@ export default function MasterAdminPage() {
 
   useEffect(() => {
     setMounted(true);
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark') {
+      setDarkMode(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
     // Validate stored master token expiry on mount — don't wait for first API call
     const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') : null;
     if (stored) {
@@ -215,6 +221,18 @@ export default function MasterAdminPage() {
     setAuthed(false);
     setAuthError('Your session has expired. Please log in again.');
   }, []);
+
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const fetchManagers = useCallback(async () => {
     if (!API_BASE) return;
@@ -367,16 +385,31 @@ export default function MasterAdminPage() {
   // ── Login screen ──────────────────────────────────────────────────────────
   if (!authed) {
     const isLocked = !!lockedUntil && Date.now() < lockedUntil;
+    const cardBg = darkMode ? '#1E2433' : '#FFFFFF';
+    const cardText = darkMode ? '#F1F5F9' : '#1A202C';
+    const cardSubText = darkMode ? '#94A3B8' : '#718096';
+    const cardMuted = darkMode ? '#64748B' : '#A0AEC0';
+    const inputBorder = darkMode ? '#334155' : '#E2E8F0';
+    const inputBg = darkMode ? '#0F172A' : '#FFFFFF';
+    const inputText = darkMode ? '#F1F5F9' : '#1A202C';
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 9999 }}>
-        <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <Image src="/logo.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
-            </div>
-            <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Master Admin</h1>
-            <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)' }}>Manager of Admins — restricted access only</p>
+      <div style={{ position: 'fixed', inset: 0, background: darkMode ? 'linear-gradient(135deg, #020617 0%, #0F172A 50%, #1E293B 100%)' : 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 9999 }}>
+        {/* Theme toggle — top right of overlay */}
+        <button
+          onClick={toggleDarkMode}
+          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '0.5rem 0.75rem', cursor: 'pointer', color: '#CBD5E0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.375rem', backdropFilter: 'blur(4px)' }}
+        >
+          <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{darkMode ? 'Light' : 'Dark'}</span>
+        </button>
+
+        <div style={{ background: cardBg, borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <Image src={darkMode ? '/logo.svg' : '/logo-dark.svg'} alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
           </div>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: cardText, marginBottom: '0.375rem' }}>Master Admin</h1>
+          <p style={{ fontSize: '0.875rem', color: cardSubText, marginBottom: '2rem' }}>Manager of Admins — restricted access only</p>
 
           <form onSubmit={handleLogin}>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
@@ -386,25 +419,25 @@ export default function MasterAdminPage() {
                 onChange={e => setPasswordInput(e.target.value)}
                 placeholder="Master password"
                 disabled={isLocked}
-                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: `2px solid ${authError ? '#EF4444' : '#E2E8F0'}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: isLocked ? '#F7FAFC' : '#fff', color: '#1A202C', boxSizing: 'border-box' }}
+                autoComplete="current-password"
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: `2px solid ${inputBorder}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: inputBg, color: inputText, boxSizing: 'border-box' }}
               />
-              <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
-                <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: cardMuted, fontSize: '0.875rem' }}>
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
 
-            {authError && (
-              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '0.625rem 0.875rem', marginBottom: '1rem', fontSize: '0.8125rem', color: '#B91C1C', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <i className="fas fa-exclamation-triangle"></i>
+            {(authError || isLocked) && (
+              <div style={{ background: darkMode ? '#450a0a' : '#FFF5F5', border: `1px solid ${darkMode ? '#7f1d1d' : '#FEB2B2'}`, color: darkMode ? '#fca5a5' : '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
                 {isLocked ? `Account locked. Try again in ${lockSecs}s.` : authError}
               </div>
             )}
 
-            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: isLocked ? '#9CA3AF' : '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1, transition: 'opacity 0.15s' }}>
-              {isLocked ? `Locked (${lockSecs}s)` : 'Access Dashboard'}
+            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: darkMode ? '#00AB4E' : '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked || !passwordInput ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1 }}>
+              {isLocked ? `Locked (${lockSecs}s)` : 'Sign In'}
             </button>
           </form>
-          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: cardMuted }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
         </div>
       </div>
     );
@@ -432,6 +465,9 @@ export default function MasterAdminPage() {
           <button onClick={fetchAll} disabled={loading} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
             <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
             {lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}
+          </button>
+          <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
           <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <i className="fas fa-sign-out-alt"></i> Sign out

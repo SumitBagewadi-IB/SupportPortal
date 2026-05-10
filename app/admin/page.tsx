@@ -418,14 +418,32 @@ export default function AdminPage() {
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
   if (!authed) {
     const isLocked = lockoutUntil !== null && Date.now() < lockoutUntil;
+    const cardBg = darkMode ? '#1E2433' : '#FFFFFF';
+    const cardText = darkMode ? '#F1F5F9' : '#1A202C';
+    const cardSubText = darkMode ? '#94A3B8' : '#718096';
+    const cardMuted = darkMode ? '#64748B' : '#A0AEC0';
+    const inputBorder = darkMode ? '#334155' : '#E2E8F0';
+    const inputBg = darkMode ? '#0F172A' : '#FFFFFF';
+    const inputText = darkMode ? '#F1F5F9' : '#1A202C';
+    const inputPlaceholder = darkMode ? '#64748B' : '#A0AEC0';
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-        <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
+      <div style={{ position: 'fixed', inset: 0, background: darkMode ? 'linear-gradient(135deg, #020617 0%, #0F172A 50%, #1E293B 100%)' : 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+        {/* Theme toggle — top right of overlay */}
+        <button
+          onClick={toggleDarkMode}
+          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '0.5rem 0.75rem', cursor: 'pointer', color: '#CBD5E0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.375rem', backdropFilter: 'blur(4px)' }}
+        >
+          <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{darkMode ? 'Light' : 'Dark'}</span>
+        </button>
+
+        <div style={{ background: cardBg, borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <Image src="/logo.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
+            <Image src={darkMode ? '/logo.svg' : '/logo-dark.svg'} alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
           </div>
-          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Manager Portal</h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: cardText, marginBottom: '0.375rem' }}>Manager Portal</h1>
+          <p style={{ fontSize: '0.875rem', color: cardSubText, marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: '0.875rem' }}>
               <input
@@ -435,7 +453,7 @@ export default function AdminPage() {
                 placeholder="Username"
                 disabled={isLocked || loginLoading}
                 autoComplete="username"
-                style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.875rem 1rem', border: `2px solid ${inputBorder}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', background: inputBg, color: inputText }}
               />
             </div>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
@@ -446,25 +464,25 @@ export default function AdminPage() {
                 placeholder="Password"
                 disabled={isLocked || loginLoading}
                 autoComplete="current-password"
-                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: `2px solid ${inputBorder}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', background: inputBg, color: inputText }}
               />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}>
+              <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: cardMuted, fontSize: '0.875rem' }}>
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
             {authError && (
-              <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
+              <div style={{ background: darkMode ? '#450a0a' : '#FFF5F5', border: `1px solid ${darkMode ? '#7f1d1d' : '#FEB2B2'}`, color: darkMode ? '#fca5a5' : '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
                 {authError}
               </div>
             )}
             {isLocked && (
               <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {lockoutSecsLeft}s.</p>
             )}
-            <button type="submit" disabled={isLocked || loginLoading} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked || loginLoading ? 'not-allowed' : 'pointer', opacity: isLocked || loginLoading ? 0.5 : 1 }}>
+            <button type="submit" disabled={isLocked || loginLoading} style={{ width: '100%', padding: '0.875rem', background: darkMode ? '#00AB4E' : '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked || loginLoading ? 'not-allowed' : 'pointer', opacity: isLocked || loginLoading ? 0.5 : 1 }}>
               {loginLoading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
-          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: cardMuted }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
         </div>
       </div>
     );
@@ -483,7 +501,7 @@ export default function AdminPage() {
       {/* SIDEBAR */}
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 }}>
-          <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto', minWidth: 0, flexShrink: 1 }} />
+          <Image src="/logo.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto', minWidth: 0, flexShrink: 1 }} />
           <button onClick={() => setSidebarOpen(false)} className="admin-sidebar-close" style={{ background: 'none', border: 'none', color: '#A0AEC0', cursor: 'pointer', fontSize: '1rem', padding: '0.25rem', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fas fa-times"></i>
           </button>
