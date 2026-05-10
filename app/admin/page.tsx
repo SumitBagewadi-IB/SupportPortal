@@ -422,7 +422,7 @@ export default function AdminPage() {
       <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
         <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={160} height={57} style={{ width: 160, height: 'auto', margin: '0 auto', display: 'block' }} />
+            <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={120} height={43} style={{ width: 120, height: 'auto', margin: '0 auto', display: 'block' }} />
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Manager Portal</h1>
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
