@@ -183,6 +183,16 @@ export default function AdminPage() {
       .finally(() => setTicketsLoading(false));
   }, []);
 
+  const handleSessionExpired = useCallback(() => {
+    setManagerToken('');
+    setAuthed(false);
+    setSessionWarning(false);
+    setSessionExpiresAt(null);
+    sessionStorage.removeItem('mgr_token');
+    sessionStorage.removeItem('mgr_info');
+    setAuthError('Your session has expired. Please log in again.');
+  }, []);
+
   const fetchAuditLogs = useCallback((token: string) => {
     if (!API_BASE) return;
     setAuditLoading(true);
@@ -333,16 +343,6 @@ export default function AdminPage() {
     }
     setSavingOrder(false);
   }, [articles, managerToken, reorderCategory, showToast]);
-
-  const handleSessionExpired = useCallback(() => {
-    setManagerToken('');
-    setAuthed(false);
-    setSessionWarning(false);
-    setSessionExpiresAt(null);
-    sessionStorage.removeItem('mgr_token');
-    sessionStorage.removeItem('mgr_info');
-    setAuthError('Your session has expired. Please log in again.');
-  }, []);
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
