@@ -517,6 +517,22 @@ export async function handler(event) {
     return r(200, { ok: true });
   }
 
+  // ── DELETE /managers/{id} ─────────────────────────────────────────────────
+  const managerDeleteMatch = path.match(/^\/managers\/([^/]+)$/);
+  if (method === 'DELETE' && managerDeleteMatch) {
+    if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
+    const managerId = managerDeleteMatch[1];
+    const existing = await ddb.send(new GetCommand({ TableName: MANAGERS_TABLE, Key: { id: managerId } }));
+    if (!existing.Item) return r(404, { error: 'Manager not found' });
+    await ddb.send(new DeleteCommand({ TableName: MANAGERS_TABLE, Key: { id: managerId } }));
+    await writeAudit({
+      action: 'MANAGER_DELETED', entity: 'manager',
+      entityId: managerId, entityTitle: existing.Item.username || managerId,
+      performedBy: 'masteradmin', meta: { username: existing.Item.username },
+    });
+    return r(200, { ok: true });
+  }
+
   // ── GET /faq ──────────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/faq') {
     const auth = requireManagerOrMaster(event);
