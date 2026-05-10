@@ -284,24 +284,29 @@ export default function AdminPage() {
   }, []);
 
   const saveOrder = useCallback(async () => {
+    if (!API_BASE || !managerToken) return;
     setSavingOrder(true);
     try {
-      // Only update articles in the category being reordered, with sortOrder = position within that category
       const toUpdate = reorderCategory
         ? articles.filter(a => a.category === reorderCategory)
         : articles;
-      await Promise.all(toUpdate.map((a, i) =>
+      const results = await Promise.all(toUpdate.map((a, i) =>
         fetch(`${API_BASE}/faq/${a.id}`, {
           method: 'PUT',
-          headers: { ...authHeaders(managerToken), 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${managerToken}` },
           body: JSON.stringify({ sortOrder: i }),
         })
       ));
-      setOrderChanged(false);
-      setReorderCategory('');
-      showToast('Order saved!');
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) {
+        showToast(`Failed to save order (${failed.length} errors). Please try again.`);
+      } else {
+        setOrderChanged(false);
+        setReorderCategory('');
+        showToast('Order saved!');
+      }
     } catch {
-      showToast('Failed to save order.');
+      showToast('Network error. Failed to save order.');
     }
     setSavingOrder(false);
   }, [articles, managerToken, reorderCategory, showToast]);
