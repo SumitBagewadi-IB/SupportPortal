@@ -6,7 +6,7 @@ frontend:
         - npm ci
     build:
       commands:
-        - npm run build
+        - NEXT_PUBLIC_API_BASE=https://un1k0vx0ij.execute-api.ap-south-1.amazonaws.com/uat npm run build
   artifacts:
     baseDirectory: out
     files:
