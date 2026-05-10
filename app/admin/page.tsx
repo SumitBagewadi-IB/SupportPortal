@@ -28,6 +28,7 @@ interface Article {
   content: string;
   answer?: string;
   status?: string;
+  sortOrder?: number;
 }
 
 interface Ticket {
