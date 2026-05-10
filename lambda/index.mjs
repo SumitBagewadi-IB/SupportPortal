@@ -491,10 +491,11 @@ async function _handler(event) {
         } else if (item.eventType === 'faq_feedback') {
           if (item.feedbackType === 'helpful') summary.faq_feedback_helpful++;
           else summary.faq_feedback_not_helpful++;
-          if (item.articleTitle) {
-            if (!summary.article_feedback[item.articleTitle]) summary.article_feedback[item.articleTitle] = { helpful: 0, not_helpful: 0, category: item.category || '' };
-            if (item.feedbackType === 'helpful') summary.article_feedback[item.articleTitle].helpful++;
-            else summary.article_feedback[item.articleTitle].not_helpful++;
+          const fbKey = item.articleTitle || item.articleId || null;
+          if (fbKey) {
+            if (!summary.article_feedback[fbKey]) summary.article_feedback[fbKey] = { helpful: 0, not_helpful: 0, category: item.category || '' };
+            if (item.feedbackType === 'helpful') summary.article_feedback[fbKey].helpful++;
+            else summary.article_feedback[fbKey].not_helpful++;
           }
         } else if (item.eventType === 'chatbot_persona_select') {
           if (item.persona) summary.persona_counts[item.persona] = (summary.persona_counts[item.persona] || 0) + 1;

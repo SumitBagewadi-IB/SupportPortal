@@ -60,7 +60,23 @@ function FAQContent() {
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set(
-    (() => { try { return JSON.parse(localStorage.getItem('faq_feedback_given') || '[]'); } catch { return []; } })()
+    (() => {
+      try {
+        const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const raw = JSON.parse(localStorage.getItem('faq_feedback_given') || '{}');
+        // Support legacy plain array format
+        if (Array.isArray(raw)) return raw;
+        // Object format: { articleId: timestamp } — filter out expired entries
+        const valid = Object.entries(raw as Record<string, number>)
+          .filter(([, ts]) => now - ts < NINETY_DAYS)
+          .map(([id]) => id);
+        // Rewrite cleaned-up version back to localStorage
+        const cleaned = Object.fromEntries(valid.map(id => [id, (raw as Record<string, number>)[id]]));
+        localStorage.setItem('faq_feedback_given', JSON.stringify(cleaned));
+        return valid;
+      } catch { return []; }
+    })()
   ));
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const feedbackGivenRef = feedbackGiven;
@@ -332,7 +348,12 @@ function FAQContent() {
                             onClick={() => {
                               const next = new Set(feedbackGivenRef); next.add(article.id);
                               setFeedbackGiven(next);
-                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...next])); } catch { /* ignore */ }
+                              try {
+                                const stored = JSON.parse(localStorage.getItem('faq_feedback_given') || '{}');
+                                const map = Array.isArray(stored) ? {} : stored;
+                                map[article.id] = Date.now();
+                                localStorage.setItem('faq_feedback_given', JSON.stringify(map));
+                              } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'helpful' });
                             }}
                           >
@@ -344,7 +365,12 @@ function FAQContent() {
                             onClick={() => {
                               const next = new Set(feedbackGivenRef); next.add(article.id);
                               setFeedbackGiven(next);
-                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...next])); } catch { /* ignore */ }
+                              try {
+                                const stored = JSON.parse(localStorage.getItem('faq_feedback_given') || '{}');
+                                const map = Array.isArray(stored) ? {} : stored;
+                                map[article.id] = Date.now();
+                                localStorage.setItem('faq_feedback_given', JSON.stringify(map));
+                              } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'not_helpful' });
                             }}
                           >
