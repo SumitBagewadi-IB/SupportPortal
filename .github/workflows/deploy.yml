@@ -27,14 +27,12 @@ jobs:
         if: github.ref == 'refs/heads/main'
         env:
           NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE }}
-          NEXT_PUBLIC_MASTER_ADMIN_PASSWORD: ${{ secrets.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD }}
         run: npm run build
 
       - name: Build Next.js (UAT)
         if: github.ref == 'refs/heads/uat'
         env:
           NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE_UAT }}
-          NEXT_PUBLIC_MASTER_ADMIN_PASSWORD: ${{ secrets.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD }}
         run: npm run build
 
       - name: Configure AWS credentials

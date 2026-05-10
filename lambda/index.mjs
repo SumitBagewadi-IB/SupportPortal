@@ -13,21 +13,22 @@
  *
  *   GET    /audit-log              manager JWT (own entries) | master secret (all)
  *
- *   POST   /auth/login             public  → returns JWT
- *   POST   /auth/logout            manager JWT  → writes audit entry
+ *   POST   /auth/login             public  → returns manager JWT
+ *   POST   /auth/masterlogin       public  → validates master password server-side, returns master session token
+ *   POST   /auth/logout            manager JWT | master session token → writes audit entry
  *
  *   POST   /analytics              public  → writes to ib-analytics
- *   GET    /analytics/summary      master secret  → aggregated stats
+ *   GET    /analytics/summary      master session token → aggregated stats
  *
- *   GET    /managers               master secret
- *   POST   /managers               master secret
- *   PUT    /managers/{id}          master secret
- *   DELETE /managers/{id}          master secret
+ *   GET    /managers               master session token
+ *   POST   /managers               master session token
+ *   PUT    /managers/{id}          master session token
+ *   DELETE /managers/{id}          master session token
  *
  * Env vars:
  *   ADMIN_SECRET          shared secret checked against X-Admin-Secret for manager-level access
- *   MASTER_ADMIN_SECRET   separate secret for masteradmin (X-Admin-Secret header)
- *   JWT_SECRET            HMAC-SHA256 signing key for manager tokens
+ *   MASTER_ADMIN_SECRET   master password — NEVER sent to the browser; validated server-side only
+ *   JWT_SECRET            HMAC-SHA256 signing key for manager tokens AND master session tokens
  *   DYNAMODB_TABLE        (defaults to ibulls-faq-articles)
  *   TICKETS_TABLE         (defaults to ib-tickets)
  *   AUDIT_TABLE           (defaults to ib-audit-log)
@@ -64,7 +65,8 @@ const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
 const JWT_SECRET          = process.env.JWT_SECRET          || (() => { throw new Error('JWT_SECRET env var is required'); })();
 
-const TOKEN_TTL_SECS = 7200; // 2 hours
+const TOKEN_TTL_SECS        = 7200;  // 2 hours — manager JWT
+const MASTER_TOKEN_TTL_SECS = 28800; // 8 hours — master session token
 
 const client = new DynamoDBClient({ region: REGION });
 const ddb    = DynamoDBDocumentClient.from(client);
@@ -161,13 +163,33 @@ async function verifyPassword(password, hash) {
 
 // ─── Auth extraction ────────────────────────────────────────────────────────
 
+function makeMasterToken() {
+  const header  = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = b64url(JSON.stringify({ role: 'masteradmin', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + MASTER_TOKEN_TTL_SECS }));
+  const sig     = b64url(createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest());
+  return `${header}.${payload}.${sig}`;
+}
+
+function verifyMasterToken(token) {
+  const payload = verifyJWT(token); // same HMAC structure, re-uses verifyJWT
+  return payload?.role === 'masteradmin' ? payload : null;
+}
+
 function extractAuth(event) {
-  const xSecret = event.headers?.['x-admin-secret'] || event.headers?.['X-Admin-Secret'] || '';
-  const authHdr = event.headers?.['authorization'] || event.headers?.['Authorization'] || '';
-  const token   = authHdr.startsWith('Bearer ') ? authHdr.slice(7) : null;
-  const isMaster  = MASTER_ADMIN_SECRET && xSecret === MASTER_ADMIN_SECRET;
-  const isAdmin   = ADMIN_SECRET && xSecret === ADMIN_SECRET;
-  const jwtPayload = token ? verifyJWT(token) : null;
+  const authHdr  = event.headers?.['authorization'] || event.headers?.['Authorization'] || '';
+  const xMaster  = event.headers?.['x-master-token'] || event.headers?.['X-Master-Token'] || '';
+  const xSecret  = event.headers?.['x-admin-secret'] || event.headers?.['X-Admin-Secret'] || '';
+
+  const bearerToken = authHdr.startsWith('Bearer ') ? authHdr.slice(7) : null;
+
+  // Master: either a signed session token (preferred) or legacy raw secret (kept for backward compat during rollover)
+  const masterTokenPayload = xMaster ? verifyMasterToken(xMaster) : null;
+  const isMasterLegacy     = !masterTokenPayload && MASTER_ADMIN_SECRET && xSecret === MASTER_ADMIN_SECRET;
+  const isMaster           = !!masterTokenPayload || isMasterLegacy;
+
+  const isAdmin    = !isMaster && ADMIN_SECRET && xSecret === ADMIN_SECRET;
+  const jwtPayload = bearerToken ? verifyJWT(bearerToken) : null;
+
   return { isMaster, isAdmin, jwtPayload };
 }
 
@@ -187,7 +209,6 @@ async function requireManagerOrMaster(event) {
       }));
       if (!res.Item || res.Item.status !== 'active') return { ok: false, reason: 'deactivated' };
     } catch {
-      // On DB error, deny access conservatively
       return { ok: false, reason: 'db_error' };
     }
     return { ok: true, performedBy: auth.jwtPayload.managerId, role: auth.jwtPayload.role, displayName: auth.jwtPayload.displayName };
@@ -196,8 +217,7 @@ async function requireManagerOrMaster(event) {
 }
 
 function requireMaster(event) {
-  const auth = extractAuth(event);
-  return auth.isMaster;
+  return extractAuth(event).isMaster;
 }
 
 // ─── Audit log writer ───────────────────────────────────────────────────────
@@ -320,6 +340,37 @@ export async function handler(event) {
     });
 
     return r(200, { token, managerId: manager.managerId, displayName: manager.displayName, role: manager.role });
+  }
+
+  // ── POST /auth/masterlogin ───────────────────────────────────────────────
+  // Validates master password server-side; returns a signed session token.
+  // The raw MASTER_ADMIN_SECRET never leaves the Lambda — it is NOT in the browser bundle.
+  if (method === 'POST' && path === '/auth/masterlogin') {
+    const { password } = body;
+    if (!password) return r(400, { error: 'password required' });
+    if (!MASTER_ADMIN_SECRET) return r(503, { error: 'Master auth not configured' });
+
+    // Constant-time comparison to prevent timing attacks
+    const provided = Buffer.from(String(password));
+    const expected = Buffer.from(MASTER_ADMIN_SECRET);
+    const valid = provided.length === expected.length && timingSafeEqual(provided, expected);
+
+    if (!valid) {
+      await writeAudit({
+        action: 'MASTER_LOGIN_FAIL', entity: 'masteradmin', entityId: 'masteradmin',
+        entityTitle: 'masteradmin', performedBy: 'system',
+        meta: { ip: sourceIp(event), userAgent: userAgent(event) },
+      });
+      return r(401, { error: 'Invalid master password' });
+    }
+
+    const token = makeMasterToken();
+    await writeAudit({
+      action: 'MASTER_LOGIN_SUCCESS', entity: 'masteradmin', entityId: 'masteradmin',
+      entityTitle: 'masteradmin', performedBy: 'masteradmin',
+      meta: { ip: sourceIp(event), userAgent: userAgent(event) },
+    });
+    return r(200, { token, expiresIn: MASTER_TOKEN_TTL_SECS });
   }
 
   // ── POST /auth/logout ────────────────────────────────────────────────────

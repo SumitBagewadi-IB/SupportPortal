@@ -64,8 +64,12 @@ interface Article {
 
 type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics';
 
-const MASTER_SECRET = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
-const masterHeaders = { 'Content-Type': 'application/json', 'X-Admin-Secret': MASTER_SECRET };
+// Master session token is obtained via POST /auth/masterlogin (server-side validation).
+// The raw master password is NEVER stored in the browser bundle or client state.
+function getMasterHeaders(): Record<string, string> {
+  const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') || '' : '';
+  return { 'Content-Type': 'application/json', 'X-Master-Token': token };
+}
 
 const ACTION_CONFIG: Record<AuditLog['action'], { label: string; icon: string; color: string; bg: string }> = {
   CREATE_FAQ:     { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
@@ -144,25 +148,40 @@ export default function MasterAdminPage() {
     return () => clearInterval(iv);
   }, [lockedUntil]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockedUntil && Date.now() < lockedUntil) return;
-    if (!MASTER_SECRET) { setAuthError('System misconfiguration. Contact administrator.'); return; }
-    if (passwordInput === MASTER_SECRET) {
-      setAuthed(true);
-      setAuthError('');
-    } else {
-      const next = attempts + 1;
-      setAttempts(next);
-      if (next >= MAX_ATTEMPTS) {
-        const until = Date.now() + LOCKOUT_SECONDS * 1000;
-        setLockedUntil(until);
-        setAuthError(`Too many attempts. Locked for ${LOCKOUT_SECONDS}s.`);
+    if (!API_BASE) { setAuthError('System misconfiguration: API not configured.'); return; }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/masterlogin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      setPasswordInput('');
+
+      if (res.ok) {
+        const data = await res.json();
+        sessionStorage.setItem('master_token', data.token);
+        setAuthed(true);
+        setAuthError('');
+        setAttempts(0);
       } else {
-        setAuthError(`Invalid password. ${MAX_ATTEMPTS - next} attempt(s) remaining.`);
+        const next = attempts + 1;
+        setAttempts(next);
+        if (next >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_SECONDS * 1000;
+          setLockedUntil(until);
+          setAuthError(`Too many attempts. Locked for ${LOCKOUT_SECONDS}s.`);
+        } else {
+          setAuthError(`Invalid password. ${MAX_ATTEMPTS - next} attempt(s) remaining.`);
+        }
       }
+    } catch {
+      setPasswordInput('');
+      setAuthError('Network error. Please try again.');
     }
-    setPasswordInput('');
   };
 
   const fetchManagers = useCallback(async () => {
@@ -170,7 +189,7 @@ export default function MasterAdminPage() {
     setManagersLoading(true);
     setManagersError('');
     try {
-      const res = await fetch(`${API_BASE}/managers`, { headers: masterHeaders });
+      const res = await fetch(`${API_BASE}/managers`, { headers: getMasterHeaders() });
       if (res.ok) setManagers(await res.json());
       else setManagersError(`Failed to load managers (${res.status}). Try refreshing.`);
     } catch { setManagersError('Could not reach the API. Check your connection.'); }
@@ -181,7 +200,7 @@ export default function MasterAdminPage() {
     if (!API_BASE) return;
     setAnalyticsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: masterHeaders });
+      const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: getMasterHeaders() });
       if (res.ok) setAnalytics(await res.json());
     } catch { /* silently ignore — main loadError covers connectivity failures */ }
     finally { setAnalyticsLoading(false); }
@@ -193,9 +212,9 @@ export default function MasterAdminPage() {
     setLoadError('');
     try {
       const [ticketsRes, faqRes, auditRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/tickets`, { headers: masterHeaders }),
+        fetch(`${API_BASE}/tickets`, { headers: getMasterHeaders() }),
         fetch(`${API_BASE}/faq`),
-        fetch(`${API_BASE}/audit-log`, { headers: masterHeaders }),
+        fetch(`${API_BASE}/audit-log`, { headers: getMasterHeaders() }),
       ]);
 
       if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
@@ -375,7 +394,7 @@ export default function MasterAdminPage() {
             <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
             {lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}
           </button>
-          <button onClick={() => setAuthed(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <i className="fas fa-sign-out-alt"></i> Sign out
           </button>
         </div>
@@ -571,7 +590,7 @@ export default function MasterAdminPage() {
                       if (!username || !displayName || !email || !password) { setManagerFormMsg('All fields required.'); return; }
                       setManagerFormSaving(true); setManagerFormMsg('');
                       try {
-                        const res = await fetch(`${API_BASE}/managers`, { method: 'POST', headers: masterHeaders, body: JSON.stringify({ username, displayName, email, role, password }) });
+                        const res = await fetch(`${API_BASE}/managers`, { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email, role, password }) });
                         const data = await res.json();
                         if (res.ok) { setManagerFormMsg('✓ Manager created!'); fetchManagers(); setTimeout(() => setShowCreateManager(false), 1200); }
                         else setManagerFormMsg(data.error || 'Failed to create manager.');
@@ -952,7 +971,7 @@ export default function MasterAdminPage() {
               <button onClick={async () => {
                 const { managerId, newStatus } = confirmManagerAction;
                 setConfirmManagerAction(null);
-                await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: newStatus }) });
+                await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
                 fetchManagers();
               }} style={{ flex: 1, padding: '0.75rem', background: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
                 {confirmManagerAction.newStatus === 'deactivated' ? 'Deactivate' : 'Reactivate'}
