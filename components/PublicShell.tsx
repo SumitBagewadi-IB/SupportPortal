@@ -30,10 +30,11 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             </div>
             <div className="footer-col">
               <p className="footer-col-title">Legal</p>
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
-              <a href="#">Disclosures</a>
-              <a href="#">Risk Disclosure</a>
+              <a href="https://indiabullssecurities.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              <a href="https://indiabullssecurities.com/terms-and-conditions" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+              <a href="https://indiabullssecurities.com/disclaimer" target="_blank" rel="noopener noreferrer">Disclosures</a>
+              <a href="https://indiabullssecurities.com/disclaimer" target="_blank" rel="noopener noreferrer">Risk Disclosure</a>
+              <a href="https://indiabullssecurities.com/cookie-policy" target="_blank" rel="noopener noreferrer">Cookie Policy</a>
             </div>
             <div className="footer-col">
               <p className="footer-col-title">Regulatory</p>
@@ -55,9 +56,9 @@ export default function PublicShell({ children }: { children: React.ReactNode })
               <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener noreferrer">
                 SCORES Grievance <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i>
               </a>
-              <a href="#">Grievance Redressal</a>
-              <a href="#">Investor Education</a>
-              <a href="#">Advisory Notice</a>
+              <a href="https://indiabullssecurities.com/grievance-redressal" target="_blank" rel="noopener noreferrer">Grievance Redressal</a>
+              <a href="https://www.sebi.gov.in/investors/investor-education.html" target="_blank" rel="noopener noreferrer">Investor Education <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.65rem' }}></i></a>
+              <a href="https://indiabullssecurities.com/disclaimer" target="_blank" rel="noopener noreferrer">Advisory Notice</a>
             </div>
           </div>
           <div className="footer-bottom">
