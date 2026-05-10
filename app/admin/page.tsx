@@ -254,11 +254,22 @@ export default function AdminPage() {
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
-  const moveArticle = (index: number, direction: 'up' | 'down') => {
+  const moveArticle = (globalIndex: number, direction: 'up' | 'down', category?: string) => {
     const next = [...articles];
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= next.length) return;
-    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    if (category) {
+      // Find the adjacent article in the same category
+      const peers = next
+        .map((a, gi) => ({ gi, cat: a.category }))
+        .filter((x) => x.cat === category);
+      const peerPos = peers.findIndex((x) => x.gi === globalIndex);
+      const adjacentPeer = direction === 'up' ? peers[peerPos - 1] : peers[peerPos + 1];
+      if (!adjacentPeer) return;
+      [next[globalIndex], next[adjacentPeer.gi]] = [next[adjacentPeer.gi], next[globalIndex]];
+    } else {
+      const swapIndex = direction === 'up' ? globalIndex - 1 : globalIndex + 1;
+      if (swapIndex < 0 || swapIndex >= next.length) return;
+      [next[globalIndex], next[swapIndex]] = [next[swapIndex], next[globalIndex]];
+    }
     setArticles(next);
     setOrderChanged(true);
     setSortBy('default');
@@ -773,14 +784,24 @@ export default function AdminPage() {
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 130 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                                  {sortBy === 'default' && (() => { const gi = (safePage - 1) * PAGE_SIZE + i; return (<>
-                                    <button onClick={() => moveArticle(gi, 'up')} disabled={gi === 0} title="Move Up" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: gi === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: gi === 0 ? 0.3 : 1 }}>
-                                      <i className="fas fa-arrow-up" style={{ fontSize: '0.75rem' }}></i>
-                                    </button>
-                                    <button onClick={() => moveArticle(gi, 'down')} disabled={gi === articles.length - 1} title="Move Down" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: gi === articles.length - 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: gi === articles.length - 1 ? 0.3 : 1 }}>
-                                      <i className="fas fa-arrow-down" style={{ fontSize: '0.75rem' }}></i>
-                                    </button>
-                                  </>); })()}
+                                  {sortBy === 'default' && (() => {
+                                    const gi = (safePage - 1) * PAGE_SIZE + i;
+                                    const cat = catFilter || undefined;
+                                    const peers = cat
+                                      ? articles.map((a, idx) => idx).filter((idx) => articles[idx].category === cat)
+                                      : articles.map((_, idx) => idx);
+                                    const peerPos = peers.indexOf(gi);
+                                    const isFirst = peerPos === 0;
+                                    const isLast = peerPos === peers.length - 1;
+                                    return (<>
+                                      <button onClick={() => moveArticle(gi, 'up', cat)} disabled={isFirst} title="Move Up" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: isFirst ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: isFirst ? 0.3 : 1 }}>
+                                        <i className="fas fa-arrow-up" style={{ fontSize: '0.75rem' }}></i>
+                                      </button>
+                                      <button onClick={() => moveArticle(gi, 'down', cat)} disabled={isLast} title="Move Down" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: isLast ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: isLast ? 0.3 : 1 }}>
+                                        <i className="fas fa-arrow-down" style={{ fontSize: '0.75rem' }}></i>
+                                      </button>
+                                    </>);
+                                  })()}
                                   <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)' }}>
                                     <i className="fas fa-eye" style={{ fontSize: '0.8rem' }}></i>
                                   </button>
