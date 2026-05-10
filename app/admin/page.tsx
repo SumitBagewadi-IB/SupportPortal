@@ -102,6 +102,8 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('');
   // Sort
   const [sortBy, setSortBy] = useState<'default' | 'title' | 'category'>('default');
+  const [orderChanged, setOrderChanged] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   // Delete confirm modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Toast notification
@@ -252,11 +254,39 @@ export default function AdminPage() {
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
+  const moveArticle = (index: number, direction: 'up' | 'down') => {
+    const next = [...articles];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= next.length) return;
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    setArticles(next);
+    setOrderChanged(true);
+    setSortBy('default');
+  };
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(''), 3500);
   }, []);
+
+  const saveOrder = useCallback(async () => {
+    setSavingOrder(true);
+    try {
+      await Promise.all(articles.map((a, i) =>
+        fetch(`${API_BASE}/faq/${a.id}`, {
+          method: 'PUT',
+          headers: { ...authHeaders(managerToken), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sortOrder: i }),
+        })
+      ));
+      setOrderChanged(false);
+      showToast('Order saved!');
+    } catch {
+      showToast('Failed to save order.');
+    }
+    setSavingOrder(false);
+  }, [articles, managerToken, showToast]);
 
   const handleSessionExpired = useCallback(() => {
     setManagerToken('');
@@ -670,9 +700,17 @@ export default function AdminPage() {
                   <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
                     Articles <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({filtered.length} total)</span>
                   </h2>
-                  <button onClick={() => { setEditingId(null); setForm(emptyForm); setFormMsg(''); setActiveView('add'); }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
-                    <i className="fas fa-plus" style={{ fontSize: '0.7rem' }}></i> Add Article
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {orderChanged && (
+                      <button onClick={saveOrder} disabled={savingOrder} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#00AB4E', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: savingOrder ? 'not-allowed' : 'pointer', opacity: savingOrder ? 0.7 : 1 }}>
+                        <i className={`fas ${savingOrder ? 'fa-spinner fa-spin' : 'fa-save'}`} style={{ fontSize: '0.7rem' }}></i>
+                        {savingOrder ? 'Saving...' : 'Save Order'}
+                      </button>
+                    )}
+                    <button onClick={() => { setEditingId(null); setForm(emptyForm); setFormMsg(''); setActiveView('add'); }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                      <i className="fas fa-plus" style={{ fontSize: '0.7rem' }}></i> Add Article
+                    </button>
+                  </div>
                 </div>
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>Loading articles...</div>
@@ -733,8 +771,16 @@ export default function AdminPage() {
                                   </span>
                                 </button>
                               </td>
-                              <td style={{ padding: '0.875rem 1.25rem', width: 100 }}>
+                              <td style={{ padding: '0.875rem 1.25rem', width: 130 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
+                                  {sortBy === 'default' && (() => { const gi = (safePage - 1) * PAGE_SIZE + i; return (<>
+                                    <button onClick={() => moveArticle(gi, 'up')} disabled={gi === 0} title="Move Up" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: gi === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: gi === 0 ? 0.3 : 1 }}>
+                                      <i className="fas fa-arrow-up" style={{ fontSize: '0.75rem' }}></i>
+                                    </button>
+                                    <button onClick={() => moveArticle(gi, 'down')} disabled={gi === articles.length - 1} title="Move Down" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: gi === articles.length - 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#718096', opacity: gi === articles.length - 1 ? 0.3 : 1 }}>
+                                      <i className="fas fa-arrow-down" style={{ fontSize: '0.75rem' }}></i>
+                                    </button>
+                                  </>); })()}
                                   <button onClick={() => setPreviewArticle(article)} title="Preview" style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)' }}>
                                     <i className="fas fa-eye" style={{ fontSize: '0.8rem' }}></i>
                                   </button>
