@@ -80,15 +80,17 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => 
 const VALID_FAQ_STATUSES    = ['published', 'draft'];
 const VALID_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
 const ALLOWED_TICKET_CATEGORIES = [
-  'General', 'Account', 'Trading', 'Funds', 'Technical', 'Reports',
-  'KYC', 'Demat', 'IPO', 'Mutual Funds', 'Derivatives', 'Compliance', 'Other',
+  'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
+  'Funds', 'Charges & Brokerage', 'Compliance & Safety', 'Mutual Funds',
+  'IPO', 'F&O', 'Pledging', 'MTF', 'Tender Offers', 'Contact & Help',
+  'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
 ];
 
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || '';
-  const allowed = ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowed = ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin) ? origin : '';
   return {
-    'Access-Control-Allow-Origin':  allowed || '*',
+    'Access-Control-Allow-Origin':  allowed || (ALLOWED_ORIGINS.length === 0 ? '*' : ''),
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,Authorization',
     'Access-Control-Allow-Credentials': 'true',
@@ -644,13 +646,6 @@ export async function handler(event) {
       const filterLower = categoryFilter.toLowerCase();
       items = items.filter(i => i.category?.toLowerCase() === filterLower);
     }
-    if (auth.ok) {
-      await writeAudit({
-        action: 'ARTICLES_VIEWED', entity: 'article', entityId: 'all',
-        entityTitle: `${items.length} articles`, performedBy: auth.performedBy,
-        meta: { count: items.length },
-      });
-    }
     return r(200, items);
   }
 
@@ -766,7 +761,7 @@ export async function handler(event) {
 
   // ── POST /tickets ─────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/tickets') {
-    const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId, phone } = body;
+    const { name, email, category, subject, description, status = 'open', createdAt, sessionId, phone } = body;
 
     // Required field validation
     if (!name || !email || !subject) return r(400, { error: 'name, email, subject required' });
@@ -798,8 +793,8 @@ export async function handler(event) {
     // Status check
     if (status !== 'open' && !VALID_TICKET_STATUSES.includes(status)) return r(400, { error: 'Invalid ticket status' });
 
-    const ticketId = id || `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
-    const now = createdAt || new Date().toISOString();
+    const ticketId = `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
+    const now = new Date().toISOString();
     await ddb.send(new PutCommand({
       TableName: TICKETS_TABLE,
       Item: {

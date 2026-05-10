@@ -81,7 +81,7 @@ export default function HomePage() {
     setSearchLoading(true);
     const articles = allArticlesRef.current;
     const filtered = articles.filter(a =>
-      a.title?.toLowerCase().includes(ql) || a.category?.toLowerCase().includes(ql)
+      a.title?.toLowerCase().includes(ql) || a.category?.toLowerCase().includes(ql) || a.content?.toLowerCase().includes(ql)
     ).slice(0, 8);
     setResults(filtered);
     setShowDropdown(filtered.length > 0);

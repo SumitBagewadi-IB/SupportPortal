@@ -17,7 +17,7 @@ const CATEGORIES = [
   'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
   'Funds', 'Charges & Brokerage', 'Compliance & Safety', 'Mutual Funds',
   'IPO', 'F&O', 'Pledging', 'MTF', 'Tender Offers', 'Contact & Help',
-  'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts',
+  'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
 ];
 
 interface Article {
@@ -38,6 +38,7 @@ interface Ticket {
   subject: string;
   status: string;
   date: string;
+  description?: string;
   message?: string;
   phone?: string;
 }
@@ -350,6 +351,7 @@ export default function AdminPage() {
           headers: authHeaders(managerToken),
           body: JSON.stringify({ status: 'solved' }),
         });
+        if (res.status === 401) { handleSessionExpired(); return; }
         if (!res.ok) throw new Error('Failed');
       } catch {
         // Roll back optimistic update on failure
@@ -975,10 +977,10 @@ export default function AdminPage() {
                   </div>
                 ) : null
               )}
-              {previewTicket.message && (
+              {(previewTicket.description || previewTicket.message) && (
                 <div style={{ marginTop: '0.75rem' }}>
-                  <dt style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', fontWeight: 600, marginBottom: '0.5rem' }}>Message</dt>
-                  <dd style={{ background: '#F7FAFC', borderRadius: 8, padding: '0.875rem', fontSize: '0.875rem', color: 'var(--admin-text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewTicket.message}</dd>
+                  <dt style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', fontWeight: 600, marginBottom: '0.5rem' }}>Description</dt>
+                  <dd style={{ background: '#F7FAFC', borderRadius: 8, padding: '0.875rem', fontSize: '0.875rem', color: 'var(--admin-text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{previewTicket.description || previewTicket.message}</dd>
                 </div>
               )}
             </dl>

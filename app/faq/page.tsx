@@ -20,29 +20,32 @@ interface Article {
 const VALID_CATEGORIES = [
   'getting-started','account-opening','trading','portfolio','funds','ipo',
   'fo','pledging','account','reports','contact-faq','mtf','tender-offers',
-  'kyc','charges','compliance','mutual-funds','nri','all',
+  'kyc','charges','compliance','mutual-funds','nri','advanced','all',
 ];
 
+// Labels MUST exactly match the category strings stored in DynamoDB.
+// The matching logic in FAQContent uses label equality — any mismatch means
+// articles in that category never appear when the sidebar filter is active.
 const CATEGORIES = [
-  { key: 'all', label: 'All Topics', icon: 'fas fa-border-all' },
-  { key: 'getting-started', label: 'Getting Started', icon: 'fas fa-rocket' },
-  { key: 'account-opening', label: 'Account Opening', icon: 'fas fa-id-card' },
-  { key: 'trading', label: 'Trading', icon: 'fas fa-chart-line' },
-  { key: 'portfolio', label: 'Portfolio', icon: 'fas fa-briefcase' },
-  { key: 'funds', label: 'Funds', icon: 'fas fa-wallet' },
-  { key: 'ipo', label: 'IPO', icon: 'fas fa-rocket' },
-  { key: 'fo', label: 'F&O', icon: 'fas fa-bolt' },
-  { key: 'pledging', label: 'Pledging', icon: 'fas fa-link' },
-  { key: 'account', label: 'Account', icon: 'fas fa-user-circle' },
-  { key: 'reports', label: 'Reports', icon: 'fas fa-file-invoice' },
-  { key: 'contact-faq', label: 'Contact & Escalation', icon: 'fas fa-headset' },
-  { key: 'mtf', label: 'MTF', icon: 'fas fa-layer-group' },
-  { key: 'tender-offers', label: 'Tender Offers', icon: 'fas fa-hand-holding-dollar' },
-  { key: 'kyc', label: 'KYC Process', icon: 'fas fa-fingerprint' },
-  { key: 'charges', label: 'Charges & Brokerage', icon: 'fas fa-tags' },
-  { key: 'compliance', label: 'Compliance & Safety', icon: 'fas fa-shield-halved' },
-  { key: 'mutual-funds', label: 'Mutual Funds', icon: 'fas fa-seedling' },
-  { key: 'nri', label: 'NRI / HUF Accounts', icon: 'fas fa-globe' },
+  { key: 'all',            label: 'All Topics',            icon: 'fas fa-border-all' },
+  { key: 'getting-started',label: 'Getting Started',       icon: 'fas fa-rocket' },
+  { key: 'account-opening',label: 'Account Opening',       icon: 'fas fa-id-card' },
+  { key: 'trading',        label: 'Trading',               icon: 'fas fa-chart-line' },
+  { key: 'portfolio',      label: 'Portfolio & Margin',    icon: 'fas fa-briefcase' },
+  { key: 'funds',          label: 'Funds',                 icon: 'fas fa-wallet' },
+  { key: 'ipo',            label: 'IPO',                   icon: 'fas fa-rocket' },
+  { key: 'fo',             label: 'F&O',                   icon: 'fas fa-bolt' },
+  { key: 'pledging',       label: 'Pledging',              icon: 'fas fa-link' },
+  { key: 'account',        label: 'Account',               icon: 'fas fa-user-circle' },
+  { key: 'reports',        label: 'Reports',               icon: 'fas fa-file-invoice' },
+  { key: 'contact-faq',    label: 'Contact & Help',        icon: 'fas fa-headset' },
+  { key: 'mtf',            label: 'MTF',                   icon: 'fas fa-layer-group' },
+  { key: 'tender-offers',  label: 'Tender Offers',         icon: 'fas fa-hand-holding-dollar' },
+  { key: 'charges',        label: 'Charges & Brokerage',   icon: 'fas fa-tags' },
+  { key: 'compliance',     label: 'Compliance & Safety',   icon: 'fas fa-shield-halved' },
+  { key: 'mutual-funds',   label: 'Mutual Funds',          icon: 'fas fa-seedling' },
+  { key: 'nri',            label: 'NRI/HUF Accounts',      icon: 'fas fa-globe' },
+  { key: 'advanced',       label: 'Advanced',              icon: 'fas fa-robot' },
 ];
 
 function FAQContent() {
