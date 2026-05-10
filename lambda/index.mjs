@@ -251,6 +251,16 @@ async function writeAudit({ action, entity, entityId, entityTitle, performedBy, 
 // ─── Router ────────────────────────────────────────────────────────────────
 
 export async function handler(event) {
+  try {
+    return await _handler(event);
+  } catch (err) {
+    console.error('Unhandled Lambda error', err);
+    const r = (status, body, extra = {}) => resp(status, body, extra, event);
+    return r(500, { error: 'Internal server error. Please try again.' });
+  }
+}
+
+async function _handler(event) {
   const r = (status, body, extra = {}) => resp(status, body, extra, event);
 
   const method = event.requestContext?.http?.method || event.httpMethod || 'GET';
