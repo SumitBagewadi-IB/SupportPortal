@@ -92,7 +92,7 @@ function corsHeaders(event) {
   return {
     'Access-Control-Allow-Origin':  allowed || '',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,X-Master-Token,Authorization',
     'Access-Control-Allow-Credentials': 'true',
   };
 }
