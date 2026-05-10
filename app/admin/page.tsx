@@ -250,23 +250,25 @@ export default function AdminPage() {
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     setError('');
-    // Always load local articles first (mirrors original admin.html reading faq.html)
-    setArticles(LOCAL_ARTICLES);
-    // Then try to sync from API — silently merge if available, silently skip if not
     if (API_BASE) {
       try {
         const res = await fetch(`${API_BASE}/faq`);
         if (res.ok) {
           const data = await res.json();
           const apiItems: Article[] = Array.isArray(data) ? data : (data.items || data.articles || []);
-          if (apiItems.length > 0) {
-            // Merge: API articles take precedence, local fills any gaps
-            const apiIds = new Set(apiItems.map((a) => a.id));
-            const merged = [...apiItems, ...LOCAL_ARTICLES.filter((a) => !apiIds.has(a.id))];
-            setArticles(merged);
-          }
+          // API is the single source of truth — never merge local fallback into admin view
+          setArticles(apiItems);
+        } else {
+          setError('Failed to load articles from API.');
+          setArticles([]);
         }
-      } catch { /* silently ignore — local articles are already shown */ }
+      } catch {
+        setError('Could not reach the API. Check your connection.');
+        setArticles([]);
+      }
+    } else {
+      setError('API not configured.');
+      setArticles([]);
     }
     setLoading(false);
   }, []);
