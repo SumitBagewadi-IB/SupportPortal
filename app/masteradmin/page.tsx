@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
@@ -335,14 +336,14 @@ export default function MasterAdminPage() {
   if (!authed) {
     const isLocked = !!lockedUntil && Date.now() < lockedUntil;
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-subtle)', padding: '1rem' }}>
-        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 16, padding: '2.5rem', width: '100%', maxWidth: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 9999 }}>
+        <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg,#00AB4E,#007a37)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-              <i className="fas fa-shield-alt" style={{ color: '#fff', fontSize: '1.375rem' }}></i>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Image src="/logo.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
             </div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Master Admin</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Manager of Admins — restricted access only</p>
+            <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>Master Admin</h1>
+            <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)' }}>Manager of Admins — restricted access only</p>
           </div>
 
           <form onSubmit={handleLogin}>
@@ -353,7 +354,7 @@ export default function MasterAdminPage() {
                 onChange={e => setPasswordInput(e.target.value)}
                 placeholder="Master password"
                 disabled={isLocked}
-                style={{ width: '100%', padding: '0.75rem 3rem 0.75rem 1rem', border: `1.5px solid ${authError ? '#EF4444' : 'var(--border)'}`, borderRadius: 10, fontSize: '0.9rem', outline: 'none', background: isLocked ? 'var(--bg-subtle)' : 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: `2px solid ${authError ? '#EF4444' : '#E2E8F0'}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: isLocked ? '#F7FAFC' : '#fff', color: '#1A202C', boxSizing: 'border-box' }}
               />
               <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
                 <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
@@ -367,10 +368,11 @@ export default function MasterAdminPage() {
               </div>
             )}
 
-            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.75rem', background: isLocked ? '#9CA3AF' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: isLocked ? '#9CA3AF' : '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1, transition: 'opacity 0.15s' }}>
               {isLocked ? `Locked (${lockSecs}s)` : 'Access Dashboard'}
             </button>
           </form>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
         </div>
       </div>
     );
