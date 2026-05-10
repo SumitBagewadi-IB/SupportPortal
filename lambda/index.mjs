@@ -183,7 +183,7 @@ function verifyMasterToken(token) {
 
 function extractAuth(event) {
   const authHdr  = event.headers?.['authorization'] || event.headers?.['Authorization'] || '';
-  const xMaster  = event.headers?.['x-master-token'] || event.headers?.['X-Master-Token'] || '';
+  const xMaster  = event.headers?.['x-master-token'] || event.headers?.['X-Master-Token'] || event.queryStringParameters?.['_mt'] || '';
   const xSecret  = event.headers?.['x-admin-secret'] || event.headers?.['X-Admin-Secret'] || '';
 
   const bearerToken = authHdr.startsWith('Bearer ') ? authHdr.slice(7) : null;

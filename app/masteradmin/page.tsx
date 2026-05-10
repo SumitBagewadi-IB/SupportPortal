@@ -67,9 +67,16 @@ type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics';
 
 // Master session token is obtained via POST /auth/masterlogin (server-side validation).
 // The raw master password is NEVER stored in the browser bundle or client state.
+function getMasterToken(): string {
+  return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') || '' : '';
+}
 function getMasterHeaders(): Record<string, string> {
-  const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') || '' : '';
-  return { 'Content-Type': 'application/json', 'X-Master-Token': token };
+  return { 'Content-Type': 'application/json' };
+}
+function masterUrl(path: string): string {
+  const token = getMasterToken();
+  const sep = path.includes('?') ? '&' : '?';
+  return `${API_BASE}${path}${token ? `${sep}_mt=${encodeURIComponent(token)}` : ''}`;
 }
 
 const ACTION_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
@@ -239,7 +246,7 @@ export default function MasterAdminPage() {
     setManagersLoading(true);
     setManagersError('');
     try {
-      const res = await fetch(`${API_BASE}/managers`, { headers: getMasterHeaders() });
+      const res = await fetch(masterUrl('/managers'), { headers: getMasterHeaders() });
       if (res.status === 401) { handleSessionExpired(); return; }
       if (res.ok) setManagers(await res.json());
       else setManagersError(`Failed to load managers (${res.status}). Try refreshing.`);
@@ -251,7 +258,7 @@ export default function MasterAdminPage() {
     if (!API_BASE) return;
     setAnalyticsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: getMasterHeaders() });
+      const res = await fetch(masterUrl(`/analytics/summary?days=${days}`), { headers: getMasterHeaders() });
       if (res.status === 401) { handleSessionExpired(); return; }
       if (res.ok) setAnalytics(await res.json());
     } catch { /* silently ignore — main loadError covers connectivity failures */ }
@@ -264,9 +271,9 @@ export default function MasterAdminPage() {
     setLoadError('');
     try {
       const [ticketsRes, faqRes, auditRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/tickets`, { headers: getMasterHeaders() }),
+        fetch(masterUrl('/tickets'), { headers: getMasterHeaders() }),
         fetch(`${API_BASE}/faq`),
-        fetch(`${API_BASE}/audit-log`, { headers: getMasterHeaders() }),
+        fetch(masterUrl('/audit-log'), { headers: getMasterHeaders() }),
       ]);
 
       // Any 401 on authenticated resources means the master session expired
@@ -644,7 +651,7 @@ export default function MasterAdminPage() {
                       if (!username || !displayName || !email || !password) { setManagerFormMsg('All fields required.'); return; }
                       setManagerFormSaving(true); setManagerFormMsg('');
                       try {
-                        const res = await fetch(`${API_BASE}/managers`, { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email, role, password }) });
+                        const res = await fetch(masterUrl('/managers'), { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email, role, password }) });
                         if (res.status === 401) { handleSessionExpired(); return; }
                         const data = await res.json();
                         if (res.ok) { setManagerFormMsg('✓ Manager created!'); fetchManagers(); setTimeout(() => setShowCreateManager(false), 1200); }
@@ -1026,7 +1033,7 @@ export default function MasterAdminPage() {
               <button onClick={async () => {
                 const { managerId, newStatus } = confirmManagerAction;
                 setConfirmManagerAction(null);
-                const r = await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
+                const r = await fetch(masterUrl(`/managers/${managerId}`), { method: 'PUT', headers: getMasterHeaders(), body: JSON.stringify({ status: newStatus }) });
                 if (r.status === 401) { handleSessionExpired(); return; }
                 fetchManagers();
               }} style={{ flex: 1, padding: '0.75rem', background: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
