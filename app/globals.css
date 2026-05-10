@@ -2286,7 +2286,7 @@ footer {
   flex-shrink: 0;
   background: #1A202C;
   color: white;
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow-y: auto;
   position: relative;

@@ -557,6 +557,34 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* TAB NAV — matches masteradmin style */}
+        <div style={{ borderBottom: '1px solid var(--admin-border)', background: 'var(--admin-topbar)', padding: '0 1.25rem', display: 'flex', gap: '0.25rem', overflowX: 'auto', flexShrink: 0 }}>
+          {[
+            { id: 'articles', label: 'FAQ Articles', icon: 'fa-list' },
+            { id: 'add',      label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
+            { id: 'tickets',  label: 'Tickets', icon: 'fa-envelope' },
+            { id: 'audit',    label: 'Audit Log', icon: 'fa-scroll' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveView(tab.id as 'articles' | 'add' | 'tickets' | 'audit'); if (tab.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } setSidebarOpen(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.75rem 0.875rem', background: 'none', border: 'none', borderBottom: `2px solid ${activeView === tab.id ? '#00AB4E' : 'transparent'}`, color: activeView === tab.id ? '#00AB4E' : 'var(--admin-text-secondary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: activeView === tab.id ? 700 : 500, whiteSpace: 'nowrap', flexShrink: 0, transition: 'color 0.15s' }}
+            >
+              <i className={`fas ${tab.icon}`} style={{ fontSize: '0.8rem' }}></i>
+              {tab.label}
+              {tab.id === 'tickets' && openTickets > 0 && (
+                <span style={{ background: '#F97316', color: 'white', fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 20 }}>{openTickets} open</span>
+              )}
+            </button>
+          ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingLeft: '1rem' }}>
+            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.75rem 0.5rem', color: 'var(--admin-text-muted)', fontSize: '0.8125rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '0.75rem' }}></i>
+              <span className="hide-mobile">View Site</span>
+            </Link>
+          </div>
+        </div>
+
         {/* SCROLLABLE CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.75rem' }}>
 
