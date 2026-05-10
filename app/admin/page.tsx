@@ -58,6 +58,9 @@ export default function AdminPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
+  const [sessionWarning, setSessionWarning] = useState(false);
+  const sessionWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lockoutSecsLeft, setLockoutSecsLeft] = useState(0);
   const lockoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -124,6 +127,7 @@ export default function AdminPage() {
         if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
           setManagerToken(token);
           setManagerInfo(JSON.parse(info));
+          setSessionExpiresAt(payload.exp);
           setAuthed(true);
         } else {
           sessionStorage.removeItem('mgr_token');
@@ -153,6 +157,15 @@ export default function AdminPage() {
       return () => { if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current); };
     }
   }, [lockoutUntil]);
+
+  // Session expiry warning — show banner 5 minutes before token expires
+  useEffect(() => {
+    if (!sessionExpiresAt) return;
+    const msUntilWarning = (sessionExpiresAt * 1000) - Date.now() - 5 * 60 * 1000;
+    if (msUntilWarning <= 0) { setSessionWarning(true); return; }
+    sessionWarningTimerRef.current = setTimeout(() => setSessionWarning(true), msUntilWarning);
+    return () => { if (sessionWarningTimerRef.current) clearTimeout(sessionWarningTimerRef.current); };
+  }, [sessionExpiresAt]);
 
   const authHeaders = useCallback((token: string) => ({
     'Content-Type': 'application/json',
@@ -205,6 +218,10 @@ export default function AdminPage() {
         sessionStorage.setItem('mgr_info', JSON.stringify({ managerId: data.managerId, displayName: data.displayName, role: data.role }));
         setManagerToken(data.token);
         setManagerInfo({ managerId: data.managerId, displayName: data.displayName, role: data.role });
+        try {
+          const p = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (p.exp) setSessionExpiresAt(p.exp);
+        } catch { /* ignore */ }
         setAuthed(true);
         setAttempts(0);
       } else {
@@ -232,10 +249,10 @@ export default function AdminPage() {
     if (API_BASE) {
       try {
         const res = await fetch(`${API_BASE}/faq`);
+        if (res.status === 401) { handleSessionExpired(); return; }
         if (res.ok) {
           const data = await res.json();
           const apiItems: Article[] = Array.isArray(data) ? data : (data.items || data.articles || []);
-          // API is the single source of truth — never merge local fallback into admin view
           setArticles(apiItems);
         } else {
           setError('Failed to load articles from API.');
@@ -251,7 +268,7 @@ export default function AdminPage() {
     }
     setLoading(false);
     setLastRefreshed(new Date());
-  }, []);
+  }, [handleSessionExpired]);
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
@@ -297,6 +314,8 @@ export default function AdminPage() {
           body: JSON.stringify({ sortOrder: i }),
         })
       ));
+      const unauthorized = results.find(r => r.status === 401);
+      if (unauthorized) { handleSessionExpired(); return; }
       const failed = results.filter(r => !r.ok);
       if (failed.length > 0) {
         showToast(`Failed to save order (${failed.length} errors). Please try again.`);
@@ -314,6 +333,8 @@ export default function AdminPage() {
   const handleSessionExpired = useCallback(() => {
     setManagerToken('');
     setAuthed(false);
+    setSessionWarning(false);
+    setSessionExpiresAt(null);
     sessionStorage.removeItem('mgr_token');
     sessionStorage.removeItem('mgr_info');
     setAuthError('Your session has expired. Please log in again.');
@@ -330,7 +351,10 @@ export default function AdminPage() {
     try {
       const method = editingId ? 'PUT' : 'POST';
       const url = editingId ? `${API_BASE}/faq/${editingId}` : `${API_BASE}/faq`;
-      const body = editingId ? { ...form } : form;
+      // Assign new articles the next sortOrder so they don't default to last
+      const catPeers = articles.filter(a => a.category === form.category);
+      const nextSortOrder = catPeers.length > 0 ? Math.max(...catPeers.map(a => a.sortOrder ?? 0)) + 1 : 0;
+      const body = editingId ? { ...form } : { ...form, sortOrder: nextSortOrder };
       const res = await fetch(url, {
         method,
         headers: authHeaders(managerToken),
@@ -643,6 +667,17 @@ export default function AdminPage() {
             </Link>
           </div>
         </div>
+
+        {/* SESSION EXPIRY WARNING */}
+        {sessionWarning && (
+          <div style={{ background: '#FFFBEB', borderBottom: '1px solid #F59E0B', padding: '0.625rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+            <i className="fas fa-clock" style={{ color: '#D97706', fontSize: '0.875rem' }}></i>
+            <span style={{ fontSize: '0.8125rem', color: '#92400E', fontWeight: 600, flex: 1 }}>
+              Your session expires soon. Save any unsaved work before you&apos;re signed out.
+            </span>
+            <button onClick={() => setSessionWarning(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', fontSize: '1rem', lineHeight: 1 }}>×</button>
+          </div>
+        )}
 
         {/* SCROLLABLE CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.75rem' }}>

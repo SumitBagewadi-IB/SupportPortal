@@ -60,7 +60,9 @@ function FAQContent() {
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const feedbackGivenRef = useRef<Set<string>>(new Set());
+  const feedbackGivenRef = useRef<Set<string>>(new Set(
+    (() => { try { return JSON.parse(localStorage.getItem('faq_feedback_given') || '[]'); } catch { return []; } })()
+  ));
 
   useEffect(() => {
     const validated = VALID_CATEGORIES.includes(rawCat) ? rawCat : 'all';
@@ -323,6 +325,7 @@ function FAQContent() {
                             onClick={() => {
                               if (feedbackGivenRef.current.has(article.id)) return;
                               feedbackGivenRef.current.add(article.id);
+                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...feedbackGivenRef.current])); } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'helpful' });
                             }}
                           >
@@ -334,6 +337,7 @@ function FAQContent() {
                             onClick={() => {
                               if (feedbackGivenRef.current.has(article.id)) return;
                               feedbackGivenRef.current.add(article.id);
+                              try { localStorage.setItem('faq_feedback_given', JSON.stringify([...feedbackGivenRef.current])); } catch { /* ignore */ }
                               trackEvent({ eventType: 'faq_feedback', articleId: article.id, articleTitle: article.title || article.question, category: article.category, feedbackType: 'not_helpful' });
                             }}
                           >
