@@ -385,31 +385,14 @@ export default function MasterAdminPage() {
   // ── Login screen ──────────────────────────────────────────────────────────
   if (!authed) {
     const isLocked = !!lockedUntil && Date.now() < lockedUntil;
-    const cardBg = darkMode ? '#1E2433' : '#FFFFFF';
-    const cardText = darkMode ? '#F1F5F9' : '#1A202C';
-    const cardSubText = darkMode ? '#94A3B8' : '#718096';
-    const cardMuted = darkMode ? '#64748B' : '#A0AEC0';
-    const inputBorder = darkMode ? '#334155' : '#E2E8F0';
-    const inputBg = darkMode ? '#0F172A' : '#FFFFFF';
-    const inputText = darkMode ? '#F1F5F9' : '#1A202C';
     return (
-      <div style={{ position: 'fixed', inset: 0, background: darkMode ? 'linear-gradient(135deg, #020617 0%, #0F172A 50%, #1E293B 100%)' : 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 9999 }}>
-        {/* Theme toggle — top right of overlay */}
-        <button
-          onClick={toggleDarkMode}
-          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '0.5rem 0.75rem', cursor: 'pointer', color: '#CBD5E0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.375rem', backdropFilter: 'blur(4px)' }}
-        >
-          <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{darkMode ? 'Light' : 'Dark'}</span>
-        </button>
-
-        <div style={{ background: cardBg, borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 9999 }}>
+        <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <Image src={darkMode ? '/logo.svg' : '/logo-dark.svg'} alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
+            <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
           </div>
-          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: cardText, marginBottom: '0.375rem' }}>Master Admin</h1>
-          <p style={{ fontSize: '0.875rem', color: cardSubText, marginBottom: '2rem' }}>Manager of Admins — restricted access only</p>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Master Admin</h1>
+          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Manager of Admins — restricted access only</p>
 
           <form onSubmit={handleLogin}>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
@@ -420,24 +403,24 @@ export default function MasterAdminPage() {
                 placeholder="Master password"
                 disabled={isLocked}
                 autoComplete="current-password"
-                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: `2px solid ${inputBorder}`, borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: inputBg, color: inputText, boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: '#fff', color: '#1A202C', boxSizing: 'border-box' }}
               />
-              <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: cardMuted, fontSize: '0.875rem' }}>
+              <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
 
             {(authError || isLocked) && (
-              <div style={{ background: darkMode ? '#450a0a' : '#FFF5F5', border: `1px solid ${darkMode ? '#7f1d1d' : '#FEB2B2'}`, color: darkMode ? '#fca5a5' : '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
+              <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
                 {isLocked ? `Account locked. Try again in ${lockSecs}s.` : authError}
               </div>
             )}
 
-            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: darkMode ? '#00AB4E' : '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked || !passwordInput ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1 }}>
+            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked || !passwordInput ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1 }}>
               {isLocked ? `Locked (${lockSecs}s)` : 'Sign In'}
             </button>
           </form>
-          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: cardMuted }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
+          <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
         </div>
       </div>
     );
