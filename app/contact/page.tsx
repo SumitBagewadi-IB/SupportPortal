@@ -128,7 +128,7 @@ export default function ContactPage() {
     return (
       <div className="page-wrap">
         <div className="container" style={{ maxWidth: 520, textAlign: 'center', paddingTop: '5rem', paddingBottom: '5rem' }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E6FAE6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success-icon-bg, #E6FAE6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
             <i className="fas fa-check" style={{ color: '#00AB4E', fontSize: '1.5rem' }}></i>
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.75rem' }}>Ticket Submitted!</h2>
@@ -200,14 +200,14 @@ export default function ContactPage() {
             </div>
             {errors.subject && <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#E53E3E' }}>{errors.subject}</p>}
             {suggestions.length > 0 && (
-              <div style={{ marginTop: '0.75rem', padding: '0.875rem 1rem', background: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: 8 }}>
-                <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#276749', marginBottom: '0.5rem' }}>
+              <div className="contact-suggestions">
+                <p className="contact-suggestions-header">
                   <i className="fas fa-lightbulb" style={{ marginRight: '0.375rem' }}></i>Recommended Articles
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {suggestions.map((s) => (
                     <li key={s.id}>
-                      <Link href={`/faq#${s.id}`} style={{ fontSize: '0.8125rem', color: '#276749', textDecoration: 'none' }}>
+                      <Link href={`/faq#${s.id}`} className="contact-suggestion-link">
                         → {s.title}
                       </Link>
                     </li>
@@ -239,12 +239,12 @@ export default function ContactPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
             {[
-              { icon: 'fas fa-phone-volume', bg: '#EFF6FF', color: '#3B82F6', title: 'Call Support', desc: 'Immediate assistance for trading & account queries.', detail: <a href="tel:02261446300" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-dark)', textDecoration: 'none' }}>022-61446300</a>, sub: 'Mon – Sat, 8 AM – 8 PM' },
-              { icon: 'fas fa-envelope-open-text', bg: '#F0FDF4', color: '#22C55E', title: 'Email Us', desc: 'For detailed queries, documentation or feedback.', detail: <a href="mailto:helpdesk@indiabullssecurities.com" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#3B82F6', textDecoration: 'none' }}>helpdesk@indiabullssecurities.com</a>, sub: 'Average Response: 4 hrs' },
-              { icon: 'fas fa-location-dot', bg: '#FFF1F2', color: '#F43F5E', title: 'Registered Office', desc: 'Plot no. 108, 5th Floor, IT Park,\nUdyog Vihar, Phase - I,\nGurugram – 122016, Haryana', detail: null, sub: null },
+              { icon: 'fas fa-phone-volume', iconBg: 'contact-icon-blue', color: '#3B82F6', title: 'Call Support', desc: 'Immediate assistance for trading & account queries.', detail: <a href="tel:02261446300" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-dark)', textDecoration: 'none' }}>022-61446300</a>, sub: 'Mon – Sat, 8 AM – 8 PM' },
+              { icon: 'fas fa-envelope-open-text', iconBg: 'contact-icon-green', color: '#22C55E', title: 'Email Us', desc: 'For detailed queries, documentation or feedback.', detail: <a href="mailto:helpdesk@indiabullssecurities.com" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#3B82F6', textDecoration: 'none' }}>helpdesk@indiabullssecurities.com</a>, sub: 'Average Response: 4 hrs' },
+              { icon: 'fas fa-location-dot', iconBg: 'contact-icon-red', color: '#F43F5E', title: 'Registered Office', desc: 'Plot no. 108, 5th Floor, IT Park,\nUdyog Vihar, Phase - I,\nGurugram – 122016, Haryana', detail: null, sub: null },
             ].map((card) => (
               <div key={card.title} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
-                <div style={{ width: 56, height: 56, background: card.bg, color: card.color, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.5rem' }}>
+                <div className={`contact-icon-circle ${card.iconBg}`} style={{ color: card.color, margin: '0 auto 1.5rem', fontSize: '1.5rem' }}>
                   <i className={card.icon}></i>
                 </div>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '0.75rem' }}>{card.title}</h3>

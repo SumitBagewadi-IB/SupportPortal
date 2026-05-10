@@ -1338,6 +1338,16 @@ html:not([data-theme="dark"]) .fa-sun {
     flex-shrink: 0;
 }
 
+[data-theme="dark"] .notice-banner {
+    background: #1C1700;
+    border-color: #78350F;
+    color: #FCD34D;
+}
+
+[data-theme="dark"] .notice-banner i {
+    color: #F59E0B;
+}
+
 /* ──────────────────────────
    FOOTER
 ────────────────────────── */
@@ -2182,6 +2192,90 @@ footer {
     background: #FEF3C7;
     text-decoration: none;
 }
+
+[data-theme="dark"] .suggestion-header {
+    background: #1C1700;
+    border-color: #78350F;
+    color: #FCD34D;
+}
+
+[data-theme="dark"] #suggestions-list {
+    background: #0D1117;
+    border-color: #78350F;
+}
+
+[data-theme="dark"] .suggest-item {
+    color: #FCD34D;
+}
+
+[data-theme="dark"] .suggest-item:hover {
+    background: #1C1700;
+}
+/* ===========================
+   Contact Page — Dark Mode Safe
+   =========================== */
+
+:root {
+    --success-icon-bg: #E6FAE6;
+}
+[data-theme="dark"] {
+    --success-icon-bg: #052e16;
+}
+
+.contact-suggestions {
+    margin-top: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: #F0FFF4;
+    border: 1px solid #9AE6B4;
+    border-radius: 8px;
+}
+[data-theme="dark"] .contact-suggestions {
+    background: #052e16;
+    border-color: #166534;
+}
+
+.contact-suggestions-header {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #276749;
+    margin-bottom: 0.5rem;
+}
+[data-theme="dark"] .contact-suggestions-header {
+    color: #4ade80;
+}
+
+.contact-suggestion-link {
+    font-size: 0.8125rem;
+    color: #276749;
+    text-decoration: none;
+}
+[data-theme="dark"] .contact-suggestion-link {
+    color: #4ade80;
+}
+
+.contact-icon-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.contact-icon-blue  { background: #EFF6FF; }
+.contact-icon-green { background: #F0FDF4; }
+.contact-icon-red   { background: #FFF1F2; }
+
+[data-theme="dark"] .contact-icon-blue  { background: #1e3a5f; }
+[data-theme="dark"] .contact-icon-green { background: #052e16; }
+[data-theme="dark"] .contact-icon-red   { background: #3b0a14; }
+
+/* ===========================
+   Utility
+   =========================== */
+@media (max-width: 640px) {
+    .hide-mobile { display: none !important; }
+}
+
 /* ===========================
    Admin Portal — Mobile Responsive
    =========================== */

@@ -90,7 +90,7 @@ function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || '';
   const allowed = ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin) ? origin : '';
   return {
-    'Access-Control-Allow-Origin':  allowed || (ALLOWED_ORIGINS.length === 0 ? '*' : ''),
+    'Access-Control-Allow-Origin':  allowed || '',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,Authorization',
     'Access-Control-Allow-Credentials': 'true',

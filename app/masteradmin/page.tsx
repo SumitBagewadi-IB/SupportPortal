@@ -453,35 +453,31 @@ export default function MasterAdminPage() {
           </div>
           <div>
             <span style={{ fontWeight: 800, color: 'var(--text-dark)', fontSize: '0.9375rem' }}>Master Admin</span>
-            <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.5rem', borderRadius: 20, fontWeight: 600 }}>MANAGER OF ADMINS</span>
+            <span className="hide-mobile" style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.5rem', borderRadius: 20, fontWeight: 600 }}>MANAGER OF ADMINS</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {lastRefreshed && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-          <button onClick={fetchAll} disabled={loading} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={fetchAll} disabled={loading} title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
             <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
-            {lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}
+            <span className="hide-mobile">{lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}</span>
           </button>
-          <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
             <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
-          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <i className="fas fa-sign-out-alt"></i> Sign out
+          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <i className="fas fa-sign-out-alt"></i>
+            <span className="hide-mobile">Sign out</span>
           </button>
         </div>
       </div>
 
       {/* Tab nav */}
-      <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', padding: '0 1.5rem', display: 'flex', gap: '0.25rem' }}>
+      <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', padding: '0 1rem', display: 'flex', gap: '0.125rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' as const, scrollbarWidth: 'none' as const }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); }}
-            style={{ padding: '0.875rem 1.125rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? '#00AB4E' : 'var(--text-muted)', borderBottom: `2px solid ${activeTab === tab.id ? '#00AB4E' : 'transparent'}`, display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'color 0.15s' }}
+            style={{ padding: '0.875rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? '#00AB4E' : 'var(--text-muted)', borderBottom: `2px solid ${activeTab === tab.id ? '#00AB4E' : 'transparent'}`, display: 'flex', alignItems: 'center', gap: '0.375rem', transition: 'color 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <i className={`fas ${tab.icon}`}></i> {tab.label}
             {tab.id === 'tickets' && stats.openTickets > 0 && (
@@ -595,7 +591,7 @@ export default function MasterAdminPage() {
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Create, deactivate and manage admin manager accounts.</p>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)} placeholder="Search by username, name or email…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', minWidth: 220 }} />
+                <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)} placeholder="Search managers…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', width: '100%', maxWidth: 260 }} />
                 <button onClick={() => { setShowCreateManager(true); setManagerFormMsg(''); setShowManagerPassword(false); setManagerForm({ username: '', displayName: '', email: '', role: 'manager', password: '' }); }} style={{ padding: '0.5rem 1rem', background: '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
                   <i className="fas fa-plus"></i> Create Manager
                 </button>
@@ -737,7 +733,7 @@ export default function MasterAdminPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)' }}>Audit Log</h2>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search by title, ID or manager…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', minWidth: 200 }} />
+                <input value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', width: '100%', maxWidth: 220 }} />
                 <select value={auditFilter} onChange={e => setAuditFilter(e.target.value)} style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)' }}>
                   <option value="all">All Actions</option>
                   <option value="faq">FAQ</option>
@@ -919,7 +915,7 @@ export default function MasterAdminPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)' }}>All Tickets <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '1rem' }}>({filteredTickets.length})</span></h2>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input value={ticketSearch} onChange={e => setTicketSearch(e.target.value)} placeholder="Search by subject, email or ID…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', minWidth: 200 }} />
+                <input value={ticketSearch} onChange={e => setTicketSearch(e.target.value)} placeholder="Search tickets…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', width: '100%', maxWidth: 220 }} />
                 <select value={ticketFilter} onChange={e => setTicketFilter(e.target.value)} style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)' }}>
                   <option value="all">All Statuses</option>
                   <option value="open">Open</option>
