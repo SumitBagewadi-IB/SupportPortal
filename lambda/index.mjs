@@ -284,7 +284,7 @@ export async function handler(event) {
 
     await ddb.send(new UpdateCommand({
       TableName: MANAGERS_TABLE,
-      Key: { managerId: manager.managerId },
+      Key: { id: manager.managerId },
       UpdateExpression: 'SET lastLoginAt = :t, failedLoginAttempts = :z REMOVE lockedUntil',
       ExpressionAttributeValues: { ':t': new Date().toISOString(), ':z': 0 },
     }));
