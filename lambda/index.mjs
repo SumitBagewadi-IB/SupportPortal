@@ -413,6 +413,8 @@ export async function handler(event) {
     if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const { username, displayName, email, role, password } = body;
     if (!username || !displayName || !email || !password) return r(400, { error: 'username, displayName, email, password required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return r(400, { error: 'Invalid email format' });
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) return r(400, { error: 'Username must be 3-30 alphanumeric/underscore characters' });
     if (password.length < 8) return r(400, { error: 'Password must be at least 8 characters' });
     const allowed_roles = ['manager', 'senior_manager'];
     if (role && !allowed_roles.includes(role)) return r(400, { error: `Invalid role. Allowed: ${allowed_roles.join(', ')}` });
@@ -626,8 +628,11 @@ export async function handler(event) {
   if (method === 'POST' && path === '/tickets') {
     const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId } = body;
     if (!name || !email || !subject) return r(400, { error: 'name, email, subject required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return r(400, { error: 'Invalid email format' });
     if (subject.length > 300) return r(400, { error: 'subject too long (max 300 chars)' });
     if (description && description.length > 5000) return r(400, { error: 'description too long (max 5000 chars)' });
+    const ALLOWED_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
+    if (status !== 'open' && !ALLOWED_TICKET_STATUSES.includes(status)) return r(400, { error: 'Invalid ticket status' });
     const ticketId = id || `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
     const now = createdAt || new Date().toISOString();
     await ddb.send(new PutCommand({
@@ -659,6 +664,8 @@ export async function handler(event) {
     if (!existing.Item) return r(404, { error: 'Ticket not found' });
     const oldStatus = existing.Item.status;
     const newStatus = body.status || oldStatus;
+    const VALID_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
+    if (!VALID_TICKET_STATUSES.includes(newStatus)) return r(400, { error: 'Invalid status. Allowed: open, in_progress, solved, resolved' });
     await ddb.send(new UpdateCommand({
       TableName: TICKETS_TABLE,
       Key: { id },
