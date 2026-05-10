@@ -220,6 +220,7 @@ export async function handler(event) {
   if (method === 'POST' && path === '/auth/login') {
     const { username, password } = body;
     if (!username || !password) return r(400, { error: 'username and password required' });
+    if (typeof username !== 'string' || typeof password !== 'string') return r(400, { error: 'username and password must be strings' });
 
     const ip = sourceIp(event);
     const ua = userAgent(event);
@@ -414,7 +415,8 @@ export async function handler(event) {
     if (!username || !displayName || !email || !password) return r(400, { error: 'username, displayName, email, password required' });
     if (password.length < 8) return r(400, { error: 'Password must be at least 8 characters' });
     const allowed_roles = ['manager', 'senior_manager'];
-    const managerRole = allowed_roles.includes(role) ? role : 'manager';
+    if (role && !allowed_roles.includes(role)) return r(400, { error: `Invalid role. Allowed: ${allowed_roles.join(', ')}` });
+    const managerRole = role || 'manager';
 
     // Check username unique
     const existing = await ddb.send(new QueryCommand({
@@ -491,6 +493,9 @@ export async function handler(event) {
     }
     if (!exprParts.length) return r(400, { error: 'Nothing to update' });
 
+    const existingMgr = await ddb.send(new GetCommand({ TableName: MANAGERS_TABLE, Key: { id: managerId } }));
+    if (!existingMgr.Item) return r(404, { error: 'Manager not found' });
+
     await ddb.send(new UpdateCommand({
       TableName: MANAGERS_TABLE,
       Key: { id: managerId },
@@ -511,8 +516,12 @@ export async function handler(event) {
   // ── GET /faq ──────────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/faq') {
     const auth = requireManagerOrMaster(event);
+    const categoryFilter = event.queryStringParameters?.category;
     const res = await ddb.send(new ScanCommand({ TableName: FAQ_TABLE }));
-    const items = res.Items || [];
+    let items = res.Items || [];
+    if (categoryFilter) {
+      items = items.filter(i => i.category?.toLowerCase() === categoryFilter.toLowerCase());
+    }
     if (auth.ok) {
       await writeAudit({
         action: 'ARTICLES_VIEWED', entity: 'article', entityId: 'all',
@@ -545,6 +554,8 @@ export async function handler(event) {
     }
 
     if (!title || !category || !content) return r(400, { error: 'title, category, content required' });
+    if (title.length > 300) return r(400, { error: 'title too long (max 300 chars)' });
+    if (content.length > 50000) return r(400, { error: 'content too long (max 50000 chars)' });
     const newId = id || `art-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
     await ddb.send(new PutCommand({
@@ -571,6 +582,7 @@ export async function handler(event) {
     if (status) { exprParts.push('#s = :s'); exprNames['#s'] = 'status'; exprVals[':s'] = status; }
 
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
+    if (!existing.Item) return r(404, { error: 'Article not found' });
     await ddb.send(new UpdateCommand({
       TableName: FAQ_TABLE,
       Key: { id },
@@ -578,7 +590,7 @@ export async function handler(event) {
       ExpressionAttributeNames: Object.keys(exprNames).length ? exprNames : undefined,
       ExpressionAttributeValues: exprVals,
     }));
-    await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existing.Item?.title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
+    await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existing.Item.title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
     return r(200, { ok: true });
   }
 
@@ -589,7 +601,8 @@ export async function handler(event) {
     if (!auth.ok) return r(401, { error: 'Unauthorized' });
     const id = faqDeleteMatch[1];
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
-    const title = existing.Item?.title || id;
+    if (!existing.Item) return r(404, { error: 'Article not found' });
+    const title = existing.Item.title || id;
     await ddb.send(new DeleteCommand({ TableName: FAQ_TABLE, Key: { id } }));
     await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy });
     return r(200, { ok: true });
@@ -613,6 +626,8 @@ export async function handler(event) {
   if (method === 'POST' && path === '/tickets') {
     const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId } = body;
     if (!name || !email || !subject) return r(400, { error: 'name, email, subject required' });
+    if (subject.length > 300) return r(400, { error: 'subject too long (max 300 chars)' });
+    if (description && description.length > 5000) return r(400, { error: 'description too long (max 5000 chars)' });
     const ticketId = id || `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
     const now = createdAt || new Date().toISOString();
     await ddb.send(new PutCommand({
