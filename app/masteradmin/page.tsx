@@ -71,13 +71,22 @@ function getMasterHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-Master-Token': token };
 }
 
-const ACTION_CONFIG: Record<AuditLog['action'], { label: string; icon: string; color: string; bg: string }> = {
-  CREATE_FAQ:     { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
-  UPDATE_FAQ:     { label: 'FAQ Updated',          icon: 'fa-edit',          color: '#1E40AF', bg: '#DBEAFE' },
-  DELETE_FAQ:     { label: 'FAQ Deleted',          icon: 'fa-trash',         color: '#991B1B', bg: '#FEE2E2' },
-  UPDATE_TICKET:  { label: 'Ticket Updated',       icon: 'fa-ticket-alt',    color: '#92400E', bg: '#FEF3C7' },
-  CREATE_TICKET:  { label: 'Ticket Submitted',     icon: 'fa-inbox',         color: '#5B21B6', bg: '#EDE9FE' },
-  LOGIN:          { label: 'Manager Login',        icon: 'fa-sign-in-alt',   color: '#374151', bg: '#F3F4F6' },
+const ACTION_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  CREATE_FAQ:          { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
+  UPDATE_FAQ:          { label: 'FAQ Updated',          icon: 'fa-edit',          color: '#1E40AF', bg: '#DBEAFE' },
+  DELETE_FAQ:          { label: 'FAQ Deleted',          icon: 'fa-trash',         color: '#991B1B', bg: '#FEE2E2' },
+  UPDATE_TICKET:       { label: 'Ticket Updated',       icon: 'fa-ticket-alt',    color: '#92400E', bg: '#FEF3C7' },
+  CREATE_TICKET:       { label: 'Ticket Submitted',     icon: 'fa-inbox',         color: '#5B21B6', bg: '#EDE9FE' },
+  LOGIN:               { label: 'Manager Login',        icon: 'fa-sign-in-alt',   color: '#374151', bg: '#F3F4F6' },
+  LOGIN_SUCCESS:       { label: 'Manager Login',        icon: 'fa-sign-in-alt',   color: '#065F46', bg: '#D1FAE5' },
+  LOGIN_FAIL:          { label: 'Login Failed',         icon: 'fa-times-circle',  color: '#991B1B', bg: '#FEE2E2' },
+  LOGIN_BLOCKED:       { label: 'Login Blocked',        icon: 'fa-ban',           color: '#991B1B', bg: '#FEE2E2' },
+  LOGOUT:              { label: 'Logged Out',           icon: 'fa-sign-out-alt',  color: '#374151', bg: '#F3F4F6' },
+  MASTER_LOGIN_SUCCESS:{ label: 'Master Login',         icon: 'fa-shield-alt',    color: '#1E40AF', bg: '#DBEAFE' },
+  MASTER_LOGIN_FAIL:   { label: 'Master Login Failed',  icon: 'fa-shield-exclamation', color: '#991B1B', bg: '#FEE2E2' },
+  CREATE_MANAGER:      { label: 'Manager Created',      icon: 'fa-user-plus',     color: '#065F46', bg: '#D1FAE5' },
+  UPDATE_MANAGER:      { label: 'Manager Updated',      icon: 'fa-user-edit',     color: '#1E40AF', bg: '#DBEAFE' },
+  DELETE_MANAGER:      { label: 'Manager Deleted',      icon: 'fa-user-minus',    color: '#991B1B', bg: '#FEE2E2' },
 };
 
 // Manager accounts derived from audit log — anyone who has performed an action

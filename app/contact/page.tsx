@@ -91,25 +91,36 @@ export default function ContactPage() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const id = generateTicketId();
-    const ticket: Ticket = { id, ...form, status: 'open', createdAt: new Date().toISOString() };
+
+    let confirmedId = generateTicketId();
+    const localTicket: Ticket = { id: confirmedId, ...form, status: 'open', createdAt: new Date().toISOString() };
+
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/tickets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, sessionId: getSession() }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.id) confirmedId = data.id;
+        }
+      } catch { /* offline — use locally generated ID */ }
+    }
+
+    const ticket: Ticket = { ...localTicket, id: confirmedId };
     try {
       const existing: Ticket[] = JSON.parse(localStorage.getItem('is_tickets') || '[]');
       existing.unshift(ticket);
       localStorage.setItem('is_tickets', JSON.stringify(existing));
     } catch { /* ignore */ }
-    if (API_BASE) {
-      fetch(`${API_BASE}/tickets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...ticket, sessionId: getSession() }),
-      }).catch(() => {});
-    }
+
     trackEvent({ eventType: 'ticket_submit', ticketCategory: form.category, category: form.category });
-    setTicketId(id);
+    setTicketId(confirmedId);
     setSubmitted(true);
   };
 

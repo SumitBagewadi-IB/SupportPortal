@@ -784,8 +784,8 @@ export async function handler(event) {
       if (!/^[+\d\s\-()]{7,20}$/.test(String(phone))) return r(400, { error: 'Invalid phone format' });
     }
 
-    // Category allow-list (optional, defaults to General)
-    const resolvedCategory = category || 'General';
+    // Category allow-list (optional, defaults to Other)
+    const resolvedCategory = category || 'Other';
     if (!ALLOWED_TICKET_CATEGORIES.includes(resolvedCategory)) {
       return r(400, { error: `Invalid category. Allowed: ${ALLOWED_TICKET_CATEGORIES.join(', ')}` });
     }
