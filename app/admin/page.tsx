@@ -529,40 +529,25 @@ export default function AdminPage() {
       {/* MAIN CONTENT */}
       <main style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--admin-bg)', flex: 1, minWidth: 0 }}>
         {/* TOPBAR */}
-        <div style={{ background: 'var(--admin-topbar)', borderBottom: '1px solid var(--admin-border)', padding: '0.875rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '0.75rem' }}>
+        <div style={{ background: 'var(--admin-topbar)', borderBottom: '1px solid var(--admin-border)', padding: '0 1.25rem', height: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="admin-hamburger"
-              aria-label="Open menu"
-              style={{ width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', flexShrink: 0 }}
-            >
+            <button onClick={() => setSidebarOpen(true)} className="admin-hamburger" aria-label="Open menu" style={{ width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', flexShrink: 0 }}>
               <i className="fas fa-bars"></i>
             </button>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--admin-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {activeView === 'articles' && 'FAQ Articles'}
-              {activeView === 'add' && (editingId ? 'Edit Article' : 'Add New Article')}
-              {activeView === 'tickets' && 'Support Tickets'}
-              {activeView === 'audit' && 'Audit Log'}
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#00AB4E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className="fas fa-shield-halved" style={{ color: '#fff', fontSize: '0.875rem' }}></i>
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', marginTop: '0.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Manager Portal · Indiabulls Securities
-            </div>
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--admin-text-primary)', whiteSpace: 'nowrap' }}>Manager Portal</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: 20, background: '#00AB4E22', color: '#00AB4E', border: '1px solid #00AB4E55', whiteSpace: 'nowrap' }}>{managerInfo?.role?.toUpperCase() || 'MANAGER'}</span>
           </div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-            <button
-              onClick={toggleDarkMode}
-              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}
-            >
+          <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}>
               <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38A169', display: 'inline-block', flexShrink: 0 }} />
-              {managerInfo?.displayName || 'Manager'}
-            </span>
+            <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.4rem 0.75rem', borderRadius: 8, border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600 }}>
+              <i className="fas fa-right-from-bracket"></i>
+              <span className="hide-mobile">Sign out</span>
+            </button>
           </div>
         </div>
 
