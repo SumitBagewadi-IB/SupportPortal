@@ -22,6 +22,7 @@
  *   GET    /managers               master secret
  *   POST   /managers               master secret
  *   PUT    /managers/{id}          master secret
+ *   DELETE /managers/{id}          master secret
  *
  * Env vars:
  *   ADMIN_SECRET          shared secret checked against X-Admin-Secret for manager-level access
@@ -69,6 +70,13 @@ const client = new DynamoDBClient({ region: REGION });
 const ddb    = DynamoDBDocumentClient.from(client);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+const VALID_FAQ_STATUSES    = ['published', 'draft'];
+const VALID_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
+const ALLOWED_TICKET_CATEGORIES = [
+  'General', 'Account', 'Trading', 'Funds', 'Technical', 'Reports',
+  'KYC', 'Demat', 'IPO', 'Mutual Funds', 'Derivatives', 'Compliance', 'Other',
+];
 
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || '';
@@ -163,18 +171,33 @@ function extractAuth(event) {
   return { isMaster, isAdmin, jwtPayload };
 }
 
-function requireManagerOrMaster(event) {
+// Checks JWT validity + that the manager's account is still active in DynamoDB
+async function requireManagerOrMaster(event) {
   const auth = extractAuth(event);
   if (auth.isMaster) return { ok: true, performedBy: 'masteradmin', role: 'masteradmin' };
   if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin', role: 'admin' };
-  if (auth.jwtPayload?.managerId) return { ok: true, performedBy: auth.jwtPayload.managerId, role: auth.jwtPayload.role, displayName: auth.jwtPayload.displayName };
+  if (auth.jwtPayload?.managerId) {
+    // Verify account is still active (catches deactivated managers whose JWT hasn't expired)
+    try {
+      const res = await ddb.send(new GetCommand({
+        TableName: MANAGERS_TABLE,
+        Key: { id: auth.jwtPayload.managerId },
+        ProjectionExpression: '#s',
+        ExpressionAttributeNames: { '#s': 'status' },
+      }));
+      if (!res.Item || res.Item.status !== 'active') return { ok: false, reason: 'deactivated' };
+    } catch {
+      // On DB error, deny access conservatively
+      return { ok: false, reason: 'db_error' };
+    }
+    return { ok: true, performedBy: auth.jwtPayload.managerId, role: auth.jwtPayload.role, displayName: auth.jwtPayload.displayName };
+  }
   return { ok: false };
 }
 
 function requireMaster(event) {
   const auth = extractAuth(event);
-  if (auth.isMaster) return true;
-  return false;
+  return auth.isMaster;
 }
 
 // ─── Audit log writer ───────────────────────────────────────────────────────
@@ -301,11 +324,18 @@ export async function handler(event) {
 
   // ── POST /auth/logout ────────────────────────────────────────────────────
   if (method === 'POST' && path === '/auth/logout') {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    // Logout accepts JWT or master secret; do not do active-status DB check here
+    // (manager should be able to log out even if deactivated)
+    const auth = extractAuth(event);
+    const isMaster = auth.isMaster;
+    const isAdmin  = auth.isAdmin;
+    const jwt      = auth.jwtPayload;
+    if (!isMaster && !isAdmin && !jwt?.managerId) return r(401, { error: 'Unauthorized' });
+    const performedBy   = isMaster ? 'masteradmin' : isAdmin ? 'admin' : jwt.managerId;
+    const displayName   = jwt?.displayName || performedBy;
     await writeAudit({
-      action: 'LOGOUT', entity: 'manager', entityId: auth.performedBy,
-      entityTitle: auth.displayName || auth.performedBy, performedBy: auth.performedBy,
+      action: 'LOGOUT', entity: 'manager', entityId: performedBy,
+      entityTitle: displayName, performedBy,
       meta: { ip: sourceIp(event) },
     });
     return r(200, { ok: true });
@@ -387,7 +417,6 @@ export async function handler(event) {
           if (item.persona) summary.persona_counts[item.persona] = (summary.persona_counts[item.persona] || 0) + 1;
         }
       }
-      // Sort and top-N
       summary.top_articles = Object.entries(summary.top_articles).sort((a, b) => b[1] - a[1]).slice(0, 10);
       summary.top_searches = Object.entries(summary.top_searches).sort((a, b) => b[1] - a[1]).slice(0, 20);
       return r(200, summary);
@@ -405,7 +434,6 @@ export async function handler(event) {
       ProjectionExpression: 'managerId, username, displayName, email, #r, #s, createdAt, lastLoginAt, deactivatedAt, createdBy',
       ExpressionAttributeNames: { '#r': 'role', '#s': 'status' },
     }));
-    // Filter out any orphan records missing required identity fields
     const items = (res.Items || []).filter(m => m.managerId && m.username);
     return r(200, items);
   }
@@ -422,14 +450,22 @@ export async function handler(event) {
     if (role && !allowed_roles.includes(role)) return r(400, { error: `Invalid role. Allowed: ${allowed_roles.join(', ')}` });
     const managerRole = role || 'manager';
 
-    // Check username unique
-    const existing = await ddb.send(new QueryCommand({
+    // Check username uniqueness
+    const existingByUsername = await ddb.send(new QueryCommand({
       TableName: MANAGERS_TABLE,
       IndexName: 'username-index',
       KeyConditionExpression: 'username = :u',
       ExpressionAttributeValues: { ':u': username },
     }));
-    if (existing.Items?.length > 0) return r(409, { error: 'Username already exists' });
+    if (existingByUsername.Items?.length > 0) return r(409, { error: 'Username already exists' });
+
+    // Check email uniqueness
+    const existingByEmail = await ddb.send(new ScanCommand({
+      TableName: MANAGERS_TABLE,
+      FilterExpression: 'email = :e',
+      ExpressionAttributeValues: { ':e': email },
+    }));
+    if ((existingByEmail.Items || []).length > 0) return r(409, { error: 'Email already in use' });
 
     const managerId = `mgr_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const passwordHash = await hashPassword(password);
@@ -459,12 +495,12 @@ export async function handler(event) {
   if (method === 'PUT' && managerPutMatch) {
     if (!requireMaster(event)) return r(403, { error: 'Forbidden' });
     const managerId = managerPutMatch[1];
-    const updates = {};
     const exprParts = [];
     const exprNames = {};
     const exprVals = {};
+    const updates = {};
 
-    if (body.status) {
+    if (body.status !== undefined) {
       const allowed = ['active', 'deactivated'];
       if (!allowed.includes(body.status)) return r(400, { error: 'Invalid status' });
       exprParts.push('#s = :s');
@@ -524,7 +560,12 @@ export async function handler(event) {
     const managerId = managerDeleteMatch[1];
     const existing = await ddb.send(new GetCommand({ TableName: MANAGERS_TABLE, Key: { id: managerId } }));
     if (!existing.Item) return r(404, { error: 'Manager not found' });
-    await ddb.send(new DeleteCommand({ TableName: MANAGERS_TABLE, Key: { id: managerId } }));
+    // Conditional delete to prevent race condition double-delete both returning 200
+    await ddb.send(new DeleteCommand({
+      TableName: MANAGERS_TABLE,
+      Key: { id: managerId },
+      ConditionExpression: 'attribute_exists(id)',
+    }));
     await writeAudit({
       action: 'MANAGER_DELETED', entity: 'manager',
       entityId: managerId, entityTitle: existing.Item.username || managerId,
@@ -535,16 +576,18 @@ export async function handler(event) {
 
   // ── GET /faq ──────────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/faq') {
-    const auth = requireManagerOrMaster(event);
+    const auth = await requireManagerOrMaster(event);
     const categoryFilter = event.queryStringParameters?.category;
     const res = await ddb.send(new ScanCommand({ TableName: FAQ_TABLE }));
     let items = res.Items || [];
-    // Public users only see published articles; managers/master see all
+    // Public users only see published articles; authenticated managers see all
     if (!auth.ok) {
-      items = items.filter(i => !i.status || i.status === 'published');
+      items = items.filter(i => i.status === 'published');
     }
     if (categoryFilter) {
-      items = items.filter(i => i.category?.toLowerCase() === categoryFilter.toLowerCase());
+      // Exact case-insensitive match on category field
+      const filterLower = categoryFilter.toLowerCase();
+      items = items.filter(i => i.category?.toLowerCase() === filterLower);
     }
     if (auth.ok) {
       await writeAudit({
@@ -558,12 +601,13 @@ export async function handler(event) {
 
   // ── POST /faq ─────────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/faq') {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const { title, category, content, status = 'published', id } = body;
 
     if (id && !title && !content) {
       // Status-only toggle
+      if (body.status && !VALID_FAQ_STATUSES.includes(body.status)) return r(400, { error: `Invalid status. Allowed: ${VALID_FAQ_STATUSES.join(', ')}` });
       const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
       if (!existing.Item) return r(404, { error: 'Article not found' });
       await ddb.send(new UpdateCommand({
@@ -580,6 +624,7 @@ export async function handler(event) {
     if (!title || !category || !content) return r(400, { error: 'title, category, content required' });
     if (title.length > 300) return r(400, { error: 'title too long (max 300 chars)' });
     if (content.length > 50000) return r(400, { error: 'content too long (max 50000 chars)' });
+    if (!VALID_FAQ_STATUSES.includes(status)) return r(400, { error: `Invalid status. Allowed: ${VALID_FAQ_STATUSES.join(', ')}` });
     const newId = id || `art-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
     await ddb.send(new PutCommand({
@@ -593,17 +638,25 @@ export async function handler(event) {
   // ── PUT /faq/{id} ─────────────────────────────────────────────────────────
   const faqPutMatch = path.match(/^\/faq\/([^/]+)$/);
   if (method === 'PUT' && faqPutMatch) {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const id = faqPutMatch[1];
     const { title, category, content, status } = body;
+
+    // Reject empty body PUTs
+    if (!title && !category && !content && status === undefined) return r(400, { error: 'Nothing to update' });
+
+    if (status !== undefined && !VALID_FAQ_STATUSES.includes(status)) {
+      return r(400, { error: `Invalid status. Allowed: ${VALID_FAQ_STATUSES.join(', ')}` });
+    }
+
     const exprParts = ['updatedAt = :t'];
     const exprNames = {};
     const exprVals = { ':t': new Date().toISOString() };
     if (title) { exprParts.push('title = :ti'); exprVals[':ti'] = title; }
     if (category) { exprParts.push('category = :ca'); exprVals[':ca'] = category; }
     if (content) { exprParts.push('content = :co'); exprVals[':co'] = content; }
-    if (status) { exprParts.push('#s = :s'); exprNames['#s'] = 'status'; exprVals[':s'] = status; }
+    if (status !== undefined) { exprParts.push('#s = :s'); exprNames['#s'] = 'status'; exprVals[':s'] = status; }
 
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
     if (!existing.Item) return r(404, { error: 'Article not found' });
@@ -621,21 +674,31 @@ export async function handler(event) {
   // ── DELETE /faq/{id} ──────────────────────────────────────────────────────
   const faqDeleteMatch = path.match(/^\/faq\/([^/]+)$/);
   if (method === 'DELETE' && faqDeleteMatch) {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const id = faqDeleteMatch[1];
     const existing = await ddb.send(new GetCommand({ TableName: FAQ_TABLE, Key: { id } }));
     if (!existing.Item) return r(404, { error: 'Article not found' });
     const title = existing.Item.title || id;
-    await ddb.send(new DeleteCommand({ TableName: FAQ_TABLE, Key: { id } }));
+    // Conditional delete prevents concurrent deletes both succeeding
+    try {
+      await ddb.send(new DeleteCommand({
+        TableName: FAQ_TABLE,
+        Key: { id },
+        ConditionExpression: 'attribute_exists(id)',
+      }));
+    } catch (e) {
+      if (e.name === 'ConditionalCheckFailedException') return r(404, { error: 'Article not found' });
+      throw e;
+    }
     await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy });
     return r(200, { ok: true });
   }
 
   // ── GET /tickets ──────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/tickets') {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const res = await ddb.send(new ScanCommand({ TableName: TICKETS_TABLE }));
     const items = (res.Items || []).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     await writeAudit({
@@ -648,20 +711,47 @@ export async function handler(event) {
 
   // ── POST /tickets ─────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/tickets') {
-    const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId } = body;
+    const { id, name, email, category, subject, description, status = 'open', createdAt, sessionId, phone } = body;
+
+    // Required field validation
     if (!name || !email || !subject) return r(400, { error: 'name, email, subject required' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return r(400, { error: 'Invalid email format' });
+
+    // Whitespace-only check
+    if (!name.trim()) return r(400, { error: 'name cannot be blank' });
+    if (!subject.trim()) return r(400, { error: 'subject cannot be blank' });
+    if (description !== undefined && description !== null && !String(description).trim()) return r(400, { error: 'description cannot be blank' });
+
+    // Length limits
+    if (name.trim().length > 100) return r(400, { error: 'name too long (max 100 chars)' });
     if (subject.length > 300) return r(400, { error: 'subject too long (max 300 chars)' });
     if (description && description.length > 5000) return r(400, { error: 'description too long (max 5000 chars)' });
-    const ALLOWED_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
-    if (status !== 'open' && !ALLOWED_TICKET_STATUSES.includes(status)) return r(400, { error: 'Invalid ticket status' });
+
+    // Email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return r(400, { error: 'Invalid email format' });
+
+    // Phone format (optional field — if provided must be digits/spaces/+/-)
+    if (phone !== undefined && phone !== null && phone !== '') {
+      if (!/^[+\d\s\-()]{7,20}$/.test(String(phone))) return r(400, { error: 'Invalid phone format' });
+    }
+
+    // Category allow-list (optional, defaults to General)
+    const resolvedCategory = category || 'General';
+    if (!ALLOWED_TICKET_CATEGORIES.includes(resolvedCategory)) {
+      return r(400, { error: `Invalid category. Allowed: ${ALLOWED_TICKET_CATEGORIES.join(', ')}` });
+    }
+
+    // Status check
+    if (status !== 'open' && !VALID_TICKET_STATUSES.includes(status)) return r(400, { error: 'Invalid ticket status' });
+
     const ticketId = id || `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
     const now = createdAt || new Date().toISOString();
     await ddb.send(new PutCommand({
       TableName: TICKETS_TABLE,
       Item: {
-        id: ticketId, name, email, category: category || 'General',
-        subject, description: description || '', status,
+        id: ticketId, name: name.trim(), email, category: resolvedCategory,
+        subject: subject.trim(), description: description ? String(description).trim() : '',
+        phone: phone ? String(phone).trim() : undefined,
+        status,
         createdAt: now, date: now.slice(0, 10),
         ipAddress: sourceIp(event),
         userAgent: userAgent(event),
@@ -671,7 +761,7 @@ export async function handler(event) {
     await writeAudit({
       action: 'CREATE_TICKET', entity: 'ticket',
       entityId: ticketId, entityTitle: subject,
-      performedBy: 'public', meta: { name, email, category, ip: sourceIp(event) },
+      performedBy: 'public', meta: { name, email, category: resolvedCategory, ip: sourceIp(event) },
     });
     return r(201, { id: ticketId, ok: true });
   }
@@ -679,14 +769,17 @@ export async function handler(event) {
   // ── PUT /tickets/{id} ─────────────────────────────────────────────────────
   const ticketPutMatch = path.match(/^\/tickets\/([^/]+)$/);
   if (method === 'PUT' && ticketPutMatch) {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
     const id = ticketPutMatch[1];
+
+    // Reject empty body PUTs
+    if (!body.status && !body.notes && !body.assignedTo) return r(400, { error: 'Nothing to update' });
+
     const existing = await ddb.send(new GetCommand({ TableName: TICKETS_TABLE, Key: { id } }));
     if (!existing.Item) return r(404, { error: 'Ticket not found' });
     const oldStatus = existing.Item.status;
     const newStatus = body.status || oldStatus;
-    const VALID_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
     if (!VALID_TICKET_STATUSES.includes(newStatus)) return r(400, { error: 'Invalid status. Allowed: open, in_progress, solved, resolved' });
     await ddb.send(new UpdateCommand({
       TableName: TICKETS_TABLE,
@@ -706,12 +799,11 @@ export async function handler(event) {
 
   // ── GET /audit-log ─────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/audit-log') {
-    const auth = requireManagerOrMaster(event);
-    if (!auth.ok) return r(401, { error: 'Unauthorized' });
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
 
     let items;
     if (auth.role === 'manager') {
-      // Regular manager sees only their own entries
       const res = await ddb.send(new ScanCommand({
         TableName: AUDIT_TABLE,
         FilterExpression: 'performedBy = :p',
@@ -719,7 +811,6 @@ export async function handler(event) {
       }));
       items = res.Items || [];
     } else {
-      // masteradmin or senior_manager sees all
       const res = await ddb.send(new ScanCommand({ TableName: AUDIT_TABLE }));
       items = res.Items || [];
     }
