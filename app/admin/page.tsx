@@ -784,12 +784,10 @@ export default function AdminPage() {
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 130 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                                  {sortBy === 'default' && (() => {
+                                  {sortBy === 'default' && !!catFilter && (() => {
                                     const gi = (safePage - 1) * PAGE_SIZE + i;
-                                    const cat = catFilter || undefined;
-                                    const peers = cat
-                                      ? articles.map((a, idx) => idx).filter((idx) => articles[idx].category === cat)
-                                      : articles.map((_, idx) => idx);
+                                    const cat = catFilter;
+                                    const peers = articles.map((a, idx) => idx).filter((idx) => articles[idx].category === cat);
                                     const peerPos = peers.indexOf(gi);
                                     const isFirst = peerPos === 0;
                                     const isLast = peerPos === peers.length - 1;
