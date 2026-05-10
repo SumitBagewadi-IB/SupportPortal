@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-const MASTER_PASSWORD = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +64,9 @@ interface Article {
 
 type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics';
 
+const MASTER_SECRET = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || '';
+const masterHeaders = { 'Content-Type': 'application/json', 'X-Admin-Secret': MASTER_SECRET };
+
 const ACTION_CONFIG: Record<AuditLog['action'], { label: string; icon: string; color: string; bg: string }> = {
   CREATE_FAQ:     { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
   UPDATE_FAQ:     { label: 'FAQ Updated',          icon: 'fa-edit',          color: '#1E40AF', bg: '#DBEAFE' },
@@ -115,10 +117,14 @@ export default function MasterAdminPage() {
   // Managers CRUD
   const [managers, setManagers] = useState<Manager[]>([]);
   const [managersLoading, setManagersLoading] = useState(false);
+  const [managersError, setManagersError] = useState('');
   const [showCreateManager, setShowCreateManager] = useState(false);
   const [managerForm, setManagerForm] = useState({ username: '', displayName: '', email: '', role: 'manager', password: '' });
+  const [showManagerPassword, setShowManagerPassword] = useState(false);
   const [managerFormMsg, setManagerFormMsg] = useState('');
   const [managerFormSaving, setManagerFormSaving] = useState(false);
+  const [managerSearch, setManagerSearch] = useState('');
+  const [confirmManagerAction, setConfirmManagerAction] = useState<{ managerId: string; newStatus: string; displayName: string } | null>(null);
 
   // Analytics
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
@@ -141,8 +147,8 @@ export default function MasterAdminPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (lockedUntil && Date.now() < lockedUntil) return;
-    if (!MASTER_PASSWORD) { setAuthError('System misconfiguration. Contact administrator.'); return; }
-    if (passwordInput === MASTER_PASSWORD) {
+    if (!MASTER_SECRET) { setAuthError('System misconfiguration. Contact administrator.'); return; }
+    if (passwordInput === MASTER_SECRET) {
       setAuthed(true);
       setAuthError('');
     } else {
@@ -159,17 +165,16 @@ export default function MasterAdminPage() {
     setPasswordInput('');
   };
 
-  const masterHeaders = { 'Content-Type': 'application/json', 'X-Admin-Secret': MASTER_PASSWORD };
-
   const fetchManagers = useCallback(async () => {
     if (!API_BASE) return;
     setManagersLoading(true);
+    setManagersError('');
     try {
       const res = await fetch(`${API_BASE}/managers`, { headers: masterHeaders });
       if (res.ok) setManagers(await res.json());
-    } catch { /* silently ignore */ }
+      else setManagersError(`Failed to load managers (${res.status}). Try refreshing.`);
+    } catch { setManagersError('Could not reach the API. Check your connection.'); }
     finally { setManagersLoading(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAnalytics = useCallback(async (days: number) => {
@@ -178,9 +183,8 @@ export default function MasterAdminPage() {
     try {
       const res = await fetch(`${API_BASE}/analytics/summary?days=${days}`, { headers: masterHeaders });
       if (res.ok) setAnalytics(await res.json());
-    } catch { /* silently ignore */ }
+    } catch { /* silently ignore — main loadError covers connectivity failures */ }
     finally { setAnalyticsLoading(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAll = useCallback(async () => {
@@ -210,7 +214,6 @@ export default function MasterAdminPage() {
       setLoading(false);
       setLastRefreshed(new Date());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -325,12 +328,12 @@ export default function MasterAdminPage() {
     { id: 'faq',        label: 'FAQ Articles',     icon: 'fa-book' },
   ];
 
-  // Derive manager activity summary from audit logs
-  const managerSummary = (() => {
+  // Derive manager activity summary from audit logs (memoized — O(n) scan, skips on re-renders)
+  const managerSummary = useMemo(() => {
     const map: Record<string, { name: string; actions: number; lastSeen: string; faqCreated: number; faqUpdated: number; faqDeleted: number; ticketsUpdated: number }> = {};
     for (const log of auditLogs) {
       const who = log.performedBy || 'admin';
-      if (who === 'public') continue; // skip public ticket submissions
+      if (who === 'public') continue;
       if (!map[who]) map[who] = { name: who, actions: 0, lastSeen: log.timestamp, faqCreated: 0, faqUpdated: 0, faqDeleted: 0, ticketsUpdated: 0 };
       map[who].actions++;
       if (new Date(log.timestamp) > new Date(map[who].lastSeen)) map[who].lastSeen = log.timestamp;
@@ -340,7 +343,14 @@ export default function MasterAdminPage() {
       if (log.action === 'UPDATE_TICKET') map[who].ticketsUpdated++;
     }
     return Object.values(map).sort((a, b) => b.actions - a.actions);
-  })();
+  }, [auditLogs]);
+
+  // Manager search filter
+  const filteredManagers = useMemo(() => {
+    if (!managerSearch) return managers;
+    const q = managerSearch.toLowerCase();
+    return managers.filter(m => m.username?.toLowerCase().includes(q) || m.displayName?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q));
+  }, [managers, managerSearch]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-subtle)' }}>
@@ -405,7 +415,7 @@ export default function MasterAdminPage() {
             {/* KPI grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
               {[
-                { label: 'Active Managers', value: managerSummary.length,  icon: 'fa-users-cog',     color: '#00AB4E', bg: '#D1FAE5' },
+                { label: 'Active Managers', value: managers.filter(m => m.status === 'active').length, icon: 'fa-users-cog', color: '#00AB4E', bg: '#D1FAE5' },
                 { label: 'Total Tickets',   value: stats.totalTickets,      icon: 'fa-ticket-alt',    color: '#5B21B6', bg: '#EDE9FE' },
                 { label: 'Open / In-Progress', value: stats.openTickets,   icon: 'fa-hourglass-half', color: '#92400E', bg: '#FEF3C7' },
                 { label: 'Solved',          value: stats.solvedTickets,     icon: 'fa-check-circle',  color: '#065F46', bg: '#D1FAE5' },
@@ -490,9 +500,12 @@ export default function MasterAdminPage() {
                 <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Manager Accounts</h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Create, deactivate and manage admin manager accounts.</p>
               </div>
-              <button onClick={() => { setShowCreateManager(true); setManagerFormMsg(''); setManagerForm({ username: '', displayName: '', email: '', role: 'manager', password: '' }); }} style={{ padding: '0.5rem 1rem', background: '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <i className="fas fa-plus"></i> Create Manager
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input value={managerSearch} onChange={e => setManagerSearch(e.target.value)} placeholder="Search by username, name or email…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', minWidth: 220 }} />
+                <button onClick={() => { setShowCreateManager(true); setManagerFormMsg(''); setShowManagerPassword(false); setManagerForm({ username: '', displayName: '', email: '', role: 'manager', password: '' }); }} style={{ padding: '0.5rem 1rem', background: '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
+                  <i className="fas fa-plus"></i> Create Manager
+                </button>
+              </div>
             </div>
 
             {/* Create Manager Modal */}
@@ -500,17 +513,49 @@ export default function MasterAdminPage() {
               <div onClick={() => setShowCreateManager(false)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 14, padding: '2rem', maxWidth: 440, width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
                   <h3 style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '1.25rem' }}>Create New Manager</h3>
-                  {(['username', 'displayName', 'email', 'password'] as const).map(field => (
+                  {(['username', 'displayName', 'email'] as const).map(field => (
                     <div key={field} style={{ marginBottom: '0.875rem' }}>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'capitalize' }}>{field === 'displayName' ? 'Display Name' : field}</label>
                       <input
-                        type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
+                        type={field === 'email' ? 'email' : 'text'}
                         value={managerForm[field]}
                         onChange={e => setManagerForm(f => ({ ...f, [field]: e.target.value }))}
                         style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
                       />
                     </div>
                   ))}
+                  <div style={{ marginBottom: '0.875rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showManagerPassword ? 'text' : 'password'}
+                        value={managerForm.password}
+                        onChange={e => setManagerForm(f => ({ ...f, password: e.target.value }))}
+                        style={{ width: '100%', padding: '0.625rem 2.5rem 0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
+                      />
+                      <button type="button" onClick={() => setShowManagerPassword(p => !p)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                        <i className={`fas ${showManagerPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
+                    </div>
+                    {managerForm.password && (() => {
+                      const p = managerForm.password;
+                      let score = 0;
+                      if (p.length >= 8) score++;
+                      if (/[A-Z]/.test(p)) score++;
+                      if (/[0-9]/.test(p)) score++;
+                      if (/[^A-Za-z0-9]/.test(p)) score++;
+                      const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+                      const colors = ['', '#E53E3E', '#DD6B20', '#D97706', '#38A169'];
+                      return (
+                        <div style={{ marginTop: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ flex: 1, height: 4, background: 'var(--border)', borderRadius: 2 }}>
+                            <div style={{ height: 4, background: colors[score], borderRadius: 2, width: `${score * 25}%`, transition: 'width 0.2s, background 0.2s' }} />
+                          </div>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: colors[score], minWidth: 40 }}>{labels[score]}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Role</label>
                     <select value={managerForm.role} onChange={e => setManagerForm(f => ({ ...f, role: e.target.value }))} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}>
@@ -540,11 +585,17 @@ export default function MasterAdminPage() {
               </div>
             )}
 
+            {managersError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1rem', color: '#B91C1C', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fas fa-exclamation-circle"></i> {managersError}
+              </div>
+            )}
+
             {managersLoading ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin"></i> Loading…</div>
-            ) : managers.length === 0 ? (
+            ) : filteredManagers.length === 0 ? (
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '4rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                No manager accounts yet. Click "Create Manager" to add the first one.
+                {managerSearch ? `No managers match "${managerSearch}".` : 'No manager accounts yet. Click "Create Manager" to add the first one.'}
               </div>
             ) : (
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -558,8 +609,8 @@ export default function MasterAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {managers.map((mgr, i) => (
-                        <tr key={mgr.managerId} style={{ borderBottom: i < managers.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      {filteredManagers.map((mgr, i) => (
+                        <tr key={mgr.managerId} style={{ borderBottom: i < filteredManagers.length - 1 ? '1px solid var(--border)' : 'none' }}>
                           <td style={{ padding: '0.875rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mgr.username}</td>
                           <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: 'var(--text-dark)' }}>{mgr.displayName}</td>
                           <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)' }}>{mgr.email}</td>
@@ -569,15 +620,9 @@ export default function MasterAdminPage() {
                           <td style={{ padding: '0.875rem 1rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                               {mgr.status === 'active' ? (
-                                <button onClick={async () => {
-                                  await fetch(`${API_BASE}/managers/${mgr.managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: 'deactivated' }) });
-                                  fetchManagers();
-                                }} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Deactivate</button>
+                                <button onClick={() => setConfirmManagerAction({ managerId: mgr.managerId, newStatus: 'deactivated', displayName: mgr.displayName })} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Deactivate</button>
                               ) : (
-                                <button onClick={async () => {
-                                  await fetch(`${API_BASE}/managers/${mgr.managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: 'active' }) });
-                                  fetchManagers();
-                                }} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#D1FAE5', color: '#065F46', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Reactivate</button>
+                                <button onClick={() => setConfirmManagerAction({ managerId: mgr.managerId, newStatus: 'active', displayName: mgr.displayName })} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#D1FAE5', color: '#065F46', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Reactivate</button>
                               )}
                             </div>
                           </td>
@@ -666,6 +711,22 @@ export default function MasterAdminPage() {
                 <button onClick={() => fetchAnalytics(analyticsDays)} disabled={analyticsLoading} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <i className={`fas fa-sync-alt ${analyticsLoading ? 'fa-spin' : ''}`}></i> Refresh
                 </button>
+                {analytics && (
+                  <button onClick={() => {
+                    const rows = [
+                      { metric: 'Article Views', value: analytics.article_views },
+                      { metric: 'Searches', value: analytics.searches },
+                      { metric: 'Chatbot Opens', value: analytics.chatbot_opens },
+                      { metric: 'Chatbot Messages', value: analytics.chatbot_messages },
+                      { metric: 'Tickets Submitted', value: analytics.ticket_submits },
+                      { metric: 'Helpful Feedback', value: analytics.faq_feedback_helpful },
+                      { metric: 'Not Helpful Feedback', value: analytics.faq_feedback_not_helpful },
+                    ];
+                    exportCSV(rows as unknown as Record<string, unknown>[], `analytics-${analyticsDays}d.csv`);
+                  }} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <i className="fas fa-download"></i> Export CSV
+                  </button>
+                )}
               </div>
             </div>
             {analyticsLoading ? (
@@ -873,13 +934,41 @@ export default function MasterAdminPage() {
         )}
       </div>
 
+      {/* ── Confirm manager status change modal ── */}
+      {confirmManagerAction && (
+        <div onClick={() => setConfirmManagerAction(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 14, padding: '2rem', maxWidth: 380, width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', textAlign: 'center' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: confirmManagerAction.newStatus === 'deactivated' ? '#FEE2E2' : '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '1.25rem', color: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#065F46' }}>
+              <i className={`fas ${confirmManagerAction.newStatus === 'deactivated' ? 'fa-user-slash' : 'fa-user-check'}`}></i>
+            </div>
+            <h3 style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.5rem' }}>{confirmManagerAction.newStatus === 'deactivated' ? 'Deactivate Manager?' : 'Reactivate Manager?'}</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              {confirmManagerAction.newStatus === 'deactivated'
+                ? `${confirmManagerAction.displayName} will lose access to the admin portal immediately.`
+                : `${confirmManagerAction.displayName} will regain access to the admin portal.`}
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setConfirmManagerAction(null)} style={{ flex: 1, padding: '0.75rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', color: 'var(--text-dark)' }}>Cancel</button>
+              <button onClick={async () => {
+                const { managerId, newStatus } = confirmManagerAction;
+                setConfirmManagerAction(null);
+                await fetch(`${API_BASE}/managers/${managerId}`, { method: 'PUT', headers: masterHeaders, body: JSON.stringify({ status: newStatus }) });
+                fetchManagers();
+              }} style={{ flex: 1, padding: '0.75rem', background: confirmManagerAction.newStatus === 'deactivated' ? '#991B1B' : '#00AB4E', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
+                {confirmManagerAction.newStatus === 'deactivated' ? 'Deactivate' : 'Reactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Audit detail modal ── */}
       {selectedLog && (
         <div onClick={() => setSelectedLog(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 14, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxWidth: 500, width: '100%', overflow: 'hidden' }}>
             <div style={{ padding: '1.125rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-subtle)' }}>
               <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '1rem' }}>Audit Entry Detail</h3>
-              <button onClick={() => setSelectedLog(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--text-muted)', lineHeight: 1 }}>&times;</button>
+              <button onClick={() => setSelectedLog(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', lineHeight: 1 }}><i className="fas fa-times"></i></button>
             </div>
             <div style={{ padding: '1.5rem', display: 'grid', gap: '1rem' }}>
               {[

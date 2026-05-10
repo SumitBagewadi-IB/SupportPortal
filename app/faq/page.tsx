@@ -45,7 +45,8 @@ const CATEGORIES = [
   { key: 'nri', label: 'NRI / HUF Accounts', icon: 'fas fa-globe' },
 ];
 
-// ─── Complete fallback article database covering all 19 categories ───────────
+// ─── Offline emergency skeleton — shown ONLY when API is unreachable ──────────
+// Never merged into live article counts; rendered separately as a fallback notice.
 const FALLBACK_ARTICLES: Article[] = [
   // GETTING STARTED
   {
@@ -328,6 +329,7 @@ function FAQContent() {
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
   const [selectedCat, setSelectedCat] = useState(catParam);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -341,20 +343,32 @@ function FAQContent() {
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
-    try {
+    setApiError(false);
+
+    const attempt = async () => {
       if (!API_BASE) throw new Error('No API configured');
       const res = await fetch(`${API_BASE}/faq`);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
+
+    try {
+      let data;
+      try {
+        data = await attempt();
+      } catch {
+        // 1 retry after 1 second for transient blips
+        await new Promise(r => setTimeout(r, 1000));
+        data = await attempt();
+      }
       const items: Article[] = Array.isArray(data) ? data : (data.items || data.articles || []);
+      // API is the sole source of truth — never merge local fallback into public counts
       const published = items.filter((a) => !a.status || a.status === 'published' || a.status === 'active' || a.status === 'approved');
-      // Merge with fallback: API articles first, then any fallback articles not covered by API
-      const apiIds = new Set(published.map(a => a.id));
-      const merged = [...published, ...FALLBACK_ARTICLES.filter(a => !apiIds.has(a.id))];
-      setArticles(merged);
+      setArticles(published);
+      setApiError(false);
     } catch {
-      // Always fall back to complete offline article set
-      setArticles(FALLBACK_ARTICLES);
+      setApiError(true);
+      setArticles([]);
     } finally {
       setLoading(false);
     }
@@ -363,6 +377,13 @@ function FAQContent() {
   useEffect(() => {
     fetchArticles();
   }, [fetchArticles]);
+
+  // Cancel pending search analytics timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
 
   // Category key → display label mapping for flexible matching
   const catKeyToLabel: Record<string, string> = Object.fromEntries(
@@ -474,6 +495,16 @@ function FAQContent() {
 
       {/* MAIN ARTICLES */}
       <main className="kb-main">
+        {apiError && (
+          <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', borderRadius: 10, padding: '0.875rem 1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <span style={{ fontSize: '0.875rem', color: '#C53030' }}>
+              <i className="fas fa-exclamation-circle" style={{ marginRight: '0.5rem' }}></i>
+              <strong>Could not load articles.</strong> Check your connection and{' '}
+              <button onClick={fetchArticles} style={{ background: 'none', border: 'none', color: '#C53030', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', padding: 0, fontWeight: 600 }}>try again</button>.
+            </span>
+          </div>
+        )}
+
         <div className="notice-banner">
           <i className="fas fa-shield-halved"></i>
           <span><strong>Verified content:</strong> All articles are cross-referenced with official Indiabulls Securities policies.</span>
@@ -503,7 +534,8 @@ function FAQContent() {
                   const val = e.target.value;
                   setSearch(val);
                   if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-                  if (val.length >= 3) {
+                  // Track search analytics only after user has typed enough to be meaningful
+                  if (val.length >= 2) {
                     searchDebounceRef.current = setTimeout(() => {
                       trackEvent({ eventType: 'search', searchTerm: val, searchResultCount: filtered.length });
                     }, 800);

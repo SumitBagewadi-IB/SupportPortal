@@ -6,45 +6,12 @@ import Image from 'next/image';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
-// Local fallback articles — mirrors faq/page.tsx FALLBACK_ARTICLES
-// Used when the API is unavailable (same pattern as original admin.html reading faq.html)
-const LOCAL_ARTICLES: Article[] = [
-  { id: 'gs-open-account', title: 'How do I open an account with Indiabulls Securities?', category: 'Getting Started', content: 'You can open an account online at indiabullssecurities.com. The process takes about 10–15 minutes. You will need your PAN card, Aadhaar card, and bank account details. The account is free to open.', status: 'published' },
-  { id: 'gs-kyc', title: 'What documents are required for KYC?', category: 'Getting Started', content: 'For KYC you need: PAN card (mandatory), Aadhaar card for address proof, a cancelled cheque or bank statement, and a passport-size photograph. All documents can be uploaded digitally.', status: 'published' },
-  { id: 'gs-activate', title: 'How long does account activation take?', category: 'Getting Started', content: 'After completing your KYC, account activation typically takes 1–2 business days. You will receive your Client ID and password via email and SMS.', status: 'published' },
-  { id: 'trading-buy-sell', title: 'How do I place a buy or sell order?', category: 'Trading', content: 'Log in to the trading platform, search for the stock, click Buy or Sell, enter the quantity and price, select the order type (Market/Limit/SL), and confirm. Your order will be placed on the exchange.', status: 'published' },
-  { id: 'trading-gtt', title: 'What is a GTT order and how do I use it?', category: 'Trading', content: 'GTT (Good Till Triggered) lets you set a target price for a stock. When the stock hits that price, your order is automatically placed. Go to the stock page and click "Set GTT". It remains active for up to 1 year.', status: 'published' },
-  { id: 'trading-types', title: 'What order types are available?', category: 'Trading', content: 'Indiabulls offers: Market Order (executes immediately at best price), Limit Order (executes at your specified price or better), Stop-Loss Order (triggers at a specified price to limit losses), and GTT Orders.', status: 'published' },
-  { id: 'trading-basket', title: 'How to execute a Basket Order?', category: 'Trading', content: 'Basket orders let you place multiple buy/sell orders simultaneously. Go to Basket Order in the menu, add the stocks and quantities you want, review and submit. All orders are placed at once.', status: 'published' },
-  { id: 'funds-add', title: 'How do I add funds to my trading account?', category: 'Funds', content: 'Go to Funds > Add Funds in the app or web platform. You can add funds via UPI (instant), NEFT/RTGS (same day), or Net Banking. Minimum transfer is ₹100. UPI transfers reflect immediately.', status: 'published' },
-  { id: 'funds-withdraw', title: 'How do I withdraw funds?', category: 'Funds', content: 'Go to Funds > Withdraw Funds. Enter the amount and confirm. Withdrawals are processed to your registered bank account within 1 working day. There is no charge for withdrawals.', status: 'published' },
-  { id: 'funds-timing', title: 'When are funds credited after selling shares?', category: 'Funds', content: 'After selling shares, funds are available in your trading account on T+1 day (next working day) after settlement. You can withdraw these funds after settlement.', status: 'published' },
-  { id: 'ipo-apply', title: 'How do I apply for an IPO?', category: 'IPO', content: 'Go to IPO section in the app, select the IPO you want to apply for, enter the number of lots and bid price, and confirm with UPI mandate. Applications close 1 day before IPO closing date.', status: 'published' },
-  { id: 'ipo-allotment', title: 'How is IPO allotment decided?', category: 'IPO', content: 'IPO allotment is done by the registrar via a lottery system for retail investors when an IPO is oversubscribed. Results are declared within 6 working days of the issue closing date.', status: 'published' },
-  { id: 'ipo-cancel', title: 'Can I cancel my IPO application?', category: 'IPO', content: 'Yes, you can cancel your IPO application before the issue closes. Go to IPO > My Applications and click Cancel. UPI mandate will be released automatically.', status: 'published' },
-  { id: 'fo-activate', title: 'How do I activate F&O trading?', category: 'F&O', content: 'To activate F&O, go to My Profile > Segments > Activate F&O. You need to meet minimum net worth criteria and complete an online declaration. Activation takes 1–2 business days.', status: 'published' },
-  { id: 'fo-margin', title: 'What is SPAN margin in F&O?', category: 'F&O', content: 'SPAN (Standard Portfolio Analysis of Risk) margin is the minimum margin required to hold F&O positions overnight. It is calculated by the exchange and changes daily based on volatility.', status: 'published' },
-  { id: 'fo-expiry', title: 'What happens on F&O expiry day?', category: 'F&O', content: 'On expiry day, all open positions are settled. In-the-money options are exercised automatically. Out-of-the-money options expire worthless. Futures are settled at the final settlement price.', status: 'published' },
-  { id: 'charges-brokerage', title: 'What are the brokerage charges?', category: 'Charges & Brokerage', content: 'Equity Delivery: 0% brokerage. Equity Intraday: 0.05% or ₹20 per order (whichever is lower). F&O: ₹20 per order flat. Commodity: ₹20 per order flat. Plus applicable taxes and exchange charges.', status: 'published' },
-  { id: 'charges-dp', title: 'What is DP (Depository Participant) charge?', category: 'Charges & Brokerage', content: 'DP charges of ₹13.5 + GST are levied per scrip per day when you sell shares from your demat account. This is charged by CDSL and is the same regardless of quantity sold.', status: 'published' },
-  { id: 'account-password', title: 'How do I reset my trading password?', category: 'Account', content: 'Go to the login page and click "Forgot Password". Enter your Client ID or registered email. You will receive a reset link. Passwords must be 8+ characters with letters and numbers.', status: 'published' },
-  { id: 'account-nominee', title: 'How do I add or update a nominee?', category: 'Account', content: 'Log in and go to My Profile > Nominee Details. You can add up to 3 nominees with their percentage share. Submit the form with an e-signature via Aadhaar OTP.', status: 'published' },
-  { id: 'mtf-what', title: 'What is MTF (Margin Trade Funding)?', category: 'MTF', content: 'MTF lets you buy shares by paying only a fraction of the total value (margin). Indiabulls funds the rest at an interest rate. You can hold MTF positions for up to 365 days.', status: 'published' },
-  { id: 'pledging-how', title: 'How do I pledge shares for margin?', category: 'Pledging', content: 'Go to Margin > Pledge Shares. Select the shares you want to pledge, enter quantity, and confirm with OTP. Pledged shares generate collateral margin that can be used for trading. Pledging takes 1 working day.', status: 'published' },
-  { id: 'mf-invest', title: 'How do I invest in Mutual Funds?', category: 'Mutual Funds', content: 'Go to the Mutual Funds section, browse or search for a fund, click Invest, choose lump sum or SIP, enter the amount and payment method. Units are allotted at the next applicable NAV.', status: 'published' },
-  { id: 'compliance-2fa', title: 'How do I enable two-factor authentication?', category: 'Compliance & Safety', content: 'Go to My Profile > Security Settings > Two-Factor Authentication. Enable TOTP via an authenticator app (Google Authenticator or Authy) or SMS OTP. 2FA adds an extra layer of security to your account.', status: 'published' },
-  { id: 'reports-pl', title: 'Where can I view my P&L report?', category: 'Reports', content: 'Go to Reports > P&L Statement. You can view realized and unrealized P&L, filter by date range, and download as CSV or PDF. The report is available for the current and past 3 financial years.', status: 'published' },
-  { id: 'kyc-update', title: 'How do I update my KYC details?', category: 'KYC', content: 'Go to My Profile > KYC Details. You can update your address, bank account, or contact details. Changes require document upload and may take 2–3 working days to reflect.', status: 'published' },
-  { id: 'contact-escalate', title: 'How do I escalate a complaint?', category: 'Contact & Escalation', content: 'If your issue is not resolved within 7 days, you can escalate to our grievance officer at grievance@indiabullssecurities.com or file a complaint on SEBI SCORES at scores.sebi.gov.in.', status: 'published' },
-  { id: 'nri-account', title: 'Can NRIs open a trading account?', category: 'NRI/HUF Accounts', content: 'Yes, NRIs can open NRE/NRO demat and trading accounts with Indiabulls Securities. PIS (Portfolio Investment Scheme) permission from RBI is required for NRE accounts. Contact our NRI desk for assistance.', status: 'published' },
-  { id: 'tender-offer', title: 'How do I participate in a Tender Offer / Buyback?', category: 'Tender Offers', content: 'When a company announces a buyback via tender offer, go to the Corporate Actions section in your account. Select the buyback offer, enter the number of shares to tender, and confirm before the last date.', status: 'published' },
-];
-
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SECONDS = 30;
 const PAGE_SIZE = 10;
-const MAX_CONTENT = 2000;
-const WARN_CONTENT = 1800;
+const MAX_CONTENT = 50000;
+const WARN_CONTENT = 45000;
+const TICKETS_PAGE_SIZE = 10;
 
 const CATEGORIES = [
   'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
@@ -134,6 +101,12 @@ export default function AdminPage() {
   const [sortBy, setSortBy] = useState<'default' | 'title' | 'category'>('default');
   // Delete confirm modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // Toast notification
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ticket search + pagination
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketPage, setTicketPage] = useState(1);
 
   // Auth effects — restore JWT session
   useEffect(() => {
@@ -275,17 +248,26 @@ export default function AdminPage() {
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 3500);
+  }, []);
+
   const handleSessionExpired = useCallback(() => {
     setManagerToken('');
     setAuthed(false);
-    sessionStorage.removeItem('managerToken');
+    sessionStorage.removeItem('mgr_token');
+    sessionStorage.removeItem('mgr_info');
     setAuthError('Your session has expired. Please log in again.');
   }, []);
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.category || !form.content) { setFormMsg('All fields are required.'); return; }
-    if (form.content.length > MAX_CONTENT) { setFormMsg('Content exceeds 2000 characters.'); return; }
+    if (form.content.length > MAX_CONTENT) { setFormMsg(`Content exceeds ${MAX_CONTENT.toLocaleString()} characters.`); return; }
+    const isDuplicate = articles.some(a => a.title.trim().toLowerCase() === form.title.trim().toLowerCase() && a.id !== editingId);
+    if (isDuplicate) { setFormMsg('An article with this title already exists.'); return; }
     setSubmitting(true);
     setFormMsg('');
     try {
@@ -331,6 +313,7 @@ export default function AdminPage() {
       if (res.status === 401) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error('Failed');
       setArticles((prev) => prev.filter((a) => a.id !== id));
+      showToast('Article deleted successfully.');
     } catch { setError('Failed to delete article. Please try again.'); }
     finally { setDeletingId(null); }
   };
@@ -339,11 +322,17 @@ export default function AdminPage() {
     const isPublished = article.status === 'published' || article.status === 'active';
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
+    // Optimistic update
+    setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
     try {
       const res = await fetch(`${API_BASE}/faq/${article.id}`, { method: 'PUT', headers: authHeaders(managerToken), body: JSON.stringify({ status: newStatus }) });
       if (res.status === 401) { handleSessionExpired(); return; }
-      setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: newStatus } : a)));
-    } catch { setError('Failed to update status. Please try again.'); }
+      if (!res.ok) throw new Error('Failed');
+    } catch {
+      // Roll back optimistic update
+      setArticles((prev) => prev.map((a) => (a.id === article.id ? { ...a, status: article.status } : a)));
+      setError('Failed to update status. Please try again.');
+    }
     finally { setTogglingId(null); }
   };
 
@@ -409,6 +398,16 @@ export default function AdminPage() {
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const contentLen = form.content.length;
+
+  // Ticket search + pagination
+  const filteredTickets = tickets.filter((t) => {
+    if (!ticketSearch) return true;
+    const q = ticketSearch.toLowerCase();
+    return t.name?.toLowerCase().includes(q) || t.email?.toLowerCase().includes(q) || t.subject?.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+  });
+  const totalTicketPages = Math.max(1, Math.ceil(filteredTickets.length / TICKETS_PAGE_SIZE));
+  const safeTicketPage = Math.min(ticketPage, totalTicketPages);
+  const paginatedTickets = filteredTickets.slice((safeTicketPage - 1) * TICKETS_PAGE_SIZE, safeTicketPage * TICKETS_PAGE_SIZE);
 
   const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
   const draftCount = articles.filter((a) => a.status === 'draft').length;
@@ -635,6 +634,9 @@ export default function AdminPage() {
                   <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
                     Articles <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({filtered.length} total)</span>
                   </h2>
+                  <button onClick={() => { setEditingId(null); setForm(emptyForm); setFormMsg(''); setActiveView('add'); }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                    <i className="fas fa-plus" style={{ fontSize: '0.7rem' }}></i> Add Article
+                  </button>
                 </div>
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>Loading articles...</div>
@@ -774,7 +776,7 @@ export default function AdminPage() {
                       rows={8}
                       style={{ width: '100%', padding: '0.625rem 0.875rem', border: `1.5px solid ${contentLen > MAX_CONTENT ? '#FC8181' : contentLen > WARN_CONTENT ? '#F6AD55' : '#E2E8F0'}`, borderRadius: 8, fontSize: '0.875rem', outline: 'none', resize: 'vertical', minHeight: 120, fontFamily: 'inherit', boxSizing: 'border-box' }}
                     />
-                    <p style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', marginTop: '0.25rem' }}>Write a clear, concise answer. Max 2,000 characters.</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', marginTop: '0.25rem' }}>Write a clear, detailed answer. Max 50,000 characters.</p>
                   </div>
                   <div style={{ marginBottom: '1.25rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Status</label>
@@ -808,10 +810,26 @@ export default function AdminPage() {
           {/* TICKETS VIEW */}
           {activeView === 'tickets' && (
             <div>
+              {/* Ticket search bar */}
+              <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', padding: '0.875rem 1.25rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <i className="fas fa-search" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', fontSize: '0.75rem', pointerEvents: 'none' }}></i>
+                  <input
+                    type="text"
+                    value={ticketSearch}
+                    onChange={(e) => { setTicketSearch(e.target.value); setTicketPage(1); }}
+                    placeholder="Search by name, email, subject or ID..."
+                    style={{ width: '100%', padding: '0.5rem 0.875rem 0.5rem 2rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }}
+                  />
+                </div>
+                {ticketSearch && (
+                  <button onClick={() => { setTicketSearch(''); setTicketPage(1); }} style={{ padding: '0.4rem 0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.8125rem', cursor: 'pointer', color: 'var(--admin-text-secondary)' }}>Clear</button>
+                )}
+              </div>
               <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
                 <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid var(--admin-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
-                    Support Tickets <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({tickets.length} total, {openTickets} open)</span>
+                    Support Tickets <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({filteredTickets.length}{ticketSearch ? ` of ${tickets.length}` : ''} total, {openTickets} open)</span>
                   </h2>
                 </div>
                 {ticketsLoading ? (
@@ -825,13 +843,15 @@ export default function AdminPage() {
                     <p style={{ color: '#E53E3E', fontSize: '0.875rem', marginBottom: '1rem' }}>{ticketsError}</p>
                     <button onClick={() => fetchTickets(managerToken)} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
                   </div>
-                ) : tickets.length === 0 ? (
+                ) : filteredTickets.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--admin-text-muted)' }}><i className="fas fa-ticket"></i></div>
-                    <p style={{ fontSize: '0.875rem' }}>No support tickets yet. Tickets submitted via the Contact page will appear here.</p>
+                    <p style={{ fontSize: '0.875rem' }}>{ticketSearch ? `No tickets match "${ticketSearch}".` : 'No support tickets yet. Tickets submitted via the Contact page will appear here.'}</p>
                   </div>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <>
+                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
                     <thead>
                       <tr style={{ background: 'var(--admin-row-hover)' }}>
                         {['Ticket ID', 'Name', 'Email', 'Category', 'Subject', 'Status', 'Date', ''].map((h) => (
@@ -840,7 +860,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tickets.map((ticket) => (
+                      {paginatedTickets.map((ticket) => (
                         <tr key={ticket.id} style={{ borderBottom: '1px solid var(--admin-border-subtle)' }}>
                           <td style={{ padding: '0.875rem 1.25rem', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--admin-text-secondary)' }}>{ticket.id}</td>
                           <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--admin-text-primary)' }}>{ticket.name}</td>
@@ -862,6 +882,15 @@ export default function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                  {totalTicketPages > 1 && (
+                    <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <button onClick={() => setTicketPage(p => Math.max(1, p - 1))} disabled={safeTicketPage === 1} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, background: 'var(--admin-surface)', cursor: safeTicketPage === 1 ? 'not-allowed' : 'pointer', opacity: safeTicketPage === 1 ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Previous</button>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>Page {safeTicketPage} of {totalTicketPages}</span>
+                      <button onClick={() => setTicketPage(p => Math.min(totalTicketPages, p + 1))} disabled={safeTicketPage === totalTicketPages} style={{ padding: '0.375rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, background: 'var(--admin-surface)', cursor: safeTicketPage === totalTicketPages ? 'not-allowed' : 'pointer', opacity: safeTicketPage === totalTicketPages ? 0.4 : 1, fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568' }}>Next</button>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             </div>
@@ -964,6 +993,14 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', background: '#1A202C', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, zIndex: 80, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <i className="fas fa-check-circle" style={{ color: '#68D391' }}></i>
+          {toast}
         </div>
       )}
 

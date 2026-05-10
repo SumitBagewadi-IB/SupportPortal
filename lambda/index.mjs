@@ -405,7 +405,9 @@ export async function handler(event) {
       ProjectionExpression: 'managerId, username, displayName, email, #r, #s, createdAt, lastLoginAt, deactivatedAt, createdBy',
       ExpressionAttributeNames: { '#r': 'role', '#s': 'status' },
     }));
-    return r(200, res.Items || []);
+    // Filter out any orphan records missing required identity fields
+    const items = (res.Items || []).filter(m => m.managerId && m.username);
+    return r(200, items);
   }
 
   // ── POST /managers ────────────────────────────────────────────────────────
