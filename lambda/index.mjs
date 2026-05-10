@@ -318,7 +318,7 @@ export async function handler(event) {
     await ddb.send(new PutCommand({
       TableName: ANALYTICS_TABLE,
       Item: {
-        eventId: randomUUID(),
+        id: randomUUID(),
         eventType,
         timestamp: new Date().toISOString(),
         sessionId: sessionId || 'unknown',
