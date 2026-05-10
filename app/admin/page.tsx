@@ -422,7 +422,7 @@ export default function AdminPage() {
       <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0F172A 0%, #1A202C 50%, #2D3748 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
         <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '3rem 2.5rem', width: '100%', maxWidth: 420, boxShadow: '0 25px 50px rgba(0,0,0,0.4)', textAlign: 'center' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={160} height={36} style={{ height: 36, width: 'auto', margin: '0 auto' }} />
+            <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={160} height={57} style={{ width: 160, height: 'auto', margin: '0 auto' }} />
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Manager Portal</h1>
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
@@ -483,7 +483,7 @@ export default function AdminPage() {
       {/* SIDEBAR */}
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #2D3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 }}>
-          <Image src="/logo.svg" alt="Indiabulls Securities" width={130} height={22} style={{ height: 22, width: 'auto', minWidth: 0, flexShrink: 1 }} />
+          <Image src="/logo.svg" alt="Indiabulls Securities" width={110} height={39} style={{ width: 110, height: 'auto', minWidth: 0, flexShrink: 1 }} />
           <button onClick={() => setSidebarOpen(false)} className="admin-sidebar-close" style={{ background: 'none', border: 'none', color: '#A0AEC0', cursor: 'pointer', fontSize: '1rem', padding: '0.25rem', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fas fa-times"></i>
           </button>
