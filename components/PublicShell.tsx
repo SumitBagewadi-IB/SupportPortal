@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 export default function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdmin = pathname?.startsWith('/admin') || pathname?.startsWith('/login');
+  const isAdmin = pathname?.startsWith('/admin') || pathname?.startsWith('/masteradmin') || pathname?.startsWith('/login');
 
   if (isAdmin) {
     return <>{children}</>;
