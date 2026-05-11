@@ -100,6 +100,7 @@ function FAQContent() {
       if (res.ok) {
         const data: Category[] = await res.json();
         const active = data.filter(c => !c.status || c.status === 'active');
+        // Always use dynamic categories if any exist; fallback only when DB is empty
         setCategories(active.length > 0 ? active : FALLBACK_CATEGORIES);
       } else {
         setCategories(FALLBACK_CATEGORIES);
@@ -107,6 +108,28 @@ function FAQContent() {
     } catch {
       setCategories(FALLBACK_CATEGORIES);
     }
+  }, []);
+
+  // Derive any article categories not covered by dynamic categories —
+  // so articles never disappear from the public view even if admin hasn't
+  // created matching dynamic categories yet.
+  const effectiveCategories = useCallback((cats: Category[], arts: Article[]): Category[] => {
+    if (cats === FALLBACK_CATEGORIES) return cats;
+    const coveredNames = new Set(cats.map(c => c.name.toLowerCase()));
+    const orphanNames = new Set<string>();
+    for (const a of arts) {
+      if (a.category && !coveredNames.has(a.category.toLowerCase())) {
+        orphanNames.add(a.category);
+      }
+    }
+    if (orphanNames.size === 0) return cats;
+    const orphans: Category[] = Array.from(orphanNames).map(name => ({
+      id: `orphan-${normalise(name)}`,
+      name,
+      icon: 'fas fa-folder',
+      parentId: null,
+    }));
+    return [...cats, ...orphans];
   }, []);
 
   const fetchArticles = useCallback(async () => {
@@ -140,15 +163,16 @@ function FAQContent() {
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
   }, []);
 
-  // Derive top-level and subcategories
-  const topLevel = categories.filter(c => !c.parentId);
-  const getSubcategories = (parentId: string) => categories.filter(c => c.parentId === parentId);
+  // Merge dynamic categories with any article categories not yet in the DB
+  const allCategories = effectiveCategories(categories, articles);
+  const topLevel = allCategories.filter(c => !c.parentId);
+  const getSubcategories = (parentId: string) => allCategories.filter(c => c.parentId === parentId);
 
   // On mount, resolve catParam/subParam to actual category IDs
   useEffect(() => {
-    if (categories.length === 0) return;
+    if (allCategories.length === 0) return;
     if (catParam) {
-      const found = categories.find(c => normalise(c.name) === catParam || c.id === catParam);
+      const found = allCategories.find(c => normalise(c.name) === catParam || c.id === catParam);
       if (found) {
         if (found.parentId) {
           setSelectedCatId(found.parentId);
@@ -165,8 +189,8 @@ function FAQContent() {
     setSelectedSubId('');
   }, [categories, catParam, subParam]);
 
-  const selectedCat = categories.find(c => c.id === selectedCatId);
-  const selectedSub = categories.find(c => c.id === selectedSubId);
+  const selectedCat = allCategories.find(c => c.id === selectedCatId);
+  const selectedSub = allCategories.find(c => c.id === selectedSubId);
   const subcategories = selectedCatId ? getSubcategories(selectedCatId) : [];
 
   // Filter articles based on navigation state

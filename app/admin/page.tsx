@@ -528,13 +528,18 @@ export default function AdminPage() {
   const safeTicketPage = Math.min(ticketPage, totalTicketPages);
   const paginatedTickets = filteredTickets.slice((safeTicketPage - 1) * TICKETS_PAGE_SIZE, safeTicketPage * TICKETS_PAGE_SIZE);
 
-  // Build flat list of category names for article form dropdowns
-  const allCategoryNames: string[] = dynamicCategories.length > 0
-    ? dynamicCategories.map(c => c.name)
-    : FALLBACK_CATEGORIES;
-
   const topLevelCats = dynamicCategories.filter(c => !c.parentId);
   const getSubcats = (parentId: string) => dynamicCategories.filter(c => c.parentId === parentId);
+
+  // Always include all article categories even if not yet in dynamic categories DB,
+  // so existing articles never lose their category assignment in the dropdown.
+  const dynamicCatNames = new Set(dynamicCategories.map(c => c.name.toLowerCase()));
+  const articleOnlyCategories = Array.from(
+    new Set(articles.map(a => a.category).filter(c => c && !dynamicCatNames.has(c.toLowerCase())))
+  );
+  const allCategoryNames: string[] = dynamicCategories.length > 0
+    ? [...dynamicCategories.map(c => c.name), ...articleOnlyCategories]
+    : FALLBACK_CATEGORIES;
 
   const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
   const draftCount = articles.filter((a) => a.status === 'draft').length;
@@ -953,8 +958,8 @@ export default function AdminPage() {
                       style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', boxSizing: 'border-box' }}
                     >
                       <option value="">Select a category...</option>
-                      {dynamicCategories.length > 0 ? (
-                        topLevelCats.map(cat => {
+                      {dynamicCategories.length > 0 ? (<>
+                        {topLevelCats.map(cat => {
                           const subs = getSubcats(cat.id);
                           return subs.length > 0 ? (
                             <optgroup key={cat.id} label={cat.name}>
@@ -964,8 +969,13 @@ export default function AdminPage() {
                           ) : (
                             <option key={cat.id} value={cat.name}>{cat.name}</option>
                           );
-                        })
-                      ) : (
+                        })}
+                        {articleOnlyCategories.length > 0 && (
+                          <optgroup label="— Existing (not yet in Categories) —">
+                            {articleOnlyCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </optgroup>
+                        )}
+                      </>) : (
                         FALLBACK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
                       )}
                     </select>
