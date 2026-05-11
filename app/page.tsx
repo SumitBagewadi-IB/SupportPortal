@@ -299,40 +299,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* TRUST & SECURITY */}
-        <div className="section" style={{ borderTop: '1px solid var(--border)', marginTop: '3rem', padding: '4rem 0' }}>
-          <div style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto 3rem' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.75rem' }}>
-              Trusted by 5 Million+ Traders
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-              Experience institutional-grade security and transparency across every trade you execute on Indiabulls Securities.
-            </p>
-          </div>
-          <div className="trust-grid">
-            <div className="trust-item">
-              <i className="fas fa-shield-check" style={{ color: '#10B981' }}></i>
-              <div className="trust-item-content">
-                <h4>SEBI Registered</h4>
-                <p>Compliant with all regulatory frameworks for safe investing.</p>
-              </div>
-            </div>
-            <div className="trust-item">
-              <i className="fas fa-lock-keyhole" style={{ color: '#3B82F6' }}></i>
-              <div className="trust-item-content">
-                <h4>Bank-grade Security</h4>
-                <p>Enforced with 256-bit encryption and two-factor authentication.</p>
-              </div>
-            </div>
-            <div className="trust-item">
-              <i className="fas fa-building-columns" style={{ color: '#F59E0B' }}></i>
-              <div className="trust-item-content">
-                <h4>CDSL/NSE/BSE Member</h4>
-                <p>Direct connectivity to India&apos;s major financial exchanges.</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
       </main>
     </>

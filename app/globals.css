@@ -552,65 +552,6 @@ html:not([data-theme="dark"]) .fa-sun {
    CATEGORY CARDS (HOME)
 ────────────────────────── */
 /* ──────────────────────────
-   TRUST GRID
-────────────────────────── */
-.trust-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2rem;
-}
-
-.trust-item {
-    text-align: left;
-    padding: 1.25rem 1.5rem;
-    background: var(--bg-subtle);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-}
-
-.trust-item:hover {
-    background: var(--bg);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow);
-    border-color: var(--blue);
-}
-
-.trust-item i {
-    font-size: 1.75rem;
-    margin-bottom: 0;
-    flex-shrink: 0;
-}
-
-.trust-item-content {
-    display: flex;
-    flex-direction: column;
-}
-
-.trust-item h4 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin-bottom: 0.25rem;
-}
-
-.trust-item p {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    line-height: 1.4;
-    margin: 0;
-}
-
-
-@media (max-width: 992px) {
-    .trust-grid {
-        grid-template-columns: 1fr;
-        gap: 1.25rem;
-    }
-}
 
 
 .section-title {
@@ -1456,11 +1397,6 @@ footer {
         padding: 1.25rem 0.875rem;
     }
 
-    .trust-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
     .section-title {
         margin: 3rem 0 1.5rem;
     }
@@ -1508,10 +1444,6 @@ footer {
         width: 38px;
         height: 38px;
         font-size: 1rem;
-    }
-
-    .trust-grid {
-        grid-template-columns: 1fr;
     }
 
     .contact-strip {
