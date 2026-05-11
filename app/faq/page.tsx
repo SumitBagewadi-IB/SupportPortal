@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { trackEvent } from '@/lib/analytics';
@@ -110,27 +110,6 @@ function FAQContent() {
     }
   }, []);
 
-  // Derive any article categories not covered by dynamic categories —
-  // so articles never disappear from the public view even if admin hasn't
-  // created matching dynamic categories yet.
-  const effectiveCategories = useCallback((cats: Category[], arts: Article[]): Category[] => {
-    if (cats === FALLBACK_CATEGORIES) return cats;
-    const coveredNames = new Set(cats.map(c => c.name.toLowerCase()));
-    const orphanNames = new Set<string>();
-    for (const a of arts) {
-      if (a.category && !coveredNames.has(a.category.toLowerCase())) {
-        orphanNames.add(a.category);
-      }
-    }
-    if (orphanNames.size === 0) return cats;
-    const orphans: Category[] = Array.from(orphanNames).map(name => ({
-      id: `orphan-${normalise(name)}`,
-      name,
-      icon: 'fas fa-folder',
-      parentId: null,
-    }));
-    return [...cats, ...orphans];
-  }, []);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -163,14 +142,35 @@ function FAQContent() {
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
   }, []);
 
-  // Merge dynamic categories with any article categories not yet in the DB
-  const allCategories = effectiveCategories(categories, articles);
-  const topLevel = allCategories.filter(c => !c.parentId);
-  const getSubcategories = (parentId: string) => allCategories.filter(c => c.parentId === parentId);
+  // Merge dynamic categories with any article categories not yet in the DB.
+  // useMemo ensures this recomputes only when categories or articles change.
+  const allCategories = useMemo((): Category[] => {
+    // If still on fallback (DB empty or API failed), return as-is
+    if (categories === FALLBACK_CATEGORIES || categories.length === 0) return categories;
+    const coveredNames = new Set(categories.map(c => c.name.toLowerCase()));
+    const orphanNames = new Set<string>();
+    for (const a of articles) {
+      if (a.category && !coveredNames.has(a.category.toLowerCase())) {
+        orphanNames.add(a.category);
+      }
+    }
+    if (orphanNames.size === 0) return categories;
+    const orphans: Category[] = Array.from(orphanNames).map(name => ({
+      id: `orphan-${normalise(name)}`,
+      name,
+      icon: 'fas fa-folder',
+      parentId: null,
+    }));
+    return [...categories, ...orphans];
+  }, [categories, articles]);
 
-  // On mount, resolve catParam/subParam to actual category IDs
+  const topLevel = useMemo(() => allCategories.filter(c => !c.parentId), [allCategories]);
+  const getSubcategories = useCallback((parentId: string) => allCategories.filter(c => c.parentId === parentId), [allCategories]);
+
+  // Resolve URL catParam to a category ID whenever allCategories or catParam changes.
+  // Both categories AND articles must be loaded before resolving.
   useEffect(() => {
-    if (allCategories.length === 0) return;
+    if (allCategories.length === 0 || loading) return;
     if (catParam) {
       const found = allCategories.find(c => normalise(c.name) === catParam || c.id === catParam);
       if (found) {
@@ -184,17 +184,16 @@ function FAQContent() {
         return;
       }
     }
-    // Default: show all (no selection)
     setSelectedCatId('');
     setSelectedSubId('');
-  }, [categories, catParam, subParam]);
+  }, [allCategories, catParam, loading]);
 
-  const selectedCat = allCategories.find(c => c.id === selectedCatId);
-  const selectedSub = allCategories.find(c => c.id === selectedSubId);
-  const subcategories = selectedCatId ? getSubcategories(selectedCatId) : [];
+  const selectedCat = useMemo(() => allCategories.find(c => c.id === selectedCatId), [allCategories, selectedCatId]);
+  const selectedSub = useMemo(() => allCategories.find(c => c.id === selectedSubId), [allCategories, selectedSubId]);
+  const subcategories = useMemo(() => selectedCatId ? getSubcategories(selectedCatId) : [], [selectedCatId, getSubcategories]);
 
   // Filter articles based on navigation state
-  const filtered = articles.filter(a => {
+  const filtered = useMemo(() => articles.filter(a => {
     let matchesCat = true;
     if (selectedSubId && selectedSub) {
       matchesCat = articleMatchesCategory(a, selectedSub.name);
@@ -209,14 +208,14 @@ function FAQContent() {
       (a.content || a.answer || '')?.toLowerCase().includes(search.toLowerCase()) ||
       a.category?.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
-  });
+  }), [articles, selectedSubId, selectedSub, selectedCatId, selectedCat, getSubcategories, search]);
 
-  const grouped: Record<string, Article[]> = filtered.reduce<Record<string, Article[]>>((acc, a) => {
+  const grouped: Record<string, Article[]> = useMemo(() => filtered.reduce<Record<string, Article[]>>((acc, a) => {
     const cat = a.category || 'General';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(a);
     return acc;
-  }, {});
+  }, {}), [filtered]);
 
   const getArticleCount = (cat: Category): number => {
     const subs = getSubcategories(cat.id);
@@ -243,7 +242,7 @@ function FAQContent() {
   };
 
   const selectSub = (subId: string) => {
-    setSelectedSubId(prev => prev === subId ? '' : subId);
+    setSelectedSubId(subId);
     setSearch('');
   };
 
