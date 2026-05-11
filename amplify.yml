@@ -7,6 +7,10 @@ frontend:
     build:
       commands:
         - NEXT_PUBLIC_API_BASE=https://un1k0vx0ij.execute-api.ap-south-1.amazonaws.com/uat npm run build
+    postBuild:
+      commands:
+        - zip -j /tmp/lambda-deploy.zip lambda/index.mjs
+        - aws lambda update-function-code --function-name ib-faq-handler --zip-file fileb:///tmp/lambda-deploy.zip --region ap-south-1 --no-cli-pager || echo "Lambda deploy skipped (check IAM permissions)"
   artifacts:
     baseDirectory: out
     files:
