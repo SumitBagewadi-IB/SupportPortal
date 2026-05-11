@@ -54,6 +54,16 @@ jobs:
           aws s3 sync out/ s3://${{ secrets.S3_BUCKET_UAT }} --delete
           echo "✅ UAT deploy complete"
 
+      - name: Deploy Lambda function
+        run: |
+          zip -j /tmp/lambda-deploy.zip lambda/index.mjs
+          aws lambda update-function-code \
+            --function-name ib-faq-handler \
+            --zip-file fileb:///tmp/lambda-deploy.zip \
+            --region ap-south-1 \
+            --no-cli-pager
+          echo "✅ Lambda deployed"
+
       - name: Invalidate CloudFront cache (Production)
         if: github.ref == 'refs/heads/main'
         env:
