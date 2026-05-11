@@ -45,6 +45,11 @@ interface AnalyticsSummary {
   tickets_by_category: Record<string, number>;
   article_feedback: ArticleFeedback[];
   zero_result_searches: number;
+  cta_open_account: number;
+  cta_login: number;
+  browser_counts: Record<string, number>;
+  os_counts: Record<string, number>;
+  device_counts: Record<string, number>;
 }
 
 interface Ticket {
@@ -64,6 +69,7 @@ interface Article {
   title: string;
   category: string;
   status: string;
+  updatedAt?: string;
 }
 
 type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics' | 'categories';
@@ -1020,6 +1026,56 @@ export default function MasterAdminPage() {
                     </div>
                   )}
                 </div>
+
+                {/* CTA Performance */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1.25rem', marginBottom: '1.25rem' }}>
+                  {[
+                    { label: 'Open Account Clicks', value: analytics.cta_open_account ?? 0, icon: 'fa-rocket', color: '#065F46', bg: '#D1FAE5' },
+                    { label: 'Login Clicks', value: analytics.cta_login ?? 0, icon: 'fa-sign-in-alt', color: '#1E40AF', bg: '#DBEAFE' },
+                  ].map(kpi => (
+                    <div key={kpi.label} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`fas ${kpi.icon}`} style={{ color: kpi.color, fontSize: '1rem' }}></i>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{kpi.label}</p>
+                        <p style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-dark)', lineHeight: 1 }}>{kpi.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Device / Browser / OS Breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                  {[
+                    { title: 'Browser', icon: 'fa-globe', color: '#1E40AF', data: analytics.browser_counts ?? {} },
+                    { title: 'Operating System', icon: 'fa-laptop', color: '#065F46', data: analytics.os_counts ?? {} },
+                    { title: 'Device Type', icon: 'fa-mobile-alt', color: '#5B21B6', data: analytics.device_counts ?? {} },
+                  ].map(({ title, icon, color, data }) => {
+                    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+                    const max = entries[0]?.[1] || 1;
+                    return (
+                      <div key={title} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem' }}>
+                        <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '0.875rem' }}>
+                          <i className={`fas ${icon}`} style={{ color, marginRight: '0.5rem' }}></i>{title}
+                        </h3>
+                        {entries.length === 0 ? (
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No data yet.</p>
+                        ) : entries.map(([name, count]) => (
+                          <div key={name} style={{ marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.2rem' }}>
+                              <span style={{ color: 'var(--text-dark)' }}>{name}</span>
+                              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
+                            </div>
+                            <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2 }}>
+                              <div style={{ height: 4, background: color, borderRadius: 2, width: `${Math.round((count / max) * 100)}%`, opacity: 0.75 }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             )}
           </>
@@ -1116,22 +1172,34 @@ export default function MasterAdminPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
-                        {['ID', 'Title', 'Category', 'Status'].map(h => (
+                        {['ID', 'Title', 'Category', 'Status', 'Last Updated'].map(h => (
                           <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredArticles.map((a, i) => (
-                        <tr key={a.id} style={{ borderBottom: i < filteredArticles.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <td style={{ padding: '0.875rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.id}</td>
-                          <td style={{ padding: '0.875rem 1rem', fontWeight: 500, color: 'var(--text-dark)', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title || '—'}</td>
-                          <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)' }}>{a.category || '—'}</td>
-                          <td style={{ padding: '0.875rem 1rem' }}>
-                            <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem', borderRadius: 20, fontWeight: 600, background: a.status === 'published' || !a.status ? '#D1FAE5' : '#F3F4F6', color: a.status === 'published' || !a.status ? '#065F46' : '#374151' }}>{a.status || 'published'}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      {filteredArticles.map((a, i) => {
+                        const lastAudit = auditLogs
+                          .filter(l => l.entityId === a.id && (l.action === 'UPDATE_FAQ' || l.action === 'CREATE_FAQ'))
+                          .sort((x, y) => new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime())[0];
+                        const updatedStr = a.updatedAt && !isNaN(new Date(a.updatedAt).getTime())
+                          ? new Date(a.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date(a.updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+                          : '—';
+                        return (
+                          <tr key={a.id} style={{ borderBottom: i < filteredArticles.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                            <td style={{ padding: '0.875rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.id}</td>
+                            <td style={{ padding: '0.875rem 1rem', fontWeight: 500, color: 'var(--text-dark)', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title || '—'}</td>
+                            <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)' }}>{a.category || '—'}</td>
+                            <td style={{ padding: '0.875rem 1rem' }}>
+                              <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem', borderRadius: 20, fontWeight: 600, background: a.status === 'published' || !a.status ? '#D1FAE5' : '#F3F4F6', color: a.status === 'published' || !a.status ? '#065F46' : '#374151' }}>{a.status || 'published'}</span>
+                            </td>
+                            <td style={{ padding: '0.875rem 1rem', fontSize: '0.8125rem' }}>
+                              <p style={{ color: 'var(--text-dark)', whiteSpace: 'nowrap' }}>{updatedStr}</p>
+                              {lastAudit && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>by {lastAudit.performedBy}</p>}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

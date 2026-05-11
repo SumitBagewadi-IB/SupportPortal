@@ -128,6 +128,28 @@ function userAgent(event) {
   return ua.slice(0, 300);
 }
 
+function parseBrowser(ua) {
+  if (!ua) return { browser: 'Unknown', os: 'Unknown', device: 'Unknown' };
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\/|Opera/.test(ua) ? 'Opera' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) && /Version\//.test(ua) ? 'Safari' :
+    /MSIE|Trident/.test(ua) ? 'IE' : 'Other';
+  const os =
+    /Windows NT/.test(ua) ? 'Windows' :
+    /Mac OS X/.test(ua) && !/iPhone|iPad/.test(ua) ? 'macOS' :
+    /iPhone/.test(ua) ? 'iOS' :
+    /iPad/.test(ua) ? 'iPadOS' :
+    /Android/.test(ua) ? 'Android' :
+    /Linux/.test(ua) ? 'Linux' : 'Other';
+  const device =
+    /iPhone|Android.*Mobile|Windows Phone/.test(ua) ? 'Mobile' :
+    /iPad|Android(?!.*Mobile)/.test(ua) ? 'Tablet' : 'Desktop';
+  return { browser, os, device };
+}
+
 // ─── JWT (library-free HMAC-SHA256) ────────────────────────────────────────
 
 function b64url(buf) {
@@ -418,8 +440,8 @@ async function _handler(event) {
 
   // ── POST /analytics ──────────────────────────────────────────────────────
   if (method === 'POST' && path === '/analytics') {
-    const ALLOWED_TYPES = ['article_view','search','chatbot_open','chatbot_persona_select','chatbot_message','ticket_submit','faq_feedback','admin_login_fail'];
-    const { eventType, sessionId, articleId, articleTitle, category, searchTerm, searchResultCount, feedbackType, persona, chatInput, ticketCategory } = body;
+    const ALLOWED_TYPES = ['article_view','search','chatbot_open','chatbot_persona_select','chatbot_message','ticket_submit','faq_feedback','admin_login_fail','cta_click','page_view'];
+    const { eventType, sessionId, articleId, articleTitle, category, searchTerm, searchResultCount, feedbackType, persona, chatInput, ticketCategory, ctaName, ctaTarget, page, referrer, screenResolution, timezone } = body;
     if (!ALLOWED_TYPES.includes(eventType)) return r(400, { error: 'Invalid eventType' });
 
     // faq_feedback: use deterministic id = sessionId#articleId so a session can
@@ -429,6 +451,8 @@ async function _handler(event) {
       ? `fb#${resolvedSessionId}#${articleId}`
       : randomUUID();
 
+    const ua = userAgent(event);
+    const browserInfo = parseBrowser(ua);
     await ddb.send(new PutCommand({
       TableName: ANALYTICS_TABLE,
       Item: {
@@ -445,8 +469,17 @@ async function _handler(event) {
         persona: persona || null,
         chatInput: chatInput ? String(chatInput).slice(0, 200) : null,
         ticketCategory: ticketCategory || null,
+        ctaName: ctaName || null,
+        ctaTarget: ctaTarget || null,
+        page: page || null,
+        referrer: referrer || null,
+        screenResolution: screenResolution || null,
+        timezone: timezone || null,
         ipAddress: sourceIp(event),
-        userAgent: userAgent(event),
+        userAgent: ua,
+        browser: browserInfo.browser,
+        os: browserInfo.os,
+        device: browserInfo.device,
       },
     }));
     return r(200, { ok: true });
@@ -480,6 +513,11 @@ async function _handler(event) {
         tickets_by_category: {},
         article_feedback: {},
         zero_result_searches: 0,
+        cta_open_account: 0,
+        cta_login: 0,
+        browser_counts: {},
+        os_counts: {},
+        device_counts: {},
       };
       for (const item of items) {
         if (item.eventType === 'article_view') {
@@ -507,7 +545,13 @@ async function _handler(event) {
           }
         } else if (item.eventType === 'chatbot_persona_select') {
           if (item.persona) summary.persona_counts[item.persona] = (summary.persona_counts[item.persona] || 0) + 1;
+        } else if (item.eventType === 'cta_click') {
+          if (item.ctaName === 'open_account') summary.cta_open_account++;
+          else if (item.ctaName === 'login') summary.cta_login++;
         }
+        if (item.browser) summary.browser_counts[item.browser] = (summary.browser_counts[item.browser] || 0) + 1;
+        if (item.os) summary.os_counts[item.os] = (summary.os_counts[item.os] || 0) + 1;
+        if (item.device) summary.device_counts[item.device] = (summary.device_counts[item.device] || 0) + 1;
       }
       summary.top_articles = Object.entries(summary.top_articles).sort((a, b) => b[1] - a[1]).slice(0, 10);
       summary.top_searches = Object.entries(summary.top_searches).sort((a, b) => b[1] - a[1]).slice(0, 20);

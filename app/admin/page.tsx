@@ -849,6 +849,9 @@ export default function AdminPage() {
                           const isPublished = article.status === 'published' || article.status === 'active';
                           const isToggling = togglingId === article.id;
                           const isDeleting = deletingId === article.id;
+                          const lastAudit = auditLogs
+                            .filter(l => l.entityId === article.id && (l.action === 'UPDATE_FAQ' || l.action === 'CREATE_FAQ'))
+                            .sort((x, y) => new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime())[0];
                           return (
                             <tr key={article.id} style={{ borderBottom: '1px solid var(--admin-border-subtle)' }}>
                               <td style={{ padding: '0.875rem 1.25rem', color: 'var(--admin-text-muted)', fontWeight: 600, fontSize: '0.8125rem', width: 48 }}>
@@ -859,6 +862,11 @@ export default function AdminPage() {
                                   {article.title || article.question || 'Untitled'}
                                 </div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', fontFamily: 'monospace', marginTop: 2 }}>{article.id}</div>
+                                {lastAudit && (
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--admin-text-muted)', marginTop: 3 }}>
+                                    Updated: {new Date(lastAudit.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} by {lastAudit.performedBy}
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '0.875rem 1.25rem', width: 160 }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', background: '#EFF6FF', color: '#3B82F6', whiteSpace: 'nowrap' }}>

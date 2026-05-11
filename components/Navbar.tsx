@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { trackEvent } from '@/lib/analytics';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -53,8 +54,8 @@ export default function Navbar() {
 
         {/* Desktop CTA buttons */}
         <div className="nav-cta">
-          <a href="https://stocks-onboarding.indiabullssecurities.com/login?_gl=1*gubd0s*_gcl_au*NTYzNDE2NTg2LjE3NzU4Mjg1Njg." target="_blank" rel="noopener noreferrer" className="btn-signin btn-open-account">Open Account</a>
-          <a href="https://trade.ibullssecurities.com/dashboard" target="_blank" rel="noopener noreferrer" className="btn-signin">Login</a>
+          <a href="https://stocks-onboarding.indiabullssecurities.com/login?_gl=1*gubd0s*_gcl_au*NTYzNDE2NTg2LjE3NzU4Mjg1Njg." target="_blank" rel="noopener noreferrer" className="btn-signin btn-open-account" onClick={() => trackEvent({ eventType: 'cta_click', ctaName: 'open_account', ctaTarget: 'https://stocks-onboarding.indiabullssecurities.com' })}>Open Account</a>
+          <a href="https://trade.ibullssecurities.com/dashboard" target="_blank" rel="noopener noreferrer" className="btn-signin" onClick={() => trackEvent({ eventType: 'cta_click', ctaName: 'login', ctaTarget: 'https://trade.ibullssecurities.com' })}>Login</a>
         </div>
 
         {/* Hamburger button (mobile only) */}
@@ -84,8 +85,8 @@ export default function Navbar() {
             <li><Link href="/my-tickets" className={pathname === '/my-tickets' ? 'active' : ''}>My Tickets</Link></li>
           </ul>
           <div className="mobile-menu-cta">
-            <a href="https://stocks-onboarding.indiabullssecurities.com/login?_gl=1*gubd0s*_gcl_au*NTYzNDE2NTg2LjE3NzU4Mjg1Njg." target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--green)', color: 'white', border: 'none' }}>Open Account</a>
-            <a href="https://trade.ibullssecurities.com/dashboard" target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Login</a>
+            <a href="https://stocks-onboarding.indiabullssecurities.com/login?_gl=1*gubd0s*_gcl_au*NTYzNDE2NTg2LjE3NzU4Mjg1Njg." target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--green)', color: 'white', border: 'none' }} onClick={() => trackEvent({ eventType: 'cta_click', ctaName: 'open_account', ctaTarget: 'https://stocks-onboarding.indiabullssecurities.com' })}>Open Account</a>
+            <a href="https://trade.ibullssecurities.com/dashboard" target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => trackEvent({ eventType: 'cta_click', ctaName: 'login', ctaTarget: 'https://trade.ibullssecurities.com' })}>Login</a>
           </div>
         </div>
       )}

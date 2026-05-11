@@ -14,6 +14,16 @@ function getSessionId(): string {
   return sid;
 }
 
+function getClientMeta() {
+  if (typeof window === 'undefined') return {};
+  return {
+    page: window.location.pathname,
+    referrer: document.referrer || null,
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
 export interface AnalyticsEvent {
   eventType:
     | 'article_view'
@@ -23,7 +33,9 @@ export interface AnalyticsEvent {
     | 'chatbot_message'
     | 'ticket_submit'
     | 'faq_feedback'
-    | 'admin_login_fail';
+    | 'admin_login_fail'
+    | 'cta_click'
+    | 'page_view';
   articleId?: string;
   articleTitle?: string;
   category?: string;
@@ -33,22 +45,22 @@ export interface AnalyticsEvent {
   persona?: string;
   chatInput?: string;
   ticketCategory?: string;
+  ctaName?: string;
+  ctaTarget?: string;
 }
 
 export function trackEvent(payload: AnalyticsEvent): void {
   if (!API_BASE || typeof window === 'undefined') return;
   try {
     const sessionId = getSessionId();
-    const body = JSON.stringify({ ...payload, sessionId });
-    // Always use fetch — sendBeacon with application/json Blob triggers CORS preflight
-    // which API Gateway may reject. keepalive:true preserves fire-and-forget behaviour.
+    const body = JSON.stringify({ ...payload, sessionId, ...getClientMeta() });
     fetch(`${API_BASE}/analytics`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       keepalive: true,
     }).catch(() => {});
-  } catch { /* fire-and-forget, never throw */ }
+  } catch { /* fire-and-forget */ }
 }
 
 export function getSession(): string {
