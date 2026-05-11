@@ -100,8 +100,27 @@ function FAQContent() {
       if (res.ok) {
         const data: Category[] = await res.json();
         const active = data.filter(c => !c.status || c.status === 'active');
-        // Always use dynamic categories if any exist; fallback only when DB is empty
-        setCategories(active.length > 0 ? active : FALLBACK_CATEGORIES);
+        // Always keep the full fallback list; merge DB categories on top.
+        // DB top-level cats override matching fallback entries (same name).
+        // DB subcategories (parentId set) are added as-is.
+        // Extra DB top-level cats not in fallback are appended at the end.
+        const dbTopLevel = active.filter(c => !c.parentId);
+        const dbSubs = active.filter(c => c.parentId);
+        const dbTopNames = new Set(dbTopLevel.map(c => c.name.toLowerCase()));
+        // Start with fallback, replace any that exist in DB by name
+        const merged: Category[] = FALLBACK_CATEGORIES.map(f => {
+          const dbMatch = dbTopLevel.find(d => d.name.toLowerCase() === f.name.toLowerCase());
+          return dbMatch || f;
+        });
+        // Append any DB top-level cats with new names not in fallback
+        dbTopLevel.forEach(d => {
+          if (!FALLBACK_CATEGORIES.some(f => f.name.toLowerCase() === d.name.toLowerCase())) {
+            merged.push(d);
+          }
+        });
+        // Add all subcategories
+        merged.push(...dbSubs);
+        setCategories(merged);
       } else {
         setCategories(FALLBACK_CATEGORIES);
       }

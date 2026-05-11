@@ -111,8 +111,11 @@ export default function HomePage() {
     fetch(`${API_BASE}/categories`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data: Category[]) => {
-        const topLevel = data.filter(c => (!c.status || c.status === 'active') && !c.parentId);
-        if (topLevel.length > 0) setHomeCategories(topLevel);
+        const dbTopLevel = data.filter(c => (!c.status || c.status === 'active') && !c.parentId);
+        // Always start with the full static list, then add any DB categories not already covered
+        const staticNames = new Set(STATIC_CATEGORIES.map(c => c.name.toLowerCase()));
+        const extraFromDB = dbTopLevel.filter(c => !staticNames.has(c.name.toLowerCase()));
+        setHomeCategories([...STATIC_CATEGORIES, ...extraFromDB]);
       })
       .catch(() => {/* keep static fallback */});
   }, []);
