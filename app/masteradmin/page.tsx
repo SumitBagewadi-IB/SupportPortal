@@ -1163,8 +1163,8 @@ export default function MasterAdminPage() {
                 setMaCatSubmitting(true); setMaCatFormMsg('');
                 try {
                   const method = editingMaCatId ? 'PUT' : 'POST';
-                  const url = editingMaCatId ? `${API_BASE}/categories/${editingMaCatId}` : `${API_BASE}/categories`;
-                  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: maCatForm.name.trim(), icon: maCatForm.icon, parentId: maCatForm.parentId || null }) });
+                  const url = editingMaCatId ? masterUrl(`/categories/${editingMaCatId}`) : masterUrl('/categories');
+                  const res = await fetch(url, { method, headers: getMasterHeaders(), body: JSON.stringify({ name: maCatForm.name.trim(), icon: maCatForm.icon, parentId: maCatForm.parentId || null }) });
                   if (res.status === 401) { handleSessionExpired(); return; }
                   if (!res.ok) throw new Error('Failed');
                   setMaCatFormMsg(editingMaCatId ? 'Category updated!' : 'Category created!');
@@ -1239,7 +1239,7 @@ export default function MasterAdminPage() {
                             if (!confirm(`Delete "${cat.name}"? All its subcategories will also be removed from the sidebar.`)) return;
                             setDeletingMaCatId(cat.id);
                             try {
-                              const r = await fetch(`${API_BASE}/categories/${cat.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                              const r = await fetch(masterUrl(`/categories/${cat.id}`), { method: 'DELETE', headers: getMasterHeaders() });
                               if (r.status === 401) { handleSessionExpired(); return; }
                               if (!r.ok) throw new Error('Failed');
                               fetchMaCats();
@@ -1260,7 +1260,7 @@ export default function MasterAdminPage() {
                               if (!confirm(`Delete subcategory "${sub.name}"?`)) return;
                               setDeletingMaCatId(sub.id);
                               try {
-                                const r = await fetch(`${API_BASE}/categories/${sub.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                                const r = await fetch(masterUrl(`/categories/${sub.id}`), { method: 'DELETE', headers: getMasterHeaders() });
                                 if (r.status === 401) { handleSessionExpired(); return; }
                                 if (!r.ok) throw new Error('Failed');
                                 fetchMaCats();
