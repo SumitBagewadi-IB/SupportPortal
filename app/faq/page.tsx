@@ -17,46 +17,61 @@ interface Article {
   status?: string;
 }
 
-const VALID_CATEGORIES = [
-  'getting-started','account-opening','trading','portfolio','funds','ipo',
-  'fo','pledging','account','reports','contact-faq','mtf','tender-offers',
-  'kyc','charges','compliance','mutual-funds','nri','advanced','all',
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  parentId: string | null;
+  sortOrder?: number;
+  status?: string;
+}
+
+// Fallback static categories used if /categories API is unavailable
+const FALLBACK_CATEGORIES: Category[] = [
+  { id: 'getting-started', name: 'Getting Started',     icon: 'fas fa-rocket',               parentId: null },
+  { id: 'account-opening', name: 'Account Opening',     icon: 'fas fa-id-card',              parentId: null },
+  { id: 'trading',         name: 'Trading',             icon: 'fas fa-chart-line',           parentId: null },
+  { id: 'portfolio',       name: 'Portfolio & Margin',  icon: 'fas fa-briefcase',            parentId: null },
+  { id: 'funds',           name: 'Funds',               icon: 'fas fa-wallet',               parentId: null },
+  { id: 'ipo',             name: 'IPO',                 icon: 'fas fa-rocket',               parentId: null },
+  { id: 'fo',              name: 'F&O',                 icon: 'fas fa-bolt',                 parentId: null },
+  { id: 'pledging',        name: 'Pledging',            icon: 'fas fa-link',                 parentId: null },
+  { id: 'account',         name: 'Account',             icon: 'fas fa-user-circle',          parentId: null },
+  { id: 'reports',         name: 'Reports',             icon: 'fas fa-file-invoice',         parentId: null },
+  { id: 'contact-faq',     name: 'Contact & Help',      icon: 'fas fa-headset',              parentId: null },
+  { id: 'mtf',             name: 'MTF',                 icon: 'fas fa-layer-group',          parentId: null },
+  { id: 'tender-offers',   name: 'Tender Offers',       icon: 'fas fa-hand-holding-dollar',  parentId: null },
+  { id: 'charges',         name: 'Charges & Brokerage', icon: 'fas fa-tags',                 parentId: null },
+  { id: 'compliance',      name: 'Compliance & Safety', icon: 'fas fa-shield-halved',        parentId: null },
+  { id: 'mutual-funds',    name: 'Mutual Funds',        icon: 'fas fa-seedling',             parentId: null },
+  { id: 'nri',             name: 'NRI/HUF Accounts',   icon: 'fas fa-globe',                parentId: null },
+  { id: 'advanced',        name: 'Advanced',            icon: 'fas fa-robot',                parentId: null },
 ];
 
-// Labels MUST exactly match the category strings stored in DynamoDB.
-// The matching logic in FAQContent uses label equality — any mismatch means
-// articles in that category never appear when the sidebar filter is active.
-const CATEGORIES = [
-  { key: 'all',            label: 'All Topics',            icon: 'fas fa-border-all' },
-  { key: 'getting-started',label: 'Getting Started',       icon: 'fas fa-rocket' },
-  { key: 'account-opening',label: 'Account Opening',       icon: 'fas fa-id-card' },
-  { key: 'trading',        label: 'Trading',               icon: 'fas fa-chart-line' },
-  { key: 'portfolio',      label: 'Portfolio & Margin',    icon: 'fas fa-briefcase' },
-  { key: 'funds',          label: 'Funds',                 icon: 'fas fa-wallet' },
-  { key: 'ipo',            label: 'IPO',                   icon: 'fas fa-rocket' },
-  { key: 'fo',             label: 'F&O',                   icon: 'fas fa-bolt' },
-  { key: 'pledging',       label: 'Pledging',              icon: 'fas fa-link' },
-  { key: 'account',        label: 'Account',               icon: 'fas fa-user-circle' },
-  { key: 'reports',        label: 'Reports',               icon: 'fas fa-file-invoice' },
-  { key: 'contact-faq',    label: 'Contact & Help',        icon: 'fas fa-headset' },
-  { key: 'mtf',            label: 'MTF',                   icon: 'fas fa-layer-group' },
-  { key: 'tender-offers',  label: 'Tender Offers',         icon: 'fas fa-hand-holding-dollar' },
-  { key: 'charges',        label: 'Charges & Brokerage',   icon: 'fas fa-tags' },
-  { key: 'compliance',     label: 'Compliance & Safety',   icon: 'fas fa-shield-halved' },
-  { key: 'mutual-funds',   label: 'Mutual Funds',          icon: 'fas fa-seedling' },
-  { key: 'nri',            label: 'NRI/HUF Accounts',      icon: 'fas fa-globe' },
-  { key: 'advanced',       label: 'Advanced',              icon: 'fas fa-robot' },
-];
+function normalise(s: string) {
+  return s?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || '';
+}
+
+function articleMatchesCategory(article: Article, catName: string): boolean {
+  const artNorm = normalise(article.category);
+  const catNorm = normalise(catName);
+  return artNorm === catNorm || article.category?.toLowerCase() === catName.toLowerCase();
+}
 
 function FAQContent() {
   const searchParams = useSearchParams();
-  const rawCat = searchParams.get('cat') || 'all';
-  const catParam = VALID_CATEGORIES.includes(rawCat) ? rawCat : 'all';
+  const catParam = searchParams.get('cat') || '';
+  const subParam = searchParams.get('sub') || '';
 
+  const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(false);
-  const [selectedCat, setSelectedCat] = useState(catParam);
+
+  // Navigation state: selectedCatId = top-level, selectedSubId = subcategory
+  const [selectedCatId, setSelectedCatId] = useState<string>('');
+  const [selectedSubId, setSelectedSubId] = useState<string>('');
+
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set(
@@ -65,13 +80,10 @@ function FAQContent() {
         const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         const raw = JSON.parse(localStorage.getItem('faq_feedback_given') || '{}');
-        // Support legacy plain array format
         if (Array.isArray(raw)) return raw;
-        // Object format: { articleId: timestamp } — filter out expired entries
         const valid = Object.entries(raw as Record<string, number>)
           .filter(([, ts]) => now - ts < NINETY_DAYS)
           .map(([id]) => id);
-        // Rewrite cleaned-up version back to localStorage
         const cleaned = Object.fromEntries(valid.map(id => [id, (raw as Record<string, number>)[id]]));
         localStorage.setItem('faq_feedback_given', JSON.stringify(cleaned));
         return valid;
@@ -81,32 +93,37 @@ function FAQContent() {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const feedbackGivenRef = feedbackGiven;
 
-  useEffect(() => {
-    const validated = VALID_CATEGORIES.includes(rawCat) ? rawCat : 'all';
-    setSelectedCat(validated);
-  }, [rawCat]);
+  const fetchCategories = useCallback(async () => {
+    if (!API_BASE) { setCategories(FALLBACK_CATEGORIES); return; }
+    try {
+      const res = await fetch(`${API_BASE}/categories`);
+      if (res.ok) {
+        const data: Category[] = await res.json();
+        const active = data.filter(c => !c.status || c.status === 'active');
+        setCategories(active.length > 0 ? active : FALLBACK_CATEGORIES);
+      } else {
+        setCategories(FALLBACK_CATEGORIES);
+      }
+    } catch {
+      setCategories(FALLBACK_CATEGORIES);
+    }
+  }, []);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     setApiError(false);
-
     const attempt = async () => {
       if (!API_BASE) throw new Error('No API configured');
       const res = await fetch(`${API_BASE}/faq`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     };
-
     try {
       let data;
-      try {
-        data = await attempt();
-      } catch {
-        await new Promise(r => setTimeout(r, 1000));
-        data = await attempt();
-      }
+      try { data = await attempt(); }
+      catch { await new Promise(r => setTimeout(r, 1000)); data = await attempt(); }
       const items: Article[] = Array.isArray(data) ? data : (data.items || data.articles || []);
-      const published = items.filter((a) => !a.status || a.status === 'published' || a.status === 'active' || a.status === 'approved');
+      const published = items.filter(a => !a.status || a.status === 'published' || a.status === 'active' || a.status === 'approved');
       setArticles(published);
       setApiError(false);
     } catch {
@@ -117,25 +134,52 @@ function FAQContent() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+  useEffect(() => { fetchCategories(); fetchArticles(); }, [fetchCategories, fetchArticles]);
 
   useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    };
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
   }, []);
 
-  const catKeyToLabel: Record<string, string> = Object.fromEntries(
-    CATEGORIES.map(c => [c.key, c.label])
-  );
+  // Derive top-level and subcategories
+  const topLevel = categories.filter(c => !c.parentId);
+  const getSubcategories = (parentId: string) => categories.filter(c => c.parentId === parentId);
 
-  const filtered = articles.filter((a) => {
-    const artCatNorm = a.category?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    const matchesCat = selectedCat === 'all' ||
-      artCatNorm === selectedCat ||
-      a.category?.toLowerCase() === (catKeyToLabel[selectedCat] || selectedCat).toLowerCase();
+  // On mount, resolve catParam/subParam to actual category IDs
+  useEffect(() => {
+    if (categories.length === 0) return;
+    if (catParam) {
+      const found = categories.find(c => normalise(c.name) === catParam || c.id === catParam);
+      if (found) {
+        if (found.parentId) {
+          setSelectedCatId(found.parentId);
+          setSelectedSubId(found.id);
+        } else {
+          setSelectedCatId(found.id);
+          setSelectedSubId('');
+        }
+        return;
+      }
+    }
+    // Default: show all (no selection)
+    setSelectedCatId('');
+    setSelectedSubId('');
+  }, [categories, catParam, subParam]);
+
+  const selectedCat = categories.find(c => c.id === selectedCatId);
+  const selectedSub = categories.find(c => c.id === selectedSubId);
+  const subcategories = selectedCatId ? getSubcategories(selectedCatId) : [];
+
+  // Filter articles based on navigation state
+  const filtered = articles.filter(a => {
+    let matchesCat = true;
+    if (selectedSubId && selectedSub) {
+      matchesCat = articleMatchesCategory(a, selectedSub.name);
+    } else if (selectedCatId && selectedCat) {
+      // Show articles for the top-level category AND all its subcategories
+      const subs = getSubcategories(selectedCatId);
+      matchesCat = articleMatchesCategory(a, selectedCat.name) ||
+        subs.some(s => articleMatchesCategory(a, s.name));
+    }
     const matchesSearch = !search ||
       a.title?.toLowerCase().includes(search.toLowerCase()) ||
       (a.content || a.answer || '')?.toLowerCase().includes(search.toLowerCase()) ||
@@ -143,25 +187,41 @@ function FAQContent() {
     return matchesCat && matchesSearch;
   });
 
-  const grouped: Record<string, Article[]> = filtered.reduce<Record<string, Article[]>>((acc: Record<string, Article[]>, a: Article) => {
+  const grouped: Record<string, Article[]> = filtered.reduce<Record<string, Article[]>>((acc, a) => {
     const cat = a.category || 'General';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(a);
     return acc;
   }, {});
 
-  const getCount = (key: string) => {
-    if (key === 'all') return articles.length;
-    const label = (catKeyToLabel[key] || key).toLowerCase();
-    return articles.filter(a => {
-      const artCatNorm = a.category?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      return artCatNorm === key || a.category?.toLowerCase() === label;
-    }).length;
+  const getArticleCount = (cat: Category): number => {
+    const subs = getSubcategories(cat.id);
+    return articles.filter(a =>
+      articleMatchesCategory(a, cat.name) || subs.some(s => articleMatchesCategory(a, s.name))
+    ).length;
   };
 
-  const heading = selectedCat === 'all'
-    ? 'All Topics'
-    : CATEGORIES.find(c => c.key === selectedCat)?.label || selectedCat;
+  const getSubCount = (sub: Category): number =>
+    articles.filter(a => articleMatchesCategory(a, sub.name)).length;
+
+  const heading = selectedSub?.name || selectedCat?.name || 'All Topics';
+
+  const selectTopLevel = (catId: string) => {
+    if (selectedCatId === catId) {
+      // Toggle collapse
+      setSelectedCatId('');
+      setSelectedSubId('');
+    } else {
+      setSelectedCatId(catId);
+      setSelectedSubId('');
+    }
+    setSearch('');
+  };
+
+  const selectSub = (subId: string) => {
+    setSelectedSubId(prev => prev === subId ? '' : subId);
+    setSearch('');
+  };
 
   return (
     <div className="kb-layout">
@@ -170,34 +230,61 @@ function FAQContent() {
       <aside className="kb-sidebar">
         <p className="kb-sidebar-title">Topics</p>
         <div className="kb-sidebar-nav" id="kbSidebar">
-          {CATEGORIES.slice(0, 15).map((cat) => {
-            const count = getCount(cat.key);
-            return (
-              <button
-                key={cat.key}
-                className={`kb-nav-link${selectedCat === cat.key ? ' active' : ''}`}
-                onClick={() => { setSelectedCat(cat.key); setSearch(''); }}
-              >
-                <i className={cat.icon} style={{ width: '14px' }}></i>
-                {cat.label}
-                {count > 0 && <span className="nav-count">{count}</span>}
-              </button>
-            );
-          })}
 
-          <p className="kb-sidebar-title" style={{ marginTop: '0.75rem' }}>More Topics</p>
-          {CATEGORIES.slice(15).map((cat) => {
-            const count = getCount(cat.key);
+          {/* All Topics button */}
+          <button
+            className={`kb-nav-link${!selectedCatId ? ' active' : ''}`}
+            onClick={() => { setSelectedCatId(''); setSelectedSubId(''); setSearch(''); }}
+          >
+            <i className="fas fa-border-all" style={{ width: '14px' }}></i>
+            All Topics
+            {articles.length > 0 && <span className="nav-count">{articles.length}</span>}
+          </button>
+
+          {topLevel.map((cat) => {
+            const count = getArticleCount(cat);
+            const subs = getSubcategories(cat.id);
+            const isExpanded = selectedCatId === cat.id;
             return (
-              <button
-                key={cat.key}
-                className={`kb-nav-link${selectedCat === cat.key ? ' active' : ''}`}
-                onClick={() => { setSelectedCat(cat.key); setSearch(''); }}
-              >
-                <i className={cat.icon} style={{ width: '14px' }}></i>
-                {cat.label}
-                {count > 0 && <span className="nav-count">{count}</span>}
-              </button>
+              <div key={cat.id}>
+                <button
+                  className={`kb-nav-link${isExpanded && !selectedSubId ? ' active' : ''}`}
+                  onClick={() => selectTopLevel(cat.id)}
+                  style={{ justifyContent: 'space-between' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                    <i className={cat.icon} style={{ width: '14px', flexShrink: 0 }}></i>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                    {count > 0 && <span className="nav-count">{count}</span>}
+                    {subs.length > 0 && (
+                      <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'}`} style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginLeft: '0.125rem' }}></i>
+                    )}
+                  </span>
+                </button>
+
+                {/* Subcategories — shown when parent is expanded */}
+                {isExpanded && subs.length > 0 && (
+                  <div style={{ marginLeft: '1rem', borderLeft: '2px solid var(--border)', paddingLeft: '0.5rem', marginBottom: '0.25rem' }}>
+                    {subs.map(sub => {
+                      const subCount = getSubCount(sub);
+                      return (
+                        <button
+                          key={sub.id}
+                          className={`kb-nav-link${selectedSubId === sub.id ? ' active' : ''}`}
+                          onClick={() => selectSub(sub.id)}
+                          style={{ fontSize: '0.8125rem', padding: '0.375rem 0.625rem' }}
+                        >
+                          <i className={sub.icon} style={{ width: '12px', fontSize: '0.75rem' }}></i>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>{sub.name}</span>
+                          {subCount > 0 && <span className="nav-count">{subCount}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -253,12 +340,47 @@ function FAQContent() {
           <span><strong>Verified content:</strong> All articles are cross-referenced with official Indiabulls Securities policies.</span>
         </div>
 
+        {/* Breadcrumb when inside a category */}
+        {selectedCatId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            <button onClick={() => { setSelectedCatId(''); setSelectedSubId(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: 'inherit' }}>All Topics</button>
+            <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
+            <button onClick={() => setSelectedSubId('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedSubId ? 'var(--text-muted)' : 'var(--text-dark)', padding: 0, fontSize: 'inherit', fontWeight: selectedSubId ? 400 : 600 }}>{selectedCat?.name}</button>
+            {selectedSub && (<>
+              <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
+              <span style={{ color: 'var(--text-dark)', fontWeight: 600 }}>{selectedSub.name}</span>
+            </>)}
+          </div>
+        )}
+
+        {/* Subcategory pill filters — shown when a top-level category is selected and has subcats */}
+        {selectedCatId && subcategories.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <button
+              onClick={() => setSelectedSubId('')}
+              style={{ padding: '0.375rem 0.875rem', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, border: '1.5px solid', borderColor: !selectedSubId ? 'var(--green)' : 'var(--border)', background: !selectedSubId ? 'var(--green)' : 'var(--bg)', color: !selectedSubId ? 'white' : 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              All
+            </button>
+            {subcategories.map(sub => (
+              <button
+                key={sub.id}
+                onClick={() => selectSub(sub.id)}
+                style={{ padding: '0.375rem 0.875rem', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, border: '1.5px solid', borderColor: selectedSubId === sub.id ? 'var(--green)' : 'var(--border)', background: selectedSubId === sub.id ? 'var(--green)' : 'var(--bg)', color: selectedSubId === sub.id ? 'white' : 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <i className={sub.icon} style={{ marginRight: '0.375rem', fontSize: '0.75rem' }}></i>
+                {sub.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="kb-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
             <div>
               <h1 id="kbHeading">{heading}</h1>
               <p id="kbSubheading">
-                {selectedCat === 'all'
+                {!selectedCatId
                   ? 'Browse all support articles or filter by topic from the sidebar.'
                   : `${filtered.length} article${filtered.length !== 1 ? 's' : ''} in this topic.`}
               </p>

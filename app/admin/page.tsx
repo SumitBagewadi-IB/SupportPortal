@@ -13,12 +13,21 @@ const MAX_CONTENT = 50000;
 const WARN_CONTENT = 45000;
 const TICKETS_PAGE_SIZE = 10;
 
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
   'Funds', 'Charges & Brokerage', 'Compliance & Safety', 'Mutual Funds',
   'IPO', 'F&O', 'Pledging', 'MTF', 'Tender Offers', 'Contact & Help',
   'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
 ];
+
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  parentId: string | null;
+  sortOrder?: number;
+  status?: string;
+}
 
 interface Article {
   id: string;
@@ -87,7 +96,17 @@ export default function AdminPage() {
   const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
 
   // Sidebar view
-  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets' | 'audit'>('articles');
+  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets' | 'audit' | 'categories'>('articles');
+
+  // Categories
+  const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
+  const [catError, setCatError] = useState('');
+  const [catForm, setCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '' });
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [catFormMsg, setCatFormMsg] = useState('');
+  const [catSubmitting, setCatSubmitting] = useState(false);
+  const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
 
   // Audit log
   const [auditLogs, setAuditLogs] = useState<{ id: string; timestamp: string; action: string; entity: string; entityId: string; entityTitle: string; performedBy: string; meta?: Record<string, string> }[]>([]);
@@ -208,12 +227,25 @@ export default function AdminPage() {
       .finally(() => setAuditLoading(false));
   }, [handleSessionExpired]);
 
+  const fetchCategories = useCallback(async () => {
+    if (!API_BASE) return;
+    setCatLoading(true);
+    setCatError('');
+    try {
+      const res = await fetch(`${API_BASE}/categories`);
+      if (res.ok) setDynamicCategories(await res.json());
+      else setCatError('Failed to load categories.');
+    } catch { setCatError('Could not reach API.'); }
+    finally { setCatLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (authed && managerToken) {
       fetchTickets(managerToken);
       fetchAuditLogs(managerToken);
+      fetchCategories();
     }
-  }, [authed, managerToken, fetchTickets, fetchAuditLogs]);
+  }, [authed, managerToken, fetchTickets, fetchAuditLogs, fetchCategories]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,6 +528,14 @@ export default function AdminPage() {
   const safeTicketPage = Math.min(ticketPage, totalTicketPages);
   const paginatedTickets = filteredTickets.slice((safeTicketPage - 1) * TICKETS_PAGE_SIZE, safeTicketPage * TICKETS_PAGE_SIZE);
 
+  // Build flat list of category names for article form dropdowns
+  const allCategoryNames: string[] = dynamicCategories.length > 0
+    ? dynamicCategories.map(c => c.name)
+    : FALLBACK_CATEGORIES;
+
+  const topLevelCats = dynamicCategories.filter(c => !c.parentId);
+  const getSubcats = (parentId: string) => dynamicCategories.filter(c => c.parentId === parentId);
+
   const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
   const draftCount = articles.filter((a) => a.status === 'draft').length;
   const openTickets = tickets.filter((t) => t.status !== 'solved' && t.status !== 'resolved').length;
@@ -648,14 +688,15 @@ export default function AdminPage() {
         {/* TAB NAV — matches masteradmin style */}
         <div style={{ borderBottom: '1px solid var(--admin-border)', background: 'var(--admin-topbar)', padding: '0 1.25rem', display: 'flex', gap: '0.25rem', overflowX: 'auto', flexShrink: 0 }}>
           {[
-            { id: 'articles', label: 'FAQ Articles', icon: 'fa-list' },
-            { id: 'add',      label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
-            { id: 'tickets',  label: 'Tickets', icon: 'fa-envelope' },
-            { id: 'audit',    label: 'Audit Log', icon: 'fa-scroll' },
+            { id: 'articles',   label: 'FAQ Articles', icon: 'fa-list' },
+            { id: 'add',        label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
+            { id: 'categories', label: 'Categories', icon: 'fa-folder-tree' },
+            { id: 'tickets',    label: 'Tickets', icon: 'fa-envelope' },
+            { id: 'audit',      label: 'Audit Log', icon: 'fa-scroll' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveView(tab.id as 'articles' | 'add' | 'tickets' | 'audit'); if (tab.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } setSidebarOpen(false); }}
+              onClick={() => { setActiveView(tab.id as 'articles' | 'add' | 'tickets' | 'audit' | 'categories'); if (tab.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } setSidebarOpen(false); }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.75rem 0.875rem', background: 'none', border: 'none', borderBottom: `2px solid ${activeView === tab.id ? '#00AB4E' : 'transparent'}`, color: activeView === tab.id ? '#00AB4E' : 'var(--admin-text-secondary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: activeView === tab.id ? 700 : 500, whiteSpace: 'nowrap', flexShrink: 0, transition: 'color 0.15s' }}
             >
               <i className={`fas ${tab.icon}`} style={{ fontSize: '0.8rem' }}></i>
@@ -732,7 +773,7 @@ export default function AdminPage() {
                   style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', cursor: 'pointer' }}
                 >
                   <option value="">All Categories</option>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {allCategoryNames.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <select
                   value={statusFilter}
@@ -912,7 +953,21 @@ export default function AdminPage() {
                       style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', boxSizing: 'border-box' }}
                     >
                       <option value="">Select a category...</option>
-                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {dynamicCategories.length > 0 ? (
+                        topLevelCats.map(cat => {
+                          const subs = getSubcats(cat.id);
+                          return subs.length > 0 ? (
+                            <optgroup key={cat.id} label={cat.name}>
+                              <option value={cat.name}>{cat.name} (general)</option>
+                              {subs.map(sub => <option key={sub.id} value={sub.name}>{sub.name}</option>)}
+                            </optgroup>
+                          ) : (
+                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                          );
+                        })
+                      ) : (
+                        FALLBACK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
+                      )}
                     </select>
                   </div>
                   <div style={{ marginBottom: '1.25rem' }}>
@@ -956,6 +1011,189 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* CATEGORIES VIEW */}
+          {activeView === 'categories' && (
+            <div style={{ maxWidth: 860 }}>
+              {/* Add / Edit form */}
+              <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '1.25rem' }}>
+                  {editingCatId ? 'Edit Category' : 'Add Category / Subcategory'}
+                </h2>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!catForm.name.trim()) { setCatFormMsg('Name is required.'); return; }
+                  setCatSubmitting(true); setCatFormMsg('');
+                  try {
+                    const method = editingCatId ? 'PUT' : 'POST';
+                    const url = editingCatId ? `${API_BASE}/categories/${editingCatId}` : `${API_BASE}/categories`;
+                    const res = await fetch(url, {
+                      method,
+                      headers: authHeaders(managerToken),
+                      body: JSON.stringify({ name: catForm.name.trim(), icon: catForm.icon, parentId: catForm.parentId || null }),
+                    });
+                    if (res.status === 401) { handleSessionExpired(); return; }
+                    if (!res.ok) throw new Error('Failed');
+                    setCatFormMsg(editingCatId ? 'Category updated!' : 'Category created!');
+                    setCatForm({ name: '', icon: 'fas fa-folder', parentId: '' });
+                    setEditingCatId(null);
+                    fetchCategories();
+                    setTimeout(() => setCatFormMsg(''), 2500);
+                  } catch { setCatFormMsg(editingCatId ? 'Failed to update.' : 'Failed to create.'); }
+                  finally { setCatSubmitting(false); }
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Name *</label>
+                      <input
+                        type="text"
+                        value={catForm.name}
+                        onChange={e => setCatForm({ ...catForm, name: e.target.value })}
+                        placeholder="e.g. Deposits"
+                        maxLength={100}
+                        style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Parent Category (leave blank for top-level)</label>
+                      <select
+                        value={catForm.parentId}
+                        onChange={e => setCatForm({ ...catForm, parentId: e.target.value })}
+                        style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', boxSizing: 'border-box' }}
+                      >
+                        <option value="">— Top-level category —</option>
+                        {dynamicCategories.filter(c => !c.parentId).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#4A5568', marginBottom: '0.375rem' }}>Icon class (FontAwesome)</label>
+                    <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={catForm.icon}
+                        onChange={e => setCatForm({ ...catForm, icon: e.target.value })}
+                        placeholder="fas fa-folder"
+                        style={{ flex: 1, padding: '0.625rem 0.875rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }}
+                      />
+                      <span style={{ fontSize: '0.875rem', color: 'var(--admin-text-secondary)', width: 32, textAlign: 'center' }}>
+                        <i className={catForm.icon || 'fas fa-folder'}></i>
+                      </span>
+                    </div>
+                  </div>
+                  {catFormMsg && (
+                    <div style={{ padding: '0.625rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.875rem', background: catFormMsg.includes('!') && !catFormMsg.toLowerCase().includes('fail') ? '#F0FFF4' : '#FFF5F5', border: `1px solid ${catFormMsg.includes('!') && !catFormMsg.toLowerCase().includes('fail') ? '#9AE6B4' : '#FEB2B2'}`, color: catFormMsg.includes('!') && !catFormMsg.toLowerCase().includes('fail') ? '#276749' : '#C53030' }}>
+                      {catFormMsg}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button type="submit" disabled={catSubmitting} style={{ padding: '0.625rem 1.375rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 700, cursor: catSubmitting ? 'not-allowed' : 'pointer', opacity: catSubmitting ? 0.6 : 1 }}>
+                      {catSubmitting ? (editingCatId ? 'Saving…' : 'Creating…') : (editingCatId ? 'Save Changes' : 'Create Category')}
+                    </button>
+                    {editingCatId && (
+                      <button type="button" onClick={() => { setEditingCatId(null); setCatForm({ name: '', icon: 'fas fa-folder', parentId: '' }); setCatFormMsg(''); }} style={{ padding: '0.625rem 1.25rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: '#4A5568' }}>Cancel</button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* Category tree */}
+              <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
+                <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid var(--admin-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
+                    All Categories <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({dynamicCategories.length})</span>
+                  </h2>
+                  <button onClick={fetchCategories} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}>
+                    <i className="fas fa-rotate-right"></i>
+                  </button>
+                </div>
+                {catLoading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>Loading…</div>
+                ) : catError ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#E53E3E', fontSize: '0.875rem' }}>{catError}</div>
+                ) : dynamicCategories.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}>No categories yet. Create your first one above.</div>
+                ) : (
+                  <div style={{ padding: '0.75rem 1.25rem' }}>
+                    {topLevelCats.map(cat => {
+                      const subs = getSubcats(cat.id);
+                      return (
+                        <div key={cat.id} style={{ marginBottom: '0.75rem' }}>
+                          {/* Top-level row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'var(--admin-row-hover)', borderRadius: 8 }}>
+                            <i className={cat.icon} style={{ color: '#00AB4E', width: 16, textAlign: 'center' }}></i>
+                            <span style={{ flex: 1, fontWeight: 700, fontSize: '0.875rem', color: 'var(--admin-text-primary)' }}>{cat.name}</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', background: 'var(--admin-border)', padding: '0.125rem 0.5rem', borderRadius: 20 }}>{subs.length} sub</span>
+                            <button onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: '' }); setCatFormMsg(''); }} style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                              <i className="fas fa-pen" style={{ fontSize: '0.7rem' }}></i>
+                            </button>
+                            <button
+                              disabled={!!deletingCatId}
+                              onClick={async () => {
+                                if (!confirm(`Delete "${cat.name}"? This will also remove all its subcategories from the sidebar.`)) return;
+                                setDeletingCatId(cat.id);
+                                try {
+                                  const res = await fetch(`${API_BASE}/categories/${cat.id}`, { method: 'DELETE', headers: authHeaders(managerToken) });
+                                  if (res.status === 401) { handleSessionExpired(); return; }
+                                  if (!res.ok) throw new Error('Failed');
+                                  fetchCategories();
+                                  showToast('Category deleted.');
+                                } catch { showToast('Failed to delete category.'); }
+                                finally { setDeletingCatId(null); }
+                              }}
+                              style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'var(--admin-surface)', cursor: deletingCatId ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E53E3E', opacity: deletingCatId === cat.id ? 0.5 : 1 }}
+                            >
+                              <i className="fas fa-trash" style={{ fontSize: '0.7rem' }}></i>
+                            </button>
+                          </div>
+                          {/* Subcategory rows */}
+                          {subs.map(sub => (
+                            <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.875rem', marginLeft: '1.5rem', borderLeft: '2px solid var(--border)', paddingLeft: '1rem' }}>
+                              <i className={sub.icon} style={{ color: '#718096', width: 14, textAlign: 'center', fontSize: '0.8rem' }}></i>
+                              <span style={{ flex: 1, fontSize: '0.8125rem', color: 'var(--admin-text-primary)' }}>{sub.name}</span>
+                              <button onClick={() => { setEditingCatId(sub.id); setCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '' }); setCatFormMsg(''); }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                                <i className="fas fa-pen" style={{ fontSize: '0.65rem' }}></i>
+                              </button>
+                              <button
+                                disabled={!!deletingCatId}
+                                onClick={async () => {
+                                  if (!confirm(`Delete subcategory "${sub.name}"?`)) return;
+                                  setDeletingCatId(sub.id);
+                                  try {
+                                    const res = await fetch(`${API_BASE}/categories/${sub.id}`, { method: 'DELETE', headers: authHeaders(managerToken) });
+                                    if (res.status === 401) { handleSessionExpired(); return; }
+                                    if (!res.ok) throw new Error('Failed');
+                                    fetchCategories();
+                                    showToast('Subcategory deleted.');
+                                  } catch { showToast('Failed to delete subcategory.'); }
+                                  finally { setDeletingCatId(null); }
+                                }}
+                                style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid #FEB2B2', background: 'var(--admin-surface)', cursor: deletingCatId ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E53E3E', opacity: deletingCatId === sub.id ? 0.5 : 1 }}
+                              >
+                                <i className="fas fa-trash" style={{ fontSize: '0.65rem' }}></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {/* Orphan subcategories (parentId set but parent not found) */}
+                    {dynamicCategories.filter(c => c.parentId && !dynamicCategories.find(p => p.id === c.parentId)).map(cat => (
+                      <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.875rem', background: '#FFFBEB', borderRadius: 8, marginBottom: '0.375rem' }}>
+                        <i className={cat.icon} style={{ color: '#D97706', width: 14, textAlign: 'center' }}></i>
+                        <span style={{ flex: 1, fontSize: '0.8125rem', color: '#92400E' }}>{cat.name} <span style={{ fontSize: '0.7rem' }}>(orphaned — parent missing)</span></span>
+                        <button onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: cat.parentId || '' }); setCatFormMsg(''); }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                          <i className="fas fa-pen" style={{ fontSize: '0.65rem' }}></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

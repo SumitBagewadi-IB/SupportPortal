@@ -61,6 +61,8 @@ const AUDIT_TABLE       = process.env.AUDIT_TABLE       || 'ib-audit-log';
 const ANALYTICS_TABLE   = process.env.ANALYTICS_TABLE   || 'ib-analytics';
 const MANAGERS_TABLE    = process.env.MANAGERS_TABLE    || 'ib-managers';
 
+const CATEGORIES_TABLE  = process.env.CATEGORIES_TABLE  || 'ib-faq-categories';
+
 const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
 const JWT_SECRET          = process.env.JWT_SECRET          || (() => { throw new Error('JWT_SECRET env var is required'); })();
@@ -904,6 +906,85 @@ async function _handler(event) {
     }
 
     return r(200, items);
+  }
+
+  // ── GET /categories ──────────────────────────────────────────────────────
+  if (method === 'GET' && path === '/categories') {
+    const res = await ddb.send(new ScanCommand({ TableName: CATEGORIES_TABLE }));
+    const items = (res.Items || []).sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
+    return r(200, items);
+  }
+
+  // ── POST /categories ──────────────────────────────────────────────────────
+  if (method === 'POST' && path === '/categories') {
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
+    const { name, icon, parentId, sortOrder } = body;
+    if (!name || !name.trim()) return r(400, { error: 'name required' });
+    if (name.length > 100) return r(400, { error: 'name too long (max 100 chars)' });
+    const id = `cat-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const now = new Date().toISOString();
+    await ddb.send(new PutCommand({
+      TableName: CATEGORIES_TABLE,
+      Item: {
+        id,
+        name: name.trim(),
+        icon: icon || 'fas fa-folder',
+        parentId: parentId || null,
+        sortOrder: sortOrder ?? 999999,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+    }));
+    await writeAudit({ action: 'CREATE_CATEGORY', entity: 'category', entityId: id, entityTitle: name.trim(), performedBy: auth.performedBy, meta: { parentId: parentId || 'none' } });
+    return r(201, { id, ok: true });
+  }
+
+  // ── PUT /categories/{id} ──────────────────────────────────────────────────
+  const catPutMatch = path.match(/^\/categories\/([^/]+)$/);
+  if (method === 'PUT' && catPutMatch) {
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
+    const catId = catPutMatch[1];
+    const existing = await ddb.send(new GetCommand({ TableName: CATEGORIES_TABLE, Key: { id: catId } }));
+    if (!existing.Item) return r(404, { error: 'Category not found' });
+    const exprParts = ['updatedAt = :t'];
+    const exprVals = { ':t': new Date().toISOString() };
+    if (body.name) { exprParts.push('name = :n'); exprVals[':n'] = body.name.trim(); }
+    if (body.icon !== undefined) { exprParts.push('icon = :ic'); exprVals[':ic'] = body.icon; }
+    if (body.sortOrder !== undefined) { exprParts.push('sortOrder = :so'); exprVals[':so'] = body.sortOrder; }
+    if (body.status !== undefined) {
+      if (!['active', 'inactive'].includes(body.status)) return r(400, { error: 'Invalid status' });
+      exprParts.push('#s = :s'); exprVals[':s'] = body.status;
+    }
+    await ddb.send(new UpdateCommand({
+      TableName: CATEGORIES_TABLE,
+      Key: { id: catId },
+      UpdateExpression: `SET ${exprParts.join(', ')}`,
+      ExpressionAttributeNames: body.status !== undefined ? { '#s': 'status' } : undefined,
+      ExpressionAttributeValues: exprVals,
+    }));
+    await writeAudit({ action: 'UPDATE_CATEGORY', entity: 'category', entityId: catId, entityTitle: body.name || existing.Item.name, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
+    return r(200, { ok: true });
+  }
+
+  // ── DELETE /categories/{id} ───────────────────────────────────────────────
+  const catDeleteMatch = path.match(/^\/categories\/([^/]+)$/);
+  if (method === 'DELETE' && catDeleteMatch) {
+    const auth = await requireManagerOrMaster(event);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
+    const catId = catDeleteMatch[1];
+    const existing = await ddb.send(new GetCommand({ TableName: CATEGORIES_TABLE, Key: { id: catId } }));
+    if (!existing.Item) return r(404, { error: 'Category not found' });
+    try {
+      await ddb.send(new DeleteCommand({ TableName: CATEGORIES_TABLE, Key: { id: catId }, ConditionExpression: 'attribute_exists(id)' }));
+    } catch (e) {
+      if (e.name === 'ConditionalCheckFailedException') return r(404, { error: 'Category not found' });
+      throw e;
+    }
+    await writeAudit({ action: 'DELETE_CATEGORY', entity: 'category', entityId: catId, entityTitle: existing.Item.name, performedBy: auth.performedBy });
+    return r(200, { ok: true });
   }
 
   return r(404, { error: 'Not found' });

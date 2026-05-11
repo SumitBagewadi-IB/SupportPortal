@@ -66,7 +66,7 @@ interface Article {
   status: string;
 }
 
-type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics';
+type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics' | 'categories';
 
 // Master session token is obtained via POST /auth/masterlogin (server-side validation).
 // The raw master password is NEVER stored in the browser bundle or client state.
@@ -156,6 +156,16 @@ export default function MasterAdminPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsDays, setAnalyticsDays] = useState(30);
+
+  // Categories
+  const [maCats, setMaCats] = useState<{ id: string; name: string; icon: string; parentId: string | null; sortOrder?: number; status?: string }[]>([]);
+  const [maCatLoading, setMaCatLoading] = useState(false);
+  const [maCatError, setMaCatError] = useState('');
+  const [maCatForm, setMaCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '' });
+  const [editingMaCatId, setEditingMaCatId] = useState<string | null>(null);
+  const [maCatFormMsg, setMaCatFormMsg] = useState('');
+  const [maCatSubmitting, setMaCatSubmitting] = useState(false);
+  const [deletingMaCatId, setDeletingMaCatId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -363,13 +373,28 @@ export default function MasterAdminPage() {
 
   // ── Must be defined before any early return (Rules of Hooks) ─────────────
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'overview',   label: 'Overview',        icon: 'fa-tachometer-alt' },
-    { id: 'managers',   label: 'Manager Accounts', icon: 'fa-users-cog' },
-    { id: 'audit',      label: 'Audit Log',        icon: 'fa-history' },
-    { id: 'analytics',  label: 'Analytics',        icon: 'fa-chart-bar' },
-    { id: 'tickets',    label: 'Tickets',          icon: 'fa-ticket-alt' },
-    { id: 'faq',        label: 'FAQ Articles',     icon: 'fa-book' },
+    { id: 'overview',    label: 'Overview',        icon: 'fa-tachometer-alt' },
+    { id: 'managers',    label: 'Manager Accounts', icon: 'fa-users-cog' },
+    { id: 'audit',       label: 'Audit Log',        icon: 'fa-history' },
+    { id: 'analytics',   label: 'Analytics',        icon: 'fa-chart-bar' },
+    { id: 'tickets',     label: 'Tickets',          icon: 'fa-ticket-alt' },
+    { id: 'faq',         label: 'FAQ Articles',     icon: 'fa-book' },
+    { id: 'categories',  label: 'Categories',       icon: 'fa-folder-tree' },
   ];
+
+  const fetchMaCats = useCallback(async () => {
+    if (!API_BASE) return;
+    setMaCatLoading(true); setMaCatError('');
+    try {
+      const res = await fetch(`${API_BASE}/categories`);
+      if (res.ok) setMaCats(await res.json());
+      else setMaCatError('Failed to load categories.');
+    } catch { setMaCatError('Could not reach API.'); }
+    finally { setMaCatLoading(false); }
+  }, []);
+
+  const maTopLevelCats = maCats.filter(c => !c.parentId);
+  const getMaSubcats = (parentId: string) => maCats.filter(c => c.parentId === parentId);
 
   const managerSummary = useMemo(() => {
     const map: Record<string, { name: string; actions: number; lastSeen: string; faqCreated: number; faqUpdated: number; faqDeleted: number; ticketsUpdated: number }> = {};
@@ -472,7 +497,7 @@ export default function MasterAdminPage() {
         {tabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => { setActiveTab(tab.id); }}
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'categories') fetchMaCats(); }}
             style={{ padding: '0.875rem 0.875rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? '#00AB4E' : 'var(--text-muted)', borderBottom: `2px solid ${activeTab === tab.id ? '#00AB4E' : 'transparent'}`, display: 'flex', alignItems: 'center', gap: '0.375rem', transition: 'color 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <i className={`fas ${tab.icon}`}></i> {tab.label}
@@ -1112,6 +1137,147 @@ export default function MasterAdminPage() {
               )}
             </div>
           </>
+        )}
+
+        {/* ── CATEGORIES TAB ── */}
+        {activeTab === 'categories' && (
+          <div style={{ maxWidth: 860 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Categories</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Manage top-level categories and subcategories visible on the Knowledge Base.</p>
+              </div>
+              <button onClick={fetchMaCats} disabled={maCatLoading} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: maCatLoading ? 'not-allowed' : 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: maCatLoading ? 0.6 : 1 }}>
+                <i className={`fas fa-sync-alt ${maCatLoading ? 'fa-spin' : ''}`}></i> Refresh
+              </button>
+            </div>
+
+            {/* Add / Edit form */}
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.5rem', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '1.25rem' }}>
+                {editingMaCatId ? 'Edit Category' : 'Add Category / Subcategory'}
+              </h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!maCatForm.name.trim()) { setMaCatFormMsg('Name is required.'); return; }
+                setMaCatSubmitting(true); setMaCatFormMsg('');
+                try {
+                  const method = editingMaCatId ? 'PUT' : 'POST';
+                  const url = editingMaCatId ? `${API_BASE}/categories/${editingMaCatId}` : `${API_BASE}/categories`;
+                  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: maCatForm.name.trim(), icon: maCatForm.icon, parentId: maCatForm.parentId || null }) });
+                  if (res.status === 401) { handleSessionExpired(); return; }
+                  if (!res.ok) throw new Error('Failed');
+                  setMaCatFormMsg(editingMaCatId ? 'Category updated!' : 'Category created!');
+                  setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '' });
+                  setEditingMaCatId(null);
+                  fetchMaCats();
+                  setTimeout(() => setMaCatFormMsg(''), 2500);
+                } catch { setMaCatFormMsg(editingMaCatId ? 'Failed to update.' : 'Failed to create.'); }
+                finally { setMaCatSubmitting(false); }
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Name *</label>
+                    <input type="text" value={maCatForm.name} onChange={e => setMaCatForm({ ...maCatForm, name: e.target.value })} placeholder="e.g. Deposits" maxLength={100} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Parent (blank = top-level)</label>
+                    <select value={maCatForm.parentId} onChange={e => setMaCatForm({ ...maCatForm, parentId: e.target.value })} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}>
+                      <option value="">— Top-level —</option>
+                      {maTopLevelCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Icon (FontAwesome class)</label>
+                  <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+                    <input type="text" value={maCatForm.icon} onChange={e => setMaCatForm({ ...maCatForm, icon: e.target.value })} placeholder="fas fa-folder" style={{ flex: 1, padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                    <span style={{ width: 32, textAlign: 'center', fontSize: '1rem', color: 'var(--text-muted)' }}><i className={maCatForm.icon || 'fas fa-folder'}></i></span>
+                  </div>
+                </div>
+                {maCatFormMsg && (
+                  <div style={{ padding: '0.625rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.875rem', background: maCatFormMsg.includes('!') && !maCatFormMsg.toLowerCase().includes('fail') ? '#D1FAE5' : '#FEE2E2', color: maCatFormMsg.includes('!') && !maCatFormMsg.toLowerCase().includes('fail') ? '#065F46' : '#B91C1C' }}>
+                    {maCatFormMsg}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button type="submit" disabled={maCatSubmitting} style={{ padding: '0.625rem 1.375rem', background: '#00AB4E', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.875rem', fontWeight: 700, cursor: maCatSubmitting ? 'not-allowed' : 'pointer', opacity: maCatSubmitting ? 0.6 : 1 }}>
+                    {maCatSubmitting ? (editingMaCatId ? 'Saving…' : 'Creating…') : (editingMaCatId ? 'Save Changes' : 'Create')}
+                  </button>
+                  {editingMaCatId && (
+                    <button type="button" onClick={() => { setEditingMaCatId(null); setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '' }); setMaCatFormMsg(''); }} style={{ padding: '0.625rem 1.25rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-dark)' }}>Cancel</button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* Category tree */}
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-dark)' }}>
+                All Categories <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8125rem' }}>({maCats.length})</span>
+              </div>
+              {maCatLoading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin"></i> Loading…</div>
+              ) : maCatError ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.875rem' }}>{maCatError}</div>
+              ) : maCats.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No categories yet. Create the first one above.</div>
+              ) : (
+                <div style={{ padding: '0.75rem 1.25rem' }}>
+                  {maTopLevelCats.map(cat => {
+                    const subs = getMaSubcats(cat.id);
+                    return (
+                      <div key={cat.id} style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'var(--bg-subtle)', borderRadius: 8 }}>
+                          <i className={cat.icon} style={{ color: '#00AB4E', width: 16, textAlign: 'center' }}></i>
+                          <span style={{ flex: 1, fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-dark)' }}>{cat.name}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--border)', padding: '0.125rem 0.5rem', borderRadius: 20 }}>{subs.length} sub</span>
+                          <button onClick={() => { setEditingMaCatId(cat.id); setMaCatForm({ name: cat.name, icon: cat.icon, parentId: '' }); setMaCatFormMsg(''); }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
+                            <i className="fas fa-pen" style={{ fontSize: '0.65rem' }}></i>
+                          </button>
+                          <button disabled={!!deletingMaCatId} onClick={async () => {
+                            if (!confirm(`Delete "${cat.name}"? All its subcategories will also be removed from the sidebar.`)) return;
+                            setDeletingMaCatId(cat.id);
+                            try {
+                              const r = await fetch(`${API_BASE}/categories/${cat.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                              if (r.status === 401) { handleSessionExpired(); return; }
+                              if (!r.ok) throw new Error('Failed');
+                              fetchMaCats();
+                            } catch { alert('Failed to delete category.'); }
+                            finally { setDeletingMaCatId(null); }
+                          }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid #FECACA', background: 'var(--bg)', cursor: deletingMaCatId ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B91C1C', opacity: deletingMaCatId === cat.id ? 0.5 : 1 }}>
+                            <i className="fas fa-trash" style={{ fontSize: '0.65rem' }}></i>
+                          </button>
+                        </div>
+                        {subs.map(sub => (
+                          <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.875rem', marginLeft: '1.5rem', borderLeft: '2px solid var(--border)', paddingLeft: '1rem' }}>
+                            <i className={sub.icon} style={{ color: '#6B7280', width: 14, textAlign: 'center', fontSize: '0.8rem' }}></i>
+                            <span style={{ flex: 1, fontSize: '0.8125rem', color: 'var(--text-dark)' }}>{sub.name}</span>
+                            <button onClick={() => { setEditingMaCatId(sub.id); setMaCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '' }); setMaCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
+                              <i className="fas fa-pen" style={{ fontSize: '0.6rem' }}></i>
+                            </button>
+                            <button disabled={!!deletingMaCatId} onClick={async () => {
+                              if (!confirm(`Delete subcategory "${sub.name}"?`)) return;
+                              setDeletingMaCatId(sub.id);
+                              try {
+                                const r = await fetch(`${API_BASE}/categories/${sub.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                                if (r.status === 401) { handleSessionExpired(); return; }
+                                if (!r.ok) throw new Error('Failed');
+                                fetchMaCats();
+                              } catch { alert('Failed to delete subcategory.'); }
+                              finally { setDeletingMaCatId(null); }
+                            }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid #FECACA', background: 'var(--bg)', cursor: deletingMaCatId ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B91C1C', opacity: deletingMaCatId === sub.id ? 0.5 : 1 }}>
+                              <i className="fas fa-trash" style={{ fontSize: '0.6rem' }}></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
