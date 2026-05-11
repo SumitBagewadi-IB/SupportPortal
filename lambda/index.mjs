@@ -90,9 +90,13 @@ const ALLOWED_TICKET_CATEGORIES = [
 
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || '';
-  const allowed = ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  // If ALLOWED_ORIGINS is configured, reflect only whitelisted origins.
+  // If not configured, reflect the requesting origin (open — safe because auth is header-based).
+  const allowedOrigin = ALLOWED_ORIGINS.length > 0
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0])
+    : (origin || '*');
   return {
-    'Access-Control-Allow-Origin':  allowed || '',
+    'Access-Control-Allow-Origin':  allowedOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,X-Master-Token,Authorization',
     'Access-Control-Allow-Credentials': 'true',
