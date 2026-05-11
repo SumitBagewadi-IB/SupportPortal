@@ -90,16 +90,18 @@ const ALLOWED_TICKET_CATEGORIES = [
 
 function corsHeaders(event) {
   const origin = event.headers?.origin || event.headers?.Origin || '';
-  // If ALLOWED_ORIGINS is configured, reflect only whitelisted origins.
-  // If not configured, reflect the requesting origin (open — safe because auth is header-based).
+  // Auth is header-based (X-Admin-Secret, Bearer tokens) — not cookie-based.
+  // We never send credentials:true from the browser, so we can safely reflect
+  // the requesting origin (or * when no origin header) without needing
+  // Access-Control-Allow-Credentials. This avoids CORS failures when
+  // ALLOWED_ORIGINS is misconfigured or the env var is not set.
   const allowedOrigin = ALLOWED_ORIGINS.length > 0
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0])
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : '*')
     : (origin || '*');
   return {
     'Access-Control-Allow-Origin':  allowedOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,X-Master-Token,Authorization',
-    'Access-Control-Allow-Credentials': 'true',
   };
 }
 
