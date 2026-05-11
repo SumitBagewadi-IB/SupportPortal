@@ -102,6 +102,7 @@ export default function HomePage() {
   const [popularError, setPopularError] = useState(false);
 
   const [homeCategories, setHomeCategories] = useState<Category[]>(STATIC_CATEGORIES);
+  const [homeSubs, setHomeSubs] = useState<Category[]>([]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allArticlesRef = useRef<Article[]>([]);
@@ -124,6 +125,9 @@ export default function HomePage() {
           }
         });
         setHomeCategories(merged);
+        // Store subcategories for chip display
+        const dbSubs = (data as Category[]).filter(c => (!c.status || c.status === 'active') && c.parentId);
+        setHomeSubs(dbSubs);
       })
       .catch(() => {/* keep static fallback — all 18 always visible */});
   }, []);
@@ -249,6 +253,33 @@ export default function HomePage() {
               const palette = CAT_PALETTE[idx % CAT_PALETTE.length];
               const slug = normalise(cat.name);
               const href = `/faq?cat=${cat.id !== slug ? cat.id : slug}`;
+              const catSubs = homeSubs.filter(s => s.parentId === cat.id);
+              const articleCount = allArticlesRef.current.filter(a =>
+                a.category?.toLowerCase() === cat.name.toLowerCase() ||
+                catSubs.some(s => a.category?.toLowerCase() === s.name.toLowerCase())
+              ).length;
+              const STATIC_DESCS: Record<string, string> = {
+                'getting-started': 'Account, KYC, first trade',
+                'account-opening': 'KYC, documents, activation',
+                'trading': 'Orders, GTT, Basket, AMO',
+                'portfolio': 'P&L, Holdings, Pledge, MTF',
+                'funds': 'Add, withdraw, ledger',
+                'charges': 'STT, GST, DP, brokerage plans',
+                'compliance': 'TPIN, eDIS, ASM/GSM, 2FA',
+                'mutual-funds': 'SIP, lump sum, ELSS, redemption',
+                'ipo': 'Apply, allotment, listing',
+                'fo': 'Futures, options, margins, expiry',
+                'pledging': 'Collateral margin, haircut',
+                'mtf': 'Margin Trading Facility',
+                'tender-offers': 'Buybacks, OFS, delisting',
+                'contact-faq': 'Support desk, escalation',
+                'advanced': 'Algo, Smallcase, Webhooks',
+                'account': 'Profile, security, segments',
+                'reports': 'Tax P&L, contract notes',
+                'nri': 'NRE/NRO, PIS, repatriation',
+              };
+              const subChips = catSubs.slice(0, 2).map(s => s.name).join(' · ');
+              const description = subChips || STATIC_DESCS[cat.id] || 'Browse articles';
               return (
                 <Link
                   key={cat.id}
@@ -265,10 +296,16 @@ export default function HomePage() {
                     textDecoration: 'none',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                     transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                    position: 'relative',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 20px -5px rgba(0,0,0,0.08)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
                 >
+                  {articleCount > 0 && (
+                    <span style={{ position: 'absolute', top: '0.625rem', right: '0.625rem', background: palette.bg, color: palette.color, fontSize: '0.65rem', fontWeight: 700, borderRadius: 20, padding: '0.1rem 0.45rem', lineHeight: 1.6 }}>
+                      {articleCount}
+                    </span>
+                  )}
                   <div style={{
                     width: '52px', height: '52px', borderRadius: '14px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -279,25 +316,7 @@ export default function HomePage() {
                   </div>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark, #111)', marginBottom: '0.35rem', margin: '0 0 0.35rem' }}>{cat.name}</h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted, #6b7280)', lineHeight: 1.4, margin: 0 }}>
-                    {cat.id === 'getting-started' ? 'Account, KYC, first trade' :
-                     cat.id === 'account-opening' ? 'KYC, documents, activation' :
-                     cat.id === 'trading' ? 'Orders, GTT, Basket, AMO' :
-                     cat.id === 'portfolio' ? 'P&L, Holdings, Pledge, MTF' :
-                     cat.id === 'funds' ? 'Add, withdraw, ledger' :
-                     cat.id === 'charges' ? 'STT, GST, DP, brokerage plans' :
-                     cat.id === 'compliance' ? 'TPIN, eDIS, ASM/GSM, 2FA' :
-                     cat.id === 'mutual-funds' ? 'SIP, lump sum, ELSS, redemption' :
-                     cat.id === 'ipo' ? 'Apply, allotment, listing' :
-                     cat.id === 'fo' ? 'Futures, options, margins, expiry' :
-                     cat.id === 'pledging' ? 'Collateral margin, haircut' :
-                     cat.id === 'mtf' ? 'Margin Trading Facility' :
-                     cat.id === 'tender-offers' ? 'Buybacks, OFS, delisting' :
-                     cat.id === 'contact-faq' ? 'Support desk, escalation' :
-                     cat.id === 'advanced' ? 'Algo, Smallcase, Webhooks' :
-                     cat.id === 'account' ? 'Profile, security, segments' :
-                     cat.id === 'reports' ? 'Tax P&L, contract notes' :
-                     cat.id === 'nri' ? 'NRE/NRO, PIS, repatriation' :
-                     'Browse articles'}
+                    {description}
                   </p>
                 </Link>
               );

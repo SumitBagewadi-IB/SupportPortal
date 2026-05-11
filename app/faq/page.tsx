@@ -15,6 +15,8 @@ interface Article {
   answer?: string;
   category: string;
   status?: string;
+  updatedAt?: string;
+  createdAt?: string;
 }
 
 interface Category {
@@ -58,10 +60,34 @@ function articleMatchesCategory(article: Article, catName: string): boolean {
   return artNorm === catNorm || article.category?.toLowerCase() === catName.toLowerCase();
 }
 
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  } catch { return ''; }
+}
+
+function highlight(text: string, term: string): React.ReactNode {
+  if (!term || !text) return text;
+  const idx = text.toLowerCase().indexOf(term.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark style={{ background: '#FEF08A', borderRadius: 2, padding: '0 2px' }}>{text.slice(idx, idx + term.length)}</mark>
+      {highlight(text.slice(idx + term.length), term)}
+    </>
+  );
+}
+
 function FAQContent() {
   const searchParams = useSearchParams();
   const catParam = searchParams.get('cat') || '';
   const subParam = searchParams.get('sub') || '';
+  const qParam = searchParams.get('q') || '';
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -72,7 +98,7 @@ function FAQContent() {
   const [selectedCatId, setSelectedCatId] = useState<string>('');
   const [selectedSubId, setSelectedSubId] = useState<string>('');
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(qParam);
   const [openId, setOpenId] = useState<string | null>(null);
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set(
     (() => {
@@ -321,6 +347,16 @@ function FAQContent() {
                   </span>
                 </button>
 
+                {/* Subcategory preview chips — shown when parent is NOT expanded */}
+                {!isExpanded && subs.length > 0 && (
+                  <div style={{ paddingLeft: '2.25rem', paddingBottom: '0.25rem', marginTop: '-0.125rem' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      {subs.slice(0, 2).map(s => s.name).join(' · ')}
+                      {subs.length > 2 ? ' …' : ''}
+                    </span>
+                  </div>
+                )}
+
                 {/* Subcategories — shown when parent is expanded */}
                 {isExpanded && subs.length > 0 && (
                   <div style={{ marginLeft: '1rem', borderLeft: '2px solid var(--border)', paddingLeft: '0.5rem', marginBottom: '0.25rem' }}>
@@ -505,8 +541,8 @@ function FAQContent() {
                       <div className="article-trigger-left">
                         <span className="article-cat-dot"></span>
                         <div>
-                          <h3>{article.title || article.question || 'Untitled'}</h3>
-                          <p>{article.category}</p>
+                          <h3>{search ? highlight(article.title || article.question || 'Untitled', search) : (article.title || article.question || 'Untitled')}</h3>
+                          <p>{article.category}{formatDate(article.updatedAt || article.createdAt) ? <span style={{ marginLeft: '0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Updated: {formatDate(article.updatedAt || article.createdAt)}</span> : null}</p>
                         </div>
                       </div>
                       <i className="fas fa-chevron-down article-chevron"></i>

@@ -166,6 +166,7 @@ export default function MasterAdminPage() {
   const [maCatFormMsg, setMaCatFormMsg] = useState('');
   const [maCatSubmitting, setMaCatSubmitting] = useState(false);
   const [deletingMaCatId, setDeletingMaCatId] = useState<string | null>(null);
+  const [seedingProgress, setSeedingProgress] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -1148,9 +1149,57 @@ export default function MasterAdminPage() {
                 <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.25rem' }}>Category Management</h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Create and organise top-level categories and subcategories shown on the Knowledge Base sidebar.</p>
               </div>
-              <button onClick={fetchMaCats} disabled={maCatLoading} style={{ padding: '0.5rem 1rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: maCatLoading ? 'not-allowed' : 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: maCatLoading ? 0.6 : 1 }}>
-                <i className={`fas fa-rotate-right ${maCatLoading ? 'fa-spin' : ''}`}></i> Refresh
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {seedingProgress && (
+                  <span style={{ fontSize: '0.8125rem', color: seedingProgress.startsWith('Done') ? '#065F46' : '#1E40AF', fontWeight: 600 }}>{seedingProgress}</span>
+                )}
+                <button
+                  onClick={async () => {
+                    const SEED_CATS = [
+                      { name: 'Getting Started', icon: 'fas fa-rocket', sortOrder: 1 },
+                      { name: 'Account Opening', icon: 'fas fa-id-card', sortOrder: 2 },
+                      { name: 'Trading', icon: 'fas fa-chart-line', sortOrder: 3 },
+                      { name: 'Portfolio & Margin', icon: 'fas fa-briefcase', sortOrder: 4 },
+                      { name: 'Funds', icon: 'fas fa-wallet', sortOrder: 5 },
+                      { name: 'Charges & Brokerage', icon: 'fas fa-tags', sortOrder: 6 },
+                      { name: 'Compliance & Safety', icon: 'fas fa-shield-halved', sortOrder: 7 },
+                      { name: 'Mutual Funds', icon: 'fas fa-seedling', sortOrder: 8 },
+                      { name: 'IPO', icon: 'fas fa-rocket', sortOrder: 9 },
+                      { name: 'F&O', icon: 'fas fa-bolt', sortOrder: 10 },
+                      { name: 'Pledging', icon: 'fas fa-link', sortOrder: 11 },
+                      { name: 'MTF', icon: 'fas fa-layer-group', sortOrder: 12 },
+                      { name: 'Tender Offers', icon: 'fas fa-hand-holding-dollar', sortOrder: 13 },
+                      { name: 'Contact & Help', icon: 'fas fa-headset', sortOrder: 14 },
+                      { name: 'Advanced', icon: 'fas fa-robot', sortOrder: 15 },
+                      { name: 'Account', icon: 'fas fa-user-circle', sortOrder: 16 },
+                      { name: 'Reports', icon: 'fas fa-file-invoice', sortOrder: 17 },
+                      { name: 'NRI/HUF Accounts', icon: 'fas fa-globe', sortOrder: 18 },
+                    ];
+                    if (!confirm('This will add the 18 standard categories to the database. Existing categories with the same name will be skipped. Continue?')) return;
+                    const existingNames = new Set(maCats.map(c => c.name.toLowerCase()));
+                    let added = 0; let skipped = 0;
+                    for (let i = 0; i < SEED_CATS.length; i++) {
+                      const cat = SEED_CATS[i];
+                      setSeedingProgress(`Seeding… ${i + 1}/${SEED_CATS.length}`);
+                      if (existingNames.has(cat.name.toLowerCase())) { skipped++; continue; }
+                      try {
+                        const res = await fetch(masterUrl('/categories'), { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ name: cat.name, icon: cat.icon, sortOrder: cat.sortOrder, parentId: null }) });
+                        if (res.ok) { added++; existingNames.add(cat.name.toLowerCase()); }
+                        else skipped++;
+                      } catch { skipped++; }
+                    }
+                    setSeedingProgress(`Done! ${added} added, ${skipped} skipped.`);
+                    fetchMaCats();
+                    setTimeout(() => setSeedingProgress(''), 6000);
+                  }}
+                  style={{ padding: '0.5rem 1rem', background: 'var(--bg)', border: '1.5px solid #3B82F6', borderRadius: 8, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: '#3B82F6', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <i className="fas fa-database"></i> Seed Default Categories
+                </button>
+                <button onClick={fetchMaCats} disabled={maCatLoading} style={{ padding: '0.5rem 1rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: maCatLoading ? 'not-allowed' : 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: maCatLoading ? 0.6 : 1 }}>
+                  <i className={`fas fa-rotate-right ${maCatLoading ? 'fa-spin' : ''}`}></i> Refresh
+                </button>
+              </div>
             </div>
 
             {/* Two-column layout: form left, tree right */}
