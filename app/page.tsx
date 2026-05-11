@@ -13,6 +13,59 @@ interface Article {
   status?: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  parentId: string | null;
+  sortOrder?: number;
+  status?: string;
+}
+
+function normalise(s: string) {
+  return s?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || '';
+}
+
+const CAT_PALETTE = [
+  { bg: '#E6FAE6', color: '#00AB4E' },
+  { bg: '#EFF6FF', color: '#3B82F6' },
+  { bg: '#FFF7ED', color: '#F97316' },
+  { bg: '#FAF5FF', color: '#A855F7' },
+  { bg: '#FEF3C7', color: '#D97706' },
+  { bg: '#FFF1F2', color: '#F43F5E' },
+  { bg: '#ECFDF5', color: '#10B981' },
+  { bg: '#FFFBEB', color: '#F59E0B' },
+  { bg: '#F0F9FF', color: '#0284C7' },
+  { bg: '#EEF2FF', color: '#6366F1' },
+  { bg: '#F5F3FF', color: '#8B5CF6' },
+  { bg: '#F0FDF4', color: '#22C55E' },
+  { bg: '#F8FAFC', color: '#64748B' },
+  { bg: '#FFF9C4', color: '#CA8A04' },
+  { bg: '#F1F5F9', color: '#0F172A' },
+  { bg: '#ECFEFF', color: '#06B6D4' },
+];
+
+const STATIC_CATEGORIES: Category[] = [
+  { id: 'getting-started', name: 'Getting Started',     icon: 'fas fa-rocket',               parentId: null },
+  { id: 'account-opening', name: 'Account Opening',     icon: 'fas fa-id-card',              parentId: null },
+  { id: 'trading',         name: 'Trading',             icon: 'fas fa-chart-line',           parentId: null },
+  { id: 'portfolio',       name: 'Portfolio & Margin',  icon: 'fas fa-briefcase',            parentId: null },
+  { id: 'funds',           name: 'Funds',               icon: 'fas fa-wallet',               parentId: null },
+  { id: 'charges',         name: 'Charges & Brokerage', icon: 'fas fa-tags',                 parentId: null },
+  { id: 'compliance',      name: 'Compliance & Safety', icon: 'fas fa-shield-halved',        parentId: null },
+  { id: 'mutual-funds',    name: 'Mutual Funds',        icon: 'fas fa-seedling',             parentId: null },
+  { id: 'ipo',             name: 'IPO',                 icon: 'fas fa-rocket',               parentId: null },
+  { id: 'fo',              name: 'F&O',                 icon: 'fas fa-bolt',                 parentId: null },
+  { id: 'pledging',        name: 'Pledging',            icon: 'fas fa-link',                 parentId: null },
+  { id: 'mtf',             name: 'MTF',                 icon: 'fas fa-layer-group',          parentId: null },
+  { id: 'tender-offers',   name: 'Tender Offers',       icon: 'fas fa-hand-holding-dollar',  parentId: null },
+  { id: 'contact-faq',     name: 'Contact & Help',      icon: 'fas fa-headset',              parentId: null },
+  { id: 'advanced',        name: 'Advanced',            icon: 'fas fa-robot',                parentId: null },
+  { id: 'account',         name: 'Account',             icon: 'fas fa-user-circle',          parentId: null },
+  { id: 'reports',         name: 'Reports',             icon: 'fas fa-file-invoice',         parentId: null },
+  { id: 'nri',             name: 'NRI / HUF Accounts',  icon: 'fas fa-globe',                parentId: null },
+];
+
 function PopularArticleRow({ article }: { article: Article }) {
   const [open, setOpen] = useState(false);
   return (
@@ -48,8 +101,21 @@ export default function HomePage() {
   const [popularLoading, setPopularLoading] = useState(true);
   const [popularError, setPopularError] = useState(false);
 
+  const [homeCategories, setHomeCategories] = useState<Category[]>(STATIC_CATEGORIES);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allArticlesRef = useRef<Article[]>([]);
+
+  useEffect(() => {
+    if (!API_BASE) return;
+    fetch(`${API_BASE}/categories`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((data: Category[]) => {
+        const topLevel = data.filter(c => (!c.status || c.status === 'active') && !c.parentId);
+        if (topLevel.length > 0) setHomeCategories(topLevel);
+      })
+      .catch(() => {/* keep static fallback */});
+  }, []);
 
   // Fetch all published articles once — used for both popular section and search
   const fetchArticles = useCallback(async () => {
@@ -164,85 +230,84 @@ export default function HomePage() {
       {/* MAIN */}
       <main className="container">
 
-        {/* CATEGORIES */}
+        {/* CATEGORIES — dynamic from DB, falls back to static list */}
         <div className="section">
           <p className="section-title">Browse by topic</p>
-          <div className="category-grid">
-            <Link href="/faq?cat=getting-started" className="cat-card" id="cat-getting-started">
-              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00AB4E' }}><i className="fas fa-rocket"></i></div>
-              <div><h3>Getting Started</h3><p>Account, KYC, first trade</p></div>
-            </Link>
-            <Link href="/faq?cat=account-opening" className="cat-card" id="cat-account-opening">
-              <div className="cat-icon" style={{ background: '#E6FAE6', color: '#00AB4E' }}><i className="fas fa-id-card"></i></div>
-              <div><h3>Account Opening</h3><p>KYC, documents, activation</p></div>
-            </Link>
-            <Link href="/faq?cat=trading" className="cat-card" id="cat-trading">
-              <div className="cat-icon" style={{ background: '#EFF6FF', color: '#3B82F6' }}><i className="fas fa-chart-line"></i></div>
-              <div><h3>Trading</h3><p>Orders, GTT, Basket, AMO</p></div>
-            </Link>
-            <Link href="/faq?cat=portfolio" className="cat-card" id="cat-portfolio">
-              <div className="cat-icon" style={{ background: '#FFF7ED', color: '#F97316' }}><i className="fas fa-briefcase"></i></div>
-              <div><h3>Portfolio &amp; Margin</h3><p>P&amp;L, Holdings, Pledge, MTF</p></div>
-            </Link>
-            <Link href="/faq?cat=funds" className="cat-card" id="cat-funds">
-              <div className="cat-icon" style={{ background: '#FAF5FF', color: '#A855F7' }}><i className="fas fa-wallet"></i></div>
-              <div><h3>Funds</h3><p>Add, withdraw, ledger</p></div>
-            </Link>
-            <Link href="/faq?cat=charges" className="cat-card" id="cat-charges">
-              <div className="cat-icon" style={{ background: '#FEF3C7', color: '#D97706' }}><i className="fas fa-tags"></i></div>
-              <div><h3>Charges &amp; Brokerage</h3><p>STT, GST, DP, brokerage plans</p></div>
-            </Link>
-            <Link href="/faq?cat=compliance" className="cat-card" id="cat-compliance">
-              <div className="cat-icon" style={{ background: '#FFF1F2', color: '#F43F5E' }}><i className="fas fa-shield-halved"></i></div>
-              <div><h3>Compliance &amp; Safety</h3><p>TPIN, eDIS, ASM/GSM, 2FA</p></div>
-            </Link>
-            <Link href="/faq?cat=mutual-funds" className="cat-card" id="cat-mf">
-              <div className="cat-icon" style={{ background: '#ECFDF5', color: '#10B981' }}><i className="fas fa-seedling"></i></div>
-              <div><h3>Mutual Funds</h3><p>SIP, lump sum, ELSS, redemption</p></div>
-            </Link>
-            <Link href="/faq?cat=ipo" className="cat-card" id="cat-ipo">
-              <div className="cat-icon" style={{ background: '#FFF1F2', color: '#F43F5E' }}><i className="fas fa-rocket"></i></div>
-              <div><h3>IPO</h3><p>Apply for IPOs, allotment status, listing</p></div>
-            </Link>
-            <Link href="/faq?cat=fo" className="cat-card" id="cat-fo">
-              <div className="cat-icon" style={{ background: '#FFFBEB', color: '#F59E0B' }}><i className="fas fa-bolt"></i></div>
-              <div><h3>F&amp;O</h3><p>Futures, options, margins, expiry</p></div>
-            </Link>
-            <Link href="/faq?cat=pledging" className="cat-card" id="cat-pledge">
-              <div className="cat-icon" style={{ background: '#F1F5F9', color: '#0F172A' }}><i className="fas fa-link"></i></div>
-              <div><h3>Pledging</h3><p>Collateral margin, shares pledge, haircut</p></div>
-            </Link>
-            <Link href="/faq?cat=mtf" className="cat-card" id="cat-mtf">
-              <div className="cat-icon" style={{ background: '#F5F3FF', color: '#8B5CF6' }}><i className="fas fa-layer-group"></i></div>
-              <div><h3>MTF</h3><p>Margin Trading Facility, leverage funding</p></div>
-            </Link>
-            <Link href="/faq?cat=tender-offers" className="cat-card" id="cat-tender">
-              <div className="cat-icon" style={{ background: '#F0F9FF', color: '#0284C7' }}><i className="fas fa-hand-holding-dollar"></i></div>
-              <div><h3>Tender Offers</h3><p>Buybacks, OFS, delisting participation</p></div>
-            </Link>
-            <Link href="/faq?cat=contact-faq" className="cat-card" id="cat-contact-faq">
-              <div className="cat-icon" style={{ background: '#EEF2FF', color: '#6366F1' }}><i className="fas fa-headset"></i></div>
-              <div><h3>Contact &amp; Help</h3><p>Support desk, office address, escalation</p></div>
-            </Link>
-            <Link href="/faq?cat=advanced" className="cat-card" id="cat-advanced">
-              <div className="cat-icon" style={{ background: '#F0F9FF', color: '#0284C7' }}><i className="fas fa-robot"></i></div>
-              <div><h3>Advanced</h3><p>Algo, MTF, Smallcase, Webhooks</p></div>
-            </Link>
-            <Link href="/faq?cat=account" className="cat-card" id="cat-account">
-              <div className="cat-icon" style={{ background: '#F0FDF4', color: '#22C55E' }}><i className="fas fa-user-circle"></i></div>
-              <div><h3>Account</h3><p>Profile, security, segments</p></div>
-            </Link>
-            <Link href="/faq?cat=reports" className="cat-card" id="cat-reports">
-              <div className="cat-icon" style={{ background: '#F8FAFC', color: '#64748B' }}><i className="fas fa-file-invoice"></i></div>
-              <div><h3>Reports</h3><p>Tax P&amp;L, contract notes, ledger</p></div>
-            </Link>
-            <Link href="/faq?cat=nri" className="cat-card" id="cat-nri">
-              <div className="cat-icon" style={{ background: '#F5F3FF', color: '#7C3AED' }}><i className="fas fa-globe"></i></div>
-              <div><h3>NRI / HUF Accounts</h3><p>NRE/NRO, PIS, repatriation</p></div>
-            </Link>
-            <Link href="/contact" className="cat-card" id="cat-contact-us">
-              <div className="cat-icon" style={{ background: '#FFF9C4', color: '#CA8A04' }}><i className="fas fa-headset"></i></div>
-              <div><h3>Contact Us</h3><p>Chat, call, raise ticket</p></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '4rem' }}>
+            {homeCategories.map((cat, idx) => {
+              const palette = CAT_PALETTE[idx % CAT_PALETTE.length];
+              const slug = normalise(cat.name);
+              const href = `/faq?cat=${cat.id !== slug ? cat.id : slug}`;
+              return (
+                <Link
+                  key={cat.id}
+                  href={href}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    padding: '1.75rem 1.25rem',
+                    background: 'var(--bg, #fff)',
+                    border: '1px solid var(--border, #e5e7eb)',
+                    borderRadius: '16px',
+                    textDecoration: 'none',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 20px -5px rgba(0,0,0,0.08)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
+                >
+                  <div style={{
+                    width: '52px', height: '52px', borderRadius: '14px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '1.35rem', marginBottom: '1rem', flexShrink: 0,
+                    background: palette.bg, color: palette.color,
+                  }}>
+                    <i className={cat.icon || 'fas fa-folder'}></i>
+                  </div>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark, #111)', marginBottom: '0.35rem', margin: '0 0 0.35rem' }}>{cat.name}</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted, #6b7280)', lineHeight: 1.4, margin: 0 }}>
+                    {cat.id === 'getting-started' ? 'Account, KYC, first trade' :
+                     cat.id === 'account-opening' ? 'KYC, documents, activation' :
+                     cat.id === 'trading' ? 'Orders, GTT, Basket, AMO' :
+                     cat.id === 'portfolio' ? 'P&L, Holdings, Pledge, MTF' :
+                     cat.id === 'funds' ? 'Add, withdraw, ledger' :
+                     cat.id === 'charges' ? 'STT, GST, DP, brokerage plans' :
+                     cat.id === 'compliance' ? 'TPIN, eDIS, ASM/GSM, 2FA' :
+                     cat.id === 'mutual-funds' ? 'SIP, lump sum, ELSS, redemption' :
+                     cat.id === 'ipo' ? 'Apply, allotment, listing' :
+                     cat.id === 'fo' ? 'Futures, options, margins, expiry' :
+                     cat.id === 'pledging' ? 'Collateral margin, haircut' :
+                     cat.id === 'mtf' ? 'Margin Trading Facility' :
+                     cat.id === 'tender-offers' ? 'Buybacks, OFS, delisting' :
+                     cat.id === 'contact-faq' ? 'Support desk, escalation' :
+                     cat.id === 'advanced' ? 'Algo, Smallcase, Webhooks' :
+                     cat.id === 'account' ? 'Profile, security, segments' :
+                     cat.id === 'reports' ? 'Tax P&L, contract notes' :
+                     cat.id === 'nri' ? 'NRE/NRO, PIS, repatriation' :
+                     'Browse articles'}
+                  </p>
+                </Link>
+              );
+            })}
+            <Link
+              href="/contact"
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                padding: '1.75rem 1.25rem', background: 'var(--bg, #fff)',
+                border: '1px solid var(--border, #e5e7eb)', borderRadius: '16px',
+                textDecoration: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 20px -5px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
+            >
+              <div style={{ width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem', marginBottom: '1rem', background: '#FFF9C4', color: '#CA8A04' }}>
+                <i className="fas fa-headset"></i>
+              </div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark, #111)', margin: '0 0 0.35rem' }}>Contact Us</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted, #6b7280)', lineHeight: 1.4, margin: 0 }}>Chat, call, raise ticket</p>
             </Link>
           </div>
         </div>
