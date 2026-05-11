@@ -106,7 +106,6 @@ function FAQContent() {
         // Extra DB top-level cats not in fallback are appended at the end.
         const dbTopLevel = active.filter(c => !c.parentId);
         const dbSubs = active.filter(c => c.parentId);
-        const dbTopNames = new Set(dbTopLevel.map(c => c.name.toLowerCase()));
         // Start with fallback, replace any that exist in DB by name
         const merged: Category[] = FALLBACK_CATEGORIES.map(f => {
           const dbMatch = dbTopLevel.find(d => d.name.toLowerCase() === f.name.toLowerCase());

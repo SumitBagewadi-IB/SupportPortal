@@ -111,13 +111,21 @@ export default function HomePage() {
     fetch(`${API_BASE}/categories`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data: Category[]) => {
-        const dbTopLevel = data.filter(c => (!c.status || c.status === 'active') && !c.parentId);
-        // Always start with the full static list, then add any DB categories not already covered
-        const staticNames = new Set(STATIC_CATEGORIES.map(c => c.name.toLowerCase()));
-        const extraFromDB = dbTopLevel.filter(c => !staticNames.has(c.name.toLowerCase()));
-        setHomeCategories([...STATIC_CATEGORIES, ...extraFromDB]);
+        const dbTopLevel = (data as Category[]).filter(c => (!c.status || c.status === 'active') && !c.parentId);
+        // 1. Start with the full static list — replace entries that exist in DB (preserves DB id/icon)
+        const merged: Category[] = STATIC_CATEGORIES.map(s => {
+          const dbMatch = dbTopLevel.find(d => d.name.toLowerCase() === s.name.toLowerCase());
+          return dbMatch || s;
+        });
+        // 2. Append any NEW top-level categories admins created that aren't in the static list
+        dbTopLevel.forEach(d => {
+          if (!STATIC_CATEGORIES.some(s => s.name.toLowerCase() === d.name.toLowerCase())) {
+            merged.push(d);
+          }
+        });
+        setHomeCategories(merged);
       })
-      .catch(() => {/* keep static fallback */});
+      .catch(() => {/* keep static fallback — all 18 always visible */});
   }, []);
 
   // Fetch all published articles once — used for both popular section and search
