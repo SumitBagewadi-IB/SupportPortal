@@ -195,8 +195,14 @@ function FAQContent() {
   // Filter articles based on navigation state
   const filtered = useMemo(() => articles.filter(a => {
     let matchesCat = true;
-    if (selectedSubId && selectedSub) {
-      matchesCat = articleMatchesCategory(a, selectedSub.name);
+    if (selectedSubId && selectedSub && selectedCat) {
+      const allSiblingSubs = getSubcategories(selectedCatId);
+      const taggedExactlyToThisSub = articleMatchesCategory(a, selectedSub.name);
+      // Also show parent-tagged articles that don't belong to any specific sibling subcategory
+      // This ensures existing articles tagged with a top-level name remain visible
+      const taggedToParentOnly = articleMatchesCategory(a, selectedCat.name) &&
+        !allSiblingSubs.some(s => s.id !== selectedSubId && articleMatchesCategory(a, s.name));
+      matchesCat = taggedExactlyToThisSub || taggedToParentOnly;
     } else if (selectedCatId && selectedCat) {
       // Show articles for the top-level category AND all its subcategories
       const subs = getSubcategories(selectedCatId);
@@ -224,8 +230,18 @@ function FAQContent() {
     ).length;
   };
 
-  const getSubCount = (sub: Category): number =>
-    articles.filter(a => articleMatchesCategory(a, sub.name)).length;
+  const getSubCount = (sub: Category): number => {
+    if (!sub.parentId) return articles.filter(a => articleMatchesCategory(a, sub.name)).length;
+    const parent = allCategories.find(c => c.id === sub.parentId);
+    const siblings = getSubcategories(sub.parentId);
+    return articles.filter(a => {
+      if (articleMatchesCategory(a, sub.name)) return true;
+      // Count parent-tagged articles that don't belong to any other sibling sub
+      if (parent && articleMatchesCategory(a, parent.name) &&
+          !siblings.some(s => s.id !== sub.id && articleMatchesCategory(a, s.name))) return true;
+      return false;
+    }).length;
+  };
 
   const heading = selectedSub?.name || selectedCat?.name || 'All Topics';
 
