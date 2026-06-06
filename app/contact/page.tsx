@@ -3,15 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { trackEvent, getSession } from '@/lib/analytics';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-
-const CATEGORIES = [
-  'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
-  'Funds', 'Charges & Brokerage', 'Compliance & Safety', 'Mutual Funds',
-  'IPO', 'F&O', 'Pledging', 'MTF', 'Tender Offers', 'Contact & Help',
-  'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
-];
+import { API_BASE } from '@/lib/api';
+import { STATIC_CATEGORY_NAMES as CATEGORIES } from '@/lib/constants';
 
 interface ArticleSuggestion {
   id: string;

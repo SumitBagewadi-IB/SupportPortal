@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/lib/analytics';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+import { API_BASE } from '@/lib/api';
 
 interface SearchResult {
   id: string;

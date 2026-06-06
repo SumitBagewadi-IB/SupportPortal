@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'rea
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { trackEvent } from '@/lib/analytics';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+import { API_BASE } from '@/lib/api';
+import { STATIC_CATEGORIES as FALLBACK_CATEGORIES, type Category } from '@/lib/constants';
 
 interface Article {
   id: string;
@@ -18,37 +18,6 @@ interface Article {
   updatedAt?: string;
   createdAt?: string;
 }
-
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  parentId: string | null;
-  sortOrder?: number;
-  status?: string;
-}
-
-// Fallback static categories used if /categories API is unavailable
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'getting-started', name: 'Getting Started',     icon: 'fas fa-rocket',               parentId: null },
-  { id: 'account-opening', name: 'Account Opening',     icon: 'fas fa-id-card',              parentId: null },
-  { id: 'trading',         name: 'Trading',             icon: 'fas fa-chart-line',           parentId: null },
-  { id: 'portfolio',       name: 'Portfolio & Margin',  icon: 'fas fa-briefcase',            parentId: null },
-  { id: 'funds',           name: 'Funds',               icon: 'fas fa-wallet',               parentId: null },
-  { id: 'ipo',             name: 'IPO',                 icon: 'fas fa-rocket',               parentId: null },
-  { id: 'fo',              name: 'F&O',                 icon: 'fas fa-bolt',                 parentId: null },
-  { id: 'pledging',        name: 'Pledging',            icon: 'fas fa-link',                 parentId: null },
-  { id: 'account',         name: 'Account',             icon: 'fas fa-user-circle',          parentId: null },
-  { id: 'reports',         name: 'Reports',             icon: 'fas fa-file-invoice',         parentId: null },
-  { id: 'contact-faq',     name: 'Contact & Help',      icon: 'fas fa-headset',              parentId: null },
-  { id: 'mtf',             name: 'MTF',                 icon: 'fas fa-layer-group',          parentId: null },
-  { id: 'tender-offers',   name: 'Tender Offers',       icon: 'fas fa-hand-holding-dollar',  parentId: null },
-  { id: 'charges',         name: 'Charges & Brokerage', icon: 'fas fa-tags',                 parentId: null },
-  { id: 'compliance',      name: 'Compliance & Safety', icon: 'fas fa-shield-halved',        parentId: null },
-  { id: 'mutual-funds',    name: 'Mutual Funds',        icon: 'fas fa-seedling',             parentId: null },
-  { id: 'nri',             name: 'NRI/HUF Accounts',   icon: 'fas fa-globe',                parentId: null },
-  { id: 'advanced',        name: 'Advanced',            icon: 'fas fa-robot',                parentId: null },
-];
 
 function normalise(s: string) {
   return s?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || '';

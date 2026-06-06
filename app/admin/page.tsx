@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+import { API_BASE } from '@/lib/api';
+import { STATIC_CATEGORY_NAMES as FALLBACK_CATEGORIES } from '@/lib/constants';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 900; // 15 minutes — matches server-side lockout
@@ -12,13 +12,6 @@ const PAGE_SIZE = 10;
 const MAX_CONTENT = 50000;
 const WARN_CONTENT = 45000;
 const TICKETS_PAGE_SIZE = 10;
-
-const FALLBACK_CATEGORIES = [
-  'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
-  'Funds', 'Charges & Brokerage', 'Compliance & Safety', 'Mutual Funds',
-  'IPO', 'F&O', 'Pledging', 'MTF', 'Tender Offers', 'Contact & Help',
-  'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
-];
 
 interface Category {
   id: string;
@@ -676,14 +669,14 @@ export default function AdminPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-            <button onClick={fetchArticles} disabled={loading} title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
+            <button onClick={fetchArticles} disabled={loading} aria-label="Refresh articles" title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
               <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
               <span className="hide-mobile">{lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}</span>
             </button>
-            <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
+            <button onClick={toggleDarkMode} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
               <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
-            <button onClick={logout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <button onClick={logout} aria-label="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
               <i className="fas fa-right-from-bracket"></i>
               <span className="hide-mobile">Sign out</span>
             </button>
@@ -798,7 +791,7 @@ export default function AdminPage() {
                   <option value="title">Sort: Title A–Z</option>
                   <option value="category">Sort: Category</option>
                 </select>
-                <button onClick={fetchArticles} title="Refresh" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', flexShrink: 0 }}>
+                <button onClick={fetchArticles} aria-label="Refresh articles" title="Refresh" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', flexShrink: 0 }}>
                   <i className="fas fa-rotate-right"></i>
                 </button>
               </div>

@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+import { API_BASE, getMasterToken, getMasterHeaders, masterUrl } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,19 +73,7 @@ interface Article {
 
 type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics' | 'categories';
 
-// Master session token is obtained via POST /auth/masterlogin (server-side validation).
-// The raw master password is NEVER stored in the browser bundle or client state.
-function getMasterToken(): string {
-  return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') || '' : '';
-}
-function getMasterHeaders(): Record<string, string> {
-  return { 'Content-Type': 'application/json' };
-}
-function masterUrl(path: string): string {
-  const token = getMasterToken();
-  const sep = path.includes('?') ? '&' : '?';
-  return `${API_BASE}${path}${token ? `${sep}_mt=${encodeURIComponent(token)}` : ''}`;
-}
+// Master token helpers (getMasterToken, getMasterHeaders, masterUrl) are imported from @/lib/api
 
 const ACTION_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
   CREATE_FAQ:          { label: 'FAQ Created',          icon: 'fa-plus-circle',   color: '#065F46', bg: '#D1FAE5' },
@@ -367,10 +354,13 @@ export default function MasterAdminPage() {
     return !q || a.title?.toLowerCase().includes(q) || a.category?.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
   });
 
-  const exportCSV = (data: Record<string, unknown>[], filename: string) => {
+  // Accept any object array — TypeScript's generic relaxes the parameter so
+  // callers don't need the `as unknown as Record<string, unknown>[]` cast that
+  // was previously required by the stricter signature.
+  const exportCSV = <T extends object>(data: T[], filename: string) => {
     if (!data.length) return;
     const keys = Object.keys(data[0]);
-    const rows = [keys.join(','), ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(','))];
+    const rows = [keys.join(','), ...data.map(row => keys.map(k => JSON.stringify((row as Record<string, unknown>)[k] ?? '')).join(','))];
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -485,14 +475,14 @@ export default function MasterAdminPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button onClick={fetchAll} disabled={loading} title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
+          <button onClick={fetchAll} disabled={loading} aria-label="Refresh data" title={lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: loading ? 0.6 : 1 }}>
             <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
             <span className="hide-mobile">{lastRefreshed ? `Refreshed ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}</span>
           </button>
-          <button onClick={toggleDarkMode} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
+          <button onClick={toggleDarkMode} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
             <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
-          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} aria-label="Sign out" title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <i className="fas fa-sign-out-alt"></i>
             <span className="hide-mobile">Sign out</span>
           </button>
@@ -773,7 +763,7 @@ export default function MasterAdminPage() {
                   <option value="CREATE_TICKET">Created Ticket</option>
                   <option value="LOGIN">Admin Login</option>
                 </select>
-                <button onClick={() => exportCSV(auditLogs as unknown as Record<string, unknown>[], 'audit-log.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <button onClick={() => exportCSV(auditLogs, 'audit-log.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <i className="fas fa-download"></i> Export CSV
                 </button>
               </div>
@@ -845,7 +835,7 @@ export default function MasterAdminPage() {
                       { metric: 'Not Helpful Feedback', value: analytics.faq_feedback_not_helpful },
                       { metric: 'Overall Satisfaction %', value: totalFb > 0 ? `${Math.round((analytics.faq_feedback_helpful / totalFb) * 100)}%` : '—' },
                     ];
-                    exportCSV(rows as unknown as Record<string, unknown>[], `analytics-${analyticsDays}d.csv`);
+                    exportCSV(rows, `analytics-${analyticsDays}d.csv`);
                   }} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                     <i className="fas fa-download"></i> Export CSV
                   </button>
@@ -1094,7 +1084,7 @@ export default function MasterAdminPage() {
                   <option value="in_progress">In Progress</option>
                   <option value="solved">Solved / Resolved</option>
                 </select>
-                <button onClick={() => exportCSV(tickets as unknown as Record<string, unknown>[], 'tickets.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <button onClick={() => exportCSV(tickets, 'tickets.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <i className="fas fa-download"></i> Export CSV
                 </button>
               </div>
@@ -1155,7 +1145,7 @@ export default function MasterAdminPage() {
               <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)' }}>FAQ Articles <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '1rem' }}>({filteredArticles.length}{faqSearch ? ` of ${articles.length}` : ''})</span></h2>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <input value={faqSearch} onChange={e => setFaqSearch(e.target.value)} placeholder="Search articles…" style={{ padding: '0.5rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', width: '100%', maxWidth: 200 }} />
-                <button onClick={() => exportCSV(articles as unknown as Record<string, unknown>[], 'faq-articles.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <button onClick={() => exportCSV(articles, 'faq-articles.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <i className="fas fa-download"></i> Export CSV
                 </button>
               </div>
