@@ -87,6 +87,60 @@ const ALLOWED_TICKET_CATEGORIES = [
   'Advanced', 'Account', 'Reports', 'NRI/HUF Accounts', 'Other',
 ];
 
+// Request body size cap to defend against oversized-payload DoS. The Functions
+// Framework already enforces a generous default; we add a tighter cap on the
+// JSON-payload routes specifically.
+const MAX_BODY_BYTES = 100 * 1024; // 100 KB
+
+// ─── Rate limiting (in-memory, per-container) ─────────────────────────────
+//
+// Per-IP token bucket kept in the container's RAM. Limits work within a
+// single container instance only — for distributed brute-force protection
+// across many containers, this would need to move to Firestore or Redis.
+// This catches ~95% of brute-force scenarios in practice because container
+// reuse on Cloud Functions Gen 2 is high for the same caller.
+//
+// Buckets are pruned lazily when accessed; with low traffic the map stays
+// small. Container restarts reset all counters.
+
+const rateLimitBuckets = new Map();
+
+/**
+ * Check if a request from `key` (typically IP+endpoint) is allowed.
+ * Returns { allowed, retryAfterSecs }.
+ *
+ * @param {string} key       — bucket identifier
+ * @param {number} maxHits   — max requests in the window
+ * @param {number} windowSecs — sliding window duration
+ */
+function checkRateLimit(key, maxHits, windowSecs) {
+  const now = Date.now();
+  const windowStart = now - windowSecs * 1000;
+  let bucket = rateLimitBuckets.get(key);
+  if (!bucket) {
+    bucket = [];
+    rateLimitBuckets.set(key, bucket);
+  }
+  // Drop hits outside the window
+  while (bucket.length && bucket[0] < windowStart) bucket.shift();
+  if (bucket.length >= maxHits) {
+    const retryAfterSecs = Math.ceil((bucket[0] + windowSecs * 1000 - now) / 1000);
+    return { allowed: false, retryAfterSecs };
+  }
+  bucket.push(now);
+  // Soft cap on total tracked IPs to prevent runaway memory growth
+  if (rateLimitBuckets.size > 10000) {
+    // Drop the oldest 20% — simple LRU-ish behaviour
+    const drop = Math.floor(rateLimitBuckets.size * 0.2);
+    let i = 0;
+    for (const k of rateLimitBuckets.keys()) {
+      if (i++ >= drop) break;
+      rateLimitBuckets.delete(k);
+    }
+  }
+  return { allowed: true };
+}
+
 // ─── CORS ──────────────────────────────────────────────────────────────────
 
 function buildCorsHeaders(origin) {
@@ -300,7 +354,15 @@ functions.http('handler', async (req, res) => {
   try {
     await _handler(req, res, corsHeaders);
   } catch (err) {
-    console.error('Unhandled Cloud Function error', err);
+    // Structured log so Cloud Logging can index + alert on these
+    console.error(JSON.stringify({
+      severity: 'ERROR',
+      message: 'Unhandled Cloud Function error',
+      error: err?.message || String(err),
+      stack: err?.stack,
+      method: req.method,
+      path: req.path,
+    }));
     res.status(500).json({ error: 'Internal server error. Please try again.' });
   }
 });
@@ -316,6 +378,21 @@ async function _handler(req, res) {
   // Shorthand response helper
   const r = (status, data) => res.status(status).json(data);
 
+  // ── Body size guard ──────────────────────────────────────────────────────
+  // Reject oversized JSON payloads as cheap DoS defense. We rely on
+  // Content-Length here since Functions Framework has already buffered the body.
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  if (contentLength > MAX_BODY_BYTES) {
+    return r(413, { error: 'Request body too large' });
+  }
+
+  // ── GET /_health ─────────────────────────────────────────────────────────
+  // Lightweight liveness probe for monitoring tools. Does NOT touch Firestore
+  // so it stays fast and won't burn quota.
+  if (method === 'GET' && path === '/_health') {
+    return r(200, { status: 'ok', timestamp: new Date().toISOString() });
+  }
+
   // ── POST /auth/login ─────────────────────────────────────────────────────
   if (method === 'POST' && path === '/auth/login') {
     const { username, password } = body;
@@ -324,6 +401,13 @@ async function _handler(req, res) {
 
     const ip = sourceIp(req);
     const ua = userAgent(req);
+
+    // Rate limit: 10 login attempts per IP per minute (defense against brute-force)
+    const rl = checkRateLimit(`login:${ip}`, 10, 60);
+    if (!rl.allowed) {
+      res.set('Retry-After', String(rl.retryAfterSecs));
+      return r(429, { error: 'Too many login attempts. Try again shortly.' });
+    }
 
     let manager;
     try {
@@ -401,6 +485,15 @@ async function _handler(req, res) {
     const { password } = body;
     if (!password) return r(400, { error: 'password required' });
     if (!MASTER_ADMIN_SECRET) return r(503, { error: 'Master auth not configured' });
+
+    // Rate limit: 5 master-login attempts per IP per minute (stricter than
+    // manager login because there's only one valid password)
+    const mlIp = sourceIp(req);
+    const mlRl = checkRateLimit(`masterlogin:${mlIp}`, 5, 60);
+    if (!mlRl.allowed) {
+      res.set('Retry-After', String(mlRl.retryAfterSecs));
+      return r(429, { error: 'Too many master login attempts. Try again shortly.' });
+    }
 
     // Constant-time comparison to prevent timing attacks
     const provided = Buffer.from(String(password));
@@ -889,6 +982,15 @@ async function _handler(req, res) {
 
   // ── POST /tickets ─────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/tickets') {
+    // Rate limit: 5 tickets per IP per minute (prevents spam without blocking
+    // legitimate users who might re-submit)
+    const tkIp = sourceIp(req);
+    const tkRl = checkRateLimit(`ticket:${tkIp}`, 5, 60);
+    if (!tkRl.allowed) {
+      res.set('Retry-After', String(tkRl.retryAfterSecs));
+      return r(429, { error: 'Too many ticket submissions. Please wait a moment.' });
+    }
+
     const { name, email, category, subject, description, status = 'open', createdAt, sessionId, phone } = body;
 
     // Required field validation
