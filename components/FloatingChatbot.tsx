@@ -1,154 +1,290 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { trackEvent } from '@/lib/analytics';
 
-type Persona = 'general' | 'technical' | 'billing';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
-interface Message {
-  role: 'bot' | 'user';
-  text: string;
-  options?: string[];
-  isTyping?: boolean;
+interface SearchResult {
+  id: string;
+  title: string;
+  category: string;
+  snippet: string;
+  updatedAt?: string;
 }
 
-const personas: Record<Persona, { name: string; icon: string; color: string }> = {
-  general:   { name: 'Indiabulls Securities Assistant', icon: 'fa-robot',              color: '#3B82F6' },
-  technical: { name: 'Tech Guru',                       icon: 'fa-microchip',           color: '#00AB4E' },
-  billing:   { name: 'Finance Pro',                     icon: 'fa-file-invoice-dollar', color: '#A855F7' },
-};
+interface Message {
+  id: number;
+  role: 'bot' | 'user';
+  text?: string;
+  isStreaming?: boolean;
+  results?: SearchResult[];
+  query?: string;              // The query that produced these results — used for highlighting
+  isTyping?: boolean;
+  isSkeleton?: boolean;        // Show skeleton card placeholders while searching
+  noResults?: boolean;
+  showTicketCTA?: boolean;
+  followUps?: string[];        // Suggested follow-up queries based on top categories
+}
 
-const flows: Record<string, { text: string; options: string[] }[]> = {
-  gtt: [
-    { text: "GTT (Good Till Trigger) is great for long-term targets. Are you trying to place a Buy or Sell GTT?", options: ['Buy GTT', 'Sell GTT'] },
-    { text: "Got it. Search for the stock, click the GTT icon (clock) near Buy/Sell. Do you see it?", options: ['Yes', 'No'] },
-    { text: "Great! Enter your trigger price and limit price. It stays active for 1 year. Need more help?", options: ['Yes please', "I'm good"] },
-  ],
-  funds: [
-    { text: "Adding funds is instant via UPI. Have you tried the 'Add Funds' button yet?", options: ['Yes', 'Where is it?'] },
-    { text: "It's in the top navigation under 'Funds'. What issue are you facing?", options: ['Payment Failed', 'Limit Error'] },
-    { text: "If payment failed but money was deducted, it reconciles in 2 hours. Should I check your ledger?", options: ['Yes, please', "No, I'll wait"] },
-  ],
-};
-
-const kbArticles = [
-  { id: 'open-account', title: 'How do I open an account?',          cat: 'getting-started' },
-  { id: 'gtt',          title: 'How to place a GTT order?',           cat: 'trading' },
-  { id: 'basket',       title: 'How to execute a Basket Order?',      cat: 'trading' },
-  { id: 'add-funds',    title: 'How to add funds to my account?',     cat: 'funds' },
-  { id: 'withdraw',     title: 'How long does fund withdrawal take?', cat: 'funds' },
-  { id: 'ipo',          title: 'How to apply for an IPO?',            cat: 'ipo' },
-  { id: 'segments',     title: 'How to activate F&O segments?',       cat: 'account' },
+const POPULAR_TOPICS = [
+  { label: 'Open an account',      q: 'open account' },
+  { label: 'Add funds',            q: 'how to add funds' },
+  { label: 'Apply for IPO',        q: 'apply for IPO' },
+  { label: 'GTT order',            q: 'GTT order' },
+  { label: 'Brokerage charges',    q: 'brokerage charges' },
+  { label: 'F&O segment',          q: 'F&O activation' },
 ];
+
+// Suggested follow-up queries when search returns 0 results
+const ZERO_RESULT_HINTS = [
+  'How to open an account',
+  'Add funds to my account',
+  'Apply for IPO',
+  'Brokerage charges',
+];
+
+// Map a category name → a suggested follow-up query
+function followUpForCategory(category: string): string | null {
+  const map: Record<string, string> = {
+    'Account Opening':     'How long does account opening take',
+    'Trading':             'How to place a market order',
+    'Funds':               'How long does withdrawal take',
+    'Charges & Brokerage': 'What are AMC charges',
+    'Mutual Funds':        'How to start a SIP',
+    'IPO':                 'IPO allotment process',
+    'F&O':                 'How to activate F&O segment',
+    'Reports':             'How to download contract notes',
+    'MTF':                 'What is MTF interest rate',
+    'Pledging':            'How does pledging work',
+  };
+  return map[category] || null;
+}
+
+let msgIdCounter = 0;
+const nextId = () => ++msgIdCounter;
+
+// Escape special regex characters in a string
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlight all occurrences of the query words within text using <mark>.
+// Splits the query into words, matches each one case-insensitively.
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  const parts = useMemo(() => {
+    if (!query || !text) return [{ text, isMatch: false }];
+    const words = query
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length >= 2);
+    if (words.length === 0) return [{ text, isMatch: false }];
+
+    // Build a single regex matching any of the words (longest first to avoid sub-matches)
+    const sorted = [...new Set(words)].sort((a, b) => b.length - a.length);
+    const re = new RegExp(`(${sorted.map(escapeRegex).join('|')})`, 'gi');
+
+    const segments: { text: string; isMatch: boolean }[] = [];
+    let lastIdx = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      if (match.index > lastIdx) {
+        segments.push({ text: text.slice(lastIdx, match.index), isMatch: false });
+      }
+      segments.push({ text: match[0], isMatch: true });
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < text.length) {
+      segments.push({ text: text.slice(lastIdx), isMatch: false });
+    }
+    return segments;
+  }, [text, query]);
+
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.isMatch ? (
+          <mark
+            key={i}
+            style={{
+              background: 'rgba(0,171,78,0.18)',
+              color: 'inherit',
+              padding: '0 2px',
+              borderRadius: 2,
+              fontWeight: 600,
+            }}
+          >
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        )
+      )}
+    </>
+  );
+}
 
 export default function FloatingChatbot() {
   const [open, setOpen] = useState(false);
-  const [persona, setPersona] = useState<Persona | null>(null);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', text: 'Hello! Please select a persona specialized for your query:' },
+    { id: nextId(), role: 'bot', text: "Hi! I'm your Indiabulls Securities assistant. Ask me anything about your account, trading, funds, or charges." },
   ]);
   const [inputVal, setInputVal] = useState('');
-  const [showInput, setShowInput] = useState(false);
-  const currentFlow = useRef<string | null>(null);
-  const flowStep = useRef(0);
+  const [searching, setSearching] = useState(false);
+  const [lastQuery, setLastQuery] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
+  // Smooth auto-scroll on any message update (including during streaming)
   useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    if (bodyRef.current) {
+      bodyRef.current.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' });
+    }
   }, [messages]);
 
-  const addMessage = (text: string, role: 'bot' | 'user', options?: string[]) => {
-    setMessages(prev => [...prev, { role, text, options }]);
+  const addMessage = (msg: Omit<Message, 'id'>) => {
+    const id = nextId();
+    setMessages(prev => [...prev, { ...msg, id }]);
+    return id;
   };
 
-  const showTyping = () => {
-    setMessages(prev => [...prev, { role: 'bot', text: '', isTyping: true }]);
+  const streamTextIntoMessage = (
+    messageId: number,
+    fullText: string,
+    charsPerTick = 2,
+    tickMs = 25
+  ): Promise<void> => {
+    return new Promise(resolve => {
+      let i = 0;
+      const interval = setInterval(() => {
+        i = Math.min(i + charsPerTick, fullText.length);
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === messageId ? { ...m, text: fullText.slice(0, i), isStreaming: i < fullText.length } : m
+          )
+        );
+        if (i >= fullText.length) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, tickMs);
+    });
   };
 
-  const removeTypingThenAdd = (text: string, options?: string[]) => {
-    setTimeout(() => {
-      setMessages(prev => [...prev.filter(m => !m.isTyping), { role: 'bot', text, options }]);
-    }, 1000);
-  };
+  const runSearch = async (q: string) => {
+    if (!q.trim() || !API_BASE || searching) return;
+    setLastQuery(q);
+    addMessage({ role: 'user', text: q });
 
-  const handleResponse = (text: string) => {
-    const lower = text.toLowerCase();
+    // Show skeleton placeholder cards while fetching (replaces dot-typing for results)
+    const skeletonId = addMessage({ role: 'bot', isSkeleton: true });
+    setSearching(true);
+    trackEvent({ eventType: 'chatbot_message', chatInput: q.slice(0, 200) });
 
-    if (lower.includes('gtt')) {
-      currentFlow.current = 'gtt';
-      flowStep.current = 0;
-      removeTypingThenAdd(flows.gtt[0].text, flows.gtt[0].options);
-      return;
-    }
-    if (lower.includes('fund')) {
-      currentFlow.current = 'funds';
-      flowStep.current = 0;
-      removeTypingThenAdd(flows.funds[0].text, flows.funds[0].options);
-      return;
-    }
-    if (lower.includes('main menu') || lower.includes('back')) {
-      currentFlow.current = null;
-      flowStep.current = 0;
-      removeTypingThenAdd("Sure! What else can I help you with?", ['GTT Issues', 'Funds Help', 'Open Account']);
-      return;
-    }
+    try {
+      const res = await fetch(`${API_BASE}/faq/search?q=${encodeURIComponent(q)}&limit=5`);
+      const data = await res.json();
+      // Remove skeleton
+      setMessages(prev => prev.filter(m => m.id !== skeletonId));
 
-    const matches = kbArticles.filter(a =>
-      a.title.toLowerCase().includes(lower) || a.id.toLowerCase().includes(lower)
-    );
-    if (matches.length > 0) {
-      const links = matches.map(a =>
-        `<a href="/faq?cat=${a.cat}" style="color:var(--green);font-weight:600;text-decoration:underline;display:block;margin-bottom:4px;">${a.title}</a>`
-      ).join('');
-      removeTypingThenAdd("Here's what I found in our Knowledge Base:<br><br>" + links);
-    } else {
-      removeTypingThenAdd("I'm not sure about that. Try asking about 'GTT' or 'Funds', or say 'Main Menu' to restart.");
-    }
-  };
+      if (data.results && data.results.length > 0) {
+        const count = data.results.length;
+        const introText =
+          count === 1
+            ? "Here's what I found:"
+            : count >= 5
+            ? "This is a popular topic — here are the most relevant articles:"
+            : `I found ${count} articles that should help:`;
 
-  const handleFlowSelection = (option: string) => {
-    addMessage(option, 'user');
-    showTyping();
-    const flow = currentFlow.current;
-    if (flow && flows[flow]) {
-      flowStep.current++;
-      const step = flows[flow][flowStep.current];
-      if (step) {
-        removeTypingThenAdd(step.text, step.options);
+        // Build follow-ups from top categories (dedupe, max 3)
+        const followUps = Array.from(
+          new Set(
+            data.results
+              .map((r: SearchResult) => followUpForCategory(r.category))
+              .filter((s: string | null): s is string => Boolean(s))
+          )
+        ).slice(0, 3) as string[];
+
+        const botMsgId = addMessage({
+          role: 'bot',
+          text: '',
+          isStreaming: true,
+          results: data.results,
+          query: q,
+          followUps,
+        });
+        await streamTextIntoMessage(botMsgId, introText);
+
+        trackEvent({ eventType: 'search', searchTerm: q.slice(0, 200), searchResultCount: count });
       } else {
-        currentFlow.current = null;
-        flowStep.current = 0;
-        removeTypingThenAdd("Glad I could help! Is there anything else?", ['Back to FAQ', 'Main Menu']);
+        const introText = "I couldn't find an article matching that. Try one of these instead, or create a support ticket:";
+        const botMsgId = addMessage({
+          role: 'bot',
+          text: '',
+          isStreaming: true,
+          noResults: true,
+          showTicketCTA: true,
+          query: q,
+        });
+        await streamTextIntoMessage(botMsgId, introText);
+        trackEvent({ eventType: 'search', searchTerm: q.slice(0, 200), searchResultCount: 0 });
       }
-    } else {
-      handleResponse(option);
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== skeletonId));
+      addMessage({
+        role: 'bot',
+        text: 'Sorry, something went wrong. Please try again or browse our Knowledge Base directly.',
+      });
+    } finally {
+      setSearching(false);
     }
-  };
-
-  const handlePersonaSelect = (p: Persona) => {
-    setPersona(p);
-    setShowInput(true);
-    trackEvent({ eventType: 'chatbot_persona_select', persona: p });
-    const info = personas[p];
-    addMessage(`Switched to ${info.name}. I'm ready to help with your ${p} queries!`, 'bot', ['GTT Issues', 'Funds Help', 'Open Account']);
   };
 
   const handleSend = () => {
     const text = inputVal.trim();
-    if (!text) return;
-    addMessage(text, 'user');
+    if (!text || searching) return;
     setInputVal('');
-    trackEvent({ eventType: 'chatbot_message', chatInput: text.slice(0, 200), persona: persona || undefined });
-    showTyping();
-    setTimeout(() => handleResponse(text), 1200);
+    runSearch(text);
   };
 
-  const currentPersonaInfo = persona ? personas[persona] : null;
+  const handleTopicClick = (q: string) => {
+    if (searching) return;
+    runSearch(q);
+  };
+
+  const handleResultClick = (r: SearchResult) => {
+    trackEvent({
+      eventType: 'article_view',
+      articleId: r.id,
+      articleTitle: r.title,
+      category: r.category,
+    });
+  };
+
+  const handleCopyLink = (r: SearchResult, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/faq/?q=${encodeURIComponent(r.title)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(r.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    }).catch(() => {});
+  };
 
   return (
     <div className="chatbot-container">
       {/* Floating bubble */}
-      <button className="chatbot-bubble" onClick={() => { const opening = !open; setOpen(o => !o); if (opening) trackEvent({ eventType: 'chatbot_open' }); }} aria-label="Open support chat">
+      <button
+        className="chatbot-bubble"
+        onClick={() => {
+          const opening = !open;
+          setOpen(o => !o);
+          if (opening) trackEvent({ eventType: 'chatbot_open' });
+        }}
+        aria-label="Open support chat"
+      >
         <i className="fas fa-comment-dots"></i>
         <span className="bubble-ping"></span>
       </button>
@@ -158,12 +294,12 @@ export default function FloatingChatbot() {
         {/* Header */}
         <div className="chat-header">
           <div className="header-info">
-            <div className="bot-avatar" style={currentPersonaInfo ? { background: currentPersonaInfo.color } : {}}>
-              <i className={`fas ${currentPersonaInfo ? currentPersonaInfo.icon : 'fa-robot'}`}></i>
+            <div className="bot-avatar" style={{ background: '#00AB4E' }}>
+              <i className="fas fa-robot"></i>
             </div>
             <div>
-              <h4>{currentPersonaInfo ? currentPersonaInfo.name : 'Indiabulls Securities Assistant'}</h4>
-              <span className="online-status">Online · Returns in 2h</span>
+              <h4>Indiabulls Securities Assistant</h4>
+              <span className="online-status">Online · Avg. reply instant</span>
             </div>
           </div>
           <button className="chat-close" onClick={() => setOpen(false)} aria-label="Close chat">
@@ -173,56 +309,251 @@ export default function FloatingChatbot() {
 
         {/* Messages body */}
         <div className="chat-body" ref={bodyRef}>
-          {messages.map((msg, i) => (
-            <div key={i}>
-              {msg.isTyping ? (
+          {messages.map((msg) => (
+            <div key={msg.id}>
+              {msg.isSkeleton ? (
+                <div style={{ marginLeft: '2.5rem', padding: '0.5rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {[0, 1, 2].map(i => (
+                    <div
+                      key={i}
+                      className="chatbot-skeleton-card"
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        background: 'var(--bg-subtle, #F9FAFB)',
+                        border: '1px solid var(--border, #E5E7EB)',
+                        borderRadius: '0.5rem',
+                      }}
+                    >
+                      <div className="chatbot-skeleton-line" style={{ width: '30%', height: 8, marginBottom: 8, borderRadius: 3 }}></div>
+                      <div className="chatbot-skeleton-line" style={{ width: '85%', height: 12, marginBottom: 6, borderRadius: 3 }}></div>
+                      <div className="chatbot-skeleton-line" style={{ width: '70%', height: 10, borderRadius: 3 }}></div>
+                    </div>
+                  ))}
+                </div>
+              ) : msg.isTyping ? (
                 <div className="message bot typing">
                   <div className="msg-content">
-                    <span className="dot"></span><span className="dot"></span><span className="dot"></span>
+                    <span className="dot"></span>
+                    <span className="dot"></span>
+                    <span className="dot"></span>
                   </div>
                 </div>
               ) : (
-                <div className={`message ${msg.role}`}>
-                  <div className="msg-content" dangerouslySetInnerHTML={{ __html: msg.text }} />
-                </div>
-              )}
-              {msg.options && (
-                <div className="quick-actions">
-                  {msg.options.map((opt, j) => (
-                    <button key={j} className="action-chip" onClick={() => handleFlowSelection(opt)}>{opt}</button>
-                  ))}
-                </div>
+                <>
+                  <div className={`message ${msg.role}`}>
+                    <div className="msg-content">
+                      {msg.text}
+                      {msg.isStreaming && <span className="streaming-cursor" aria-hidden="true">▎</span>}
+                    </div>
+                  </div>
+
+                  {/* Article result cards — appear after streaming completes */}
+                  {msg.results && msg.results.length > 0 && !msg.isStreaming && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem 0', marginLeft: '2.5rem' }}>
+                      {msg.results.map((r, idx) => (
+                        <div
+                          key={r.id}
+                          className="chatbot-result-card"
+                          style={{
+                            position: 'relative',
+                            animation: `chatbotCardFadeIn 0.35s ease both`,
+                            animationDelay: `${idx * 60}ms`,
+                          }}
+                        >
+                          <Link
+                            href={`/faq/?q=${encodeURIComponent(r.title)}`}
+                            onClick={() => handleResultClick(r)}
+                            style={{
+                              display: 'block',
+                              padding: '0.65rem 0.85rem',
+                              paddingRight: '2.5rem',
+                              background: 'var(--bg-subtle, #F9FAFB)',
+                              border: '1px solid var(--border, #E5E7EB)',
+                              borderRadius: '0.5rem',
+                              textDecoration: 'none',
+                              color: 'inherit',
+                              transition: 'border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#00AB4E';
+                              e.currentTarget.style.background = 'rgba(0,171,78,0.04)';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,171,78,0.08)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = '';
+                              e.currentTarget.style.background = '';
+                              e.currentTarget.style.transform = '';
+                              e.currentTarget.style.boxShadow = '';
+                            }}
+                          >
+                            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#00AB4E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                              {r.category}
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.3, marginBottom: '0.2rem', color: 'var(--text, #111827)' }}>
+                              <HighlightedText text={r.title} query={msg.query || ''} />
+                            </div>
+                            {r.snippet && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #6B7280)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                <HighlightedText text={r.snippet} query={msg.query || ''} />
+                              </div>
+                            )}
+                          </Link>
+
+                          {/* Copy link button */}
+                          <button
+                            onClick={(e) => handleCopyLink(r, e)}
+                            aria-label="Copy article link"
+                            title={copiedId === r.id ? 'Copied!' : 'Copy link'}
+                            style={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              width: 28,
+                              height: 28,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: copiedId === r.id ? '#00AB4E' : 'transparent',
+                              color: copiedId === r.id ? 'white' : 'var(--text-muted, #6B7280)',
+                              border: 'none',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (copiedId !== r.id) {
+                                e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
+                                e.currentTarget.style.color = '#00AB4E';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (copiedId !== r.id) {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-muted, #6B7280)';
+                              }
+                            }}
+                          >
+                            <i className={`fas ${copiedId === r.id ? 'fa-check' : 'fa-link'}`}></i>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Follow-up suggestion chips — after results */}
+                  {msg.followUps && msg.followUps.length > 0 && !msg.isStreaming && (
+                    <div style={{
+                      marginLeft: '2.5rem',
+                      marginTop: '0.5rem',
+                      animation: 'chatbotCardFadeIn 0.35s ease both',
+                      animationDelay: `${(msg.results?.length || 0) * 60 + 100}ms`,
+                    }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted, #6B7280)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+                        You might also ask
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {msg.followUps.map((fu) => (
+                          <button
+                            key={fu}
+                            className="action-chip"
+                            onClick={() => handleTopicClick(fu)}
+                            disabled={searching}
+                          >
+                            {fu}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty-state actions */}
+                  {msg.showTicketCTA && !msg.isStreaming && (
+                    <div style={{ marginLeft: '2.5rem', marginTop: '0.5rem', animation: 'chatbotCardFadeIn 0.35s ease both' }}>
+                      {/* Suggested searches when no result */}
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted, #6B7280)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+                        Try one of these
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                        {ZERO_RESULT_HINTS.map(h => (
+                          <button
+                            key={h}
+                            className="action-chip"
+                            onClick={() => handleTopicClick(h)}
+                            disabled={searching}
+                          >
+                            {h}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <Link
+                          href={`/contact/?subject=${encodeURIComponent(lastQuery)}`}
+                          className="action-chip"
+                          style={{ background: '#00AB4E', color: 'white', borderColor: '#00AB4E' }}
+                          onClick={() =>
+                            trackEvent({
+                              eventType: 'ticket_submit',
+                              ticketCategory: 'chatbot_fallback',
+                              chatInput: lastQuery.slice(0, 200),
+                            })
+                          }
+                        >
+                          <i className="fas fa-headset" style={{ marginRight: '0.4rem' }}></i>
+                          Create a ticket
+                        </Link>
+                        <Link href="/faq/" className="action-chip">
+                          <i className="fas fa-book" style={{ marginRight: '0.4rem' }}></i>
+                          Browse Knowledge Base
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
 
-          {!persona && (
-            <div className="persona-selection">
-              <button className="persona-btn" onClick={() => handlePersonaSelect('general')}>
-                <i className="fas fa-robot"></i><span>General Assistant</span>
-              </button>
-              <button className="persona-btn" onClick={() => handlePersonaSelect('technical')}>
-                <i className="fas fa-microchip"></i><span>Technical Support</span>
-              </button>
-              <button className="persona-btn" onClick={() => handlePersonaSelect('billing')}>
-                <i className="fas fa-file-invoice-dollar"></i><span>Billing &amp; Funds</span>
-              </button>
+          {/* Popular topics — shown when chat is fresh */}
+          {messages.length === 1 && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted, #6B7280)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+                Popular topics
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {POPULAR_TOPICS.map((t) => (
+                  <button
+                    key={t.q}
+                    className="action-chip"
+                    onClick={() => handleTopicClick(t.q)}
+                    disabled={searching}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Input footer */}
-        <div className="chat-footer" style={{ display: showInput ? 'flex' : 'none' }}>
+        <div className="chat-footer">
           <input
             type="text"
-            placeholder="Type your question..."
+            placeholder="Ask anything..."
             autoComplete="off"
             value={inputVal}
             maxLength={300}
+            disabled={searching}
             onChange={e => setInputVal(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
           />
-          <button onClick={handleSend} aria-label="Send message">
+          <button
+            onClick={handleSend}
+            disabled={searching || !inputVal.trim()}
+            aria-label="Send message"
+          >
             <i className="fas fa-paper-plane"></i>
           </button>
         </div>

@@ -40,3 +40,16 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.deploy
+
+# firebase local cache (not for git)
+.firebase/
+
+# data backups (never commit — contains PII)
+/backups/
+
+# gcp/aws build artifacts
+/lambda/function.zip
+/gcp/node_modules/
+
+# archived legacy code (safety net, not for git)
+/_archive/

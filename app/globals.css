@@ -1,4 +1,69 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
+
+/* ─── IB Trading Platform Design Tokens ──────────────────────────────────── */
+:root {
+  /* Brand — exact QA site tokens (dark mode: #00ab4e, light mode: #18874a) */
+  --ib-green:        #00ab4e;
+  --ib-green-bright: #00a63e;
+  --ib-green-soft:   #28c67c;
+  --ib-green-tint:   #F0FDF8;
+  --ib-error:        #FF4F4F;
+  --ib-teal:         #22A699;
+  --ib-amber:        #C8A830;
+
+  /* Dark mode bg scale — exact QA tokens */
+  --ib-bg-body:   #000000;   /* --global-bg-2 dark */
+  --ib-bg-card:   #1e2939;   /* --global-bg-10 dark — the blue-dark card colour */
+  --ib-bg-card2:  #1f2937;   /* --global-bg-12 dark */
+  --ib-bg-muted:  #0d1117;   /* --global-bg-4 dark (header bg) */
+  --ib-bg-subtle: #1c1c1e;   /* --global-bg-21 dark */
+
+  /* Grey scale */
+  --ib-g1:  #000000;
+  --ib-g2:  #FFFFFF;
+  --ib-g4:  #F5F5F5;
+  --ib-g12: #F9FAFB;
+  --ib-g13: #F3F4F6;
+  --ib-g14: #E5E7EB;
+  --ib-g15: #D1D5DB;
+  --ib-g16: #9CA3AF;
+  --ib-g17: #6B7280;
+  --ib-g18: #4B5563;
+  --ib-g19: #374151;
+  --ib-g20: #1F2937;
+
+  /* Text */
+  --ib-text-primary:  #FFFFFF;
+  --ib-text-body:     #EDEDED;
+  --ib-text-muted:    #9CA3AF;
+  --ib-text-disabled: #6B7280;
+
+  /* Typography */
+  --font-heading: 'Manrope', 'Manrope Fallback', sans-serif;
+  --font-ui:      'Noto Sans', 'Noto Sans Fallback', sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+
+  /* Border radius */
+  --ib-radius-sm:   6px;
+  --ib-radius-md:   8px;
+  --ib-radius-lg:   12px;
+  --ib-radius-xl:   16px;
+  --ib-radius-2xl:  24px;
+  --ib-radius-pill: 9999px;
+
+  /* Shadows */
+  --ib-shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
+  --ib-shadow-md:  0 4px 16px rgba(0,0,0,0.4);
+  --ib-shadow-lg:  0 8px 32px rgba(0,0,0,0.5);
+  --ib-shadow-green: 0 0 20px rgba(24,135,74,0.25);
+
+  /* Gain / Loss */
+  --ib-gain: #00A63E;
+  --ib-loss: #FF4F4F;
+  --ib-gain-bg: rgba(0,166,62,0.12);
+  --ib-loss-bg: rgba(255,79,79,0.12);
+  --ib-neutral-bg: rgba(156,163,175,0.12);
+}
 
 @import "tailwindcss";
 
@@ -169,7 +234,8 @@ a:hover {
 /* ──────────────────────────
    NAV
 ────────────────────────── */
-nav {
+/* Support portal Navbar only — option-chain uses its own layout */
+nav:not(.oc-nav) {
     position: sticky;
     top: 0;
     z-index: 100;
@@ -2278,4 +2344,62 @@ footer {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+/* ─── Chatbot streaming + fade-in animations ───────────────────────────── */
+
+.streaming-cursor {
+  display: inline-block;
+  margin-left: 1px;
+  font-weight: 400;
+  color: #00AB4E;
+  animation: chatbotCursorBlink 0.85s steps(1) infinite;
+}
+
+@keyframes chatbotCursorBlink {
+  0%, 50%   { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes chatbotCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Chatbot skeleton shimmer (loading state) ─────────────────────────── */
+
+.chatbot-skeleton-card {
+  animation: chatbotCardFadeIn 0.25s ease;
+}
+
+.chatbot-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: chatbotShimmer 1.4s ease-in-out infinite;
+}
+
+[data-theme="dark"] .chatbot-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes chatbotShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

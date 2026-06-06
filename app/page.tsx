@@ -163,7 +163,7 @@ export default function HomePage() {
     const articles = allArticlesRef.current;
     const filtered = articles.filter(a =>
       a.title?.toLowerCase().includes(ql) || a.category?.toLowerCase().includes(ql) || a.content?.toLowerCase().includes(ql)
-    ).slice(0, 8);
+    ).slice(0, 6);
     setResults(filtered);
     setShowDropdown(filtered.length > 0);
     setSearchLoading(false);
@@ -198,6 +198,7 @@ export default function HomePage() {
           />
           {showDropdown && results.length > 0 && (
             <div id="searchResults" className="search-results-dropdown active" role="listbox">
+              {/* Article results */}
               {results.map((article, i) => (
                 <Link
                   key={i}
