@@ -217,22 +217,44 @@ function extractAuth(req) {
   return { isMaster, isAdmin, jwtPayload };
 }
 
-// Checks JWT validity + that the manager's account is still active in Firestore
+// How long to trust the cached `status` field embedded in the JWT before
+// re-validating against Firestore. Deactivated managers stay logged in for
+// at most this duration after deactivation.
+const STATUS_CACHE_TTL_SECS = 300; // 5 minutes
+
+// Checks JWT validity + that the manager's account is still active.
+//
+// Performance: the JWT embeds the manager's `status` and `statusCachedAt`
+// at login time. We trust that cache for STATUS_CACHE_TTL_SECS, eliminating
+// the per-request Firestore read. Old JWTs (issued before this change) lack
+// these fields, so we fall back to the DB lookup for them — they'll get the
+// new fields after their next login.
 async function requireManagerOrMaster(req) {
   const auth = extractAuth(req);
   if (auth.isMaster) return { ok: true, performedBy: 'masteradmin', role: 'masteradmin' };
   if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin', role: 'admin' };
-  if (auth.jwtPayload?.managerId) {
-    // Verify account is still active (catches deactivated managers whose JWT hasn't expired)
+
+  const jwt = auth.jwtPayload;
+  if (!jwt?.managerId) return { ok: false };
+
+  const now = Math.floor(Date.now() / 1000);
+  const cacheAge = jwt.statusCachedAt ? now - jwt.statusCachedAt : Infinity;
+  const cacheValid = jwt.status && cacheAge < STATUS_CACHE_TTL_SECS;
+
+  if (cacheValid) {
+    // Trust the JWT — no DB hit
+    if (jwt.status !== 'active') return { ok: false, reason: 'deactivated' };
+  } else {
+    // Cache expired or missing (old JWT): fall back to DB lookup
     try {
-      const snap = await db.collection(MANAGERS_COL).doc(auth.jwtPayload.managerId).get();
+      const snap = await db.collection(MANAGERS_COL).doc(jwt.managerId).get();
       if (!snap.exists || snap.data().status !== 'active') return { ok: false, reason: 'deactivated' };
     } catch {
       return { ok: false, reason: 'db_error' };
     }
-    return { ok: true, performedBy: auth.jwtPayload.managerId, role: auth.jwtPayload.role, displayName: auth.jwtPayload.displayName };
   }
-  return { ok: false };
+
+  return { ok: true, performedBy: jwt.managerId, role: jwt.role, displayName: jwt.displayName };
 }
 
 function requireMaster(req) {
@@ -346,7 +368,16 @@ async function _handler(req, res) {
     const valid = await verifyPassword(password, manager.passwordHash || '');
     if (!valid) return fail('wrong_password');
 
-    const token = makeJWT({ managerId: manager.managerId, username: manager.username, displayName: manager.displayName, role: manager.role });
+    // Embed status + cache timestamp so requireManagerOrMaster can skip the
+    // per-request DB lookup. Re-checks status from DB after 5 minutes elapse.
+    const token = makeJWT({
+      managerId: manager.managerId,
+      username: manager.username,
+      displayName: manager.displayName,
+      role: manager.role,
+      status: manager.status,
+      statusCachedAt: Math.floor(Date.now() / 1000),
+    });
 
     await db.collection(MANAGERS_COL).doc(manager.managerId).update({
       lastLoginAt: new Date().toISOString(),
@@ -664,17 +695,26 @@ async function _handler(req, res) {
   }
 
   // ── GET /faq ──────────────────────────────────────────────────────────────
+  // Public users get only published articles; authenticated managers get all.
+  // Optional ?category=X filter (case-insensitive).
+  //
+  // Optimization: status filter pushed to Firestore (server-side), saving
+  // ~1 draft article worth of bandwidth in the common public case. Category
+  // filter stays in-memory because (a) frontend doesn't use it, (b) keeping
+  // it case-insensitive avoids breaking any external scripts.
   if (method === 'GET' && path === '/faq') {
     const auth = await requireManagerOrMaster(req);
     const categoryFilter = req.query?.category;
-    const snap = await db.collection(FAQ_COL).get();
-    let items = snap.docs.map(d => d.data());
-    // Public users only see published articles; authenticated managers see all
+
+    let query = db.collection(FAQ_COL);
     if (!auth.ok) {
-      items = items.filter(i => i.status === 'published');
+      query = query.where('status', '==', 'published');
     }
+
+    const snap = await query.get();
+    let items = snap.docs.map(d => d.data());
     if (categoryFilter) {
-      const filterLower = categoryFilter.toLowerCase();
+      const filterLower = String(categoryFilter).toLowerCase();
       items = items.filter(i => i.category?.toLowerCase() === filterLower);
     }
     items.sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
@@ -832,13 +872,13 @@ async function _handler(req, res) {
   }
 
   // ── GET /tickets ──────────────────────────────────────────────────────────
+  // Returns all tickets, newest first. Uses Firestore orderBy() for the
+  // sort so we don't load + sort the entire collection in memory.
   if (method === 'GET' && path === '/tickets') {
     const auth = await requireManagerOrMaster(req);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
-    const snap = await db.collection(TICKETS_COL).get();
-    const items = snap.docs
-      .map(d => d.data())
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const snap = await db.collection(TICKETS_COL).orderBy('createdAt', 'desc').get();
+    const items = snap.docs.map(d => d.data());
     await writeAudit({
       action: 'TICKETS_VIEWED', entity: 'ticket', entityId: 'all',
       entityTitle: `${items.length} tickets`, performedBy: auth.performedBy,
@@ -955,11 +995,10 @@ async function _handler(req, res) {
   }
 
   // ── GET /categories ──────────────────────────────────────────────────────
+  // Returns all categories sorted by sortOrder. Sort pushed to Firestore.
   if (method === 'GET' && path === '/categories') {
-    const snap = await db.collection(CATEGORIES_COL).get();
-    const items = snap.docs
-      .map(d => d.data())
-      .sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
+    const snap = await db.collection(CATEGORIES_COL).orderBy('sortOrder', 'asc').get();
+    const items = snap.docs.map(d => d.data());
     return r(200, items);
   }
 
