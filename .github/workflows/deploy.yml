@@ -1,90 +1,110 @@
-name: Deploy to AWS S3 + CloudFront
+name: Deploy to GCP (Firebase Hosting + Cloud Functions)
 
 on:
   push:
     branches:
-      - main       # triggers production deploy
-      - uat        # triggers UAT deploy
+      - main
+  workflow_dispatch:
+
+# Cancel any in-progress run on the same branch to avoid races
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GCP_PROJECT: ibproduct-vibe-coding
+  GCP_REGION: asia-south1
+  CLOUD_FUNCTION_NAME: ib-faq-handler
+  FIREBASE_SITE: ibproduct-vibe-coding
+  API_BASE_URL: https://asia-south1-ibproduct-vibe-coding.cloudfunctions.net/ib-faq-handler
 
 jobs:
   deploy:
+    name: Build & deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      # ── Frontend ────────────────────────────────────────────────────
+      - name: Install frontend deps
         run: npm ci
 
-      - name: Build Next.js (Production)
-        if: github.ref == 'refs/heads/main'
+      - name: Build Next.js (static export)
         env:
-          NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE }}
+          NEXT_PUBLIC_API_BASE: ${{ env.API_BASE_URL }}
+          NODE_ENV: production
         run: npm run build
 
-      - name: Build Next.js (UAT)
-        if: github.ref == 'refs/heads/uat'
-        env:
-          NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE_UAT }}
-        run: npm run build
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@latest
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-
-      - name: Deploy to S3 (Production)
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy Frontend to Firebase Hosting
         run: |
-          aws s3 sync out/ s3://${{ secrets.S3_BUCKET_PROD }} --delete
-          echo "✅ Production deploy complete"
+          firebase deploy \
+            --only hosting:${{ env.FIREBASE_SITE }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --non-interactive
 
-      - name: Deploy to S3 (UAT)
-        if: github.ref == 'refs/heads/uat'
+      # ── Backend Cloud Function ──────────────────────────────────────
+      - name: Deploy Cloud Function
+        working-directory: gcp
         run: |
-          aws s3 sync out/ s3://${{ secrets.S3_BUCKET_UAT }} --delete
-          echo "✅ UAT deploy complete"
+          gcloud functions deploy ${{ env.CLOUD_FUNCTION_NAME }} \
+            --gen2 \
+            --runtime=nodejs22 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=handler \
+            --trigger-http \
+            --allow-unauthenticated \
+            --memory=512Mi \
+            --timeout=60s \
+            --max-instances=10 \
+            --env-vars-file=.env.yaml \
+            --set-secrets="JWT_SECRET=JWT_SECRET:latest,ADMIN_SECRET=ADMIN_SECRET:latest,MASTER_ADMIN_SECRET=MASTER_ADMIN_SECRET:latest" \
+            --project=${{ env.GCP_PROJECT }}
 
-      - name: Deploy Lambda function
+      # ── Smoke test ──────────────────────────────────────────────────
+      - name: Smoke test
         run: |
-          zip -j /tmp/lambda-deploy.zip lambda/index.mjs
-          aws lambda update-function-code \
-            --function-name ib-faq-handler \
-            --zip-file fileb:///tmp/lambda-deploy.zip \
-            --region ap-south-1 \
-            --no-cli-pager
-          echo "✅ Lambda deployed"
+          set -e
+          echo "Testing frontend..."
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.FIREBASE_SITE }}.web.app/)
+          if [ "$HTTP" != "200" ]; then echo "Frontend failed: HTTP $HTTP"; exit 1; fi
 
-      - name: Invalidate CloudFront cache (Production)
-        if: github.ref == 'refs/heads/main'
-        env:
-          CF_DIST: ${{ secrets.CF_DISTRIBUTION_PROD }}
+          echo "Testing API /faq..."
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.API_BASE_URL }}/faq)
+          if [ "$HTTP" != "200" ]; then echo "API failed: HTTP $HTTP"; exit 1; fi
+
+          echo "All smoke tests passed."
+
+      - name: Summary
+        if: always()
         run: |
-          if [ -n "$CF_DIST" ]; then
-            aws cloudfront create-invalidation --distribution-id "$CF_DIST" --paths "/*"
-            echo "✅ Production CDN cache cleared"
-          else
-            echo "⏭️ No CF_DISTRIBUTION_PROD set, skipping"
-          fi
-
-      - name: Invalidate CloudFront cache (UAT)
-        if: github.ref == 'refs/heads/uat'
-        env:
-          CF_DIST: ${{ secrets.CF_DISTRIBUTION_UAT }}
-        run: |
-          if [ -n "$CF_DIST" ]; then
-            aws cloudfront create-invalidation --distribution-id "$CF_DIST" --paths "/*"
-            echo "✅ UAT CDN cache cleared"
-          else
-            echo "⏭️ No CF_DISTRIBUTION_UAT set, skipping"
-          fi
-
+          echo "### Deployment Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | https://${{ env.FIREBASE_SITE }}.web.app |" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ env.API_BASE_URL }} |" >> $GITHUB_STEP_SUMMARY
