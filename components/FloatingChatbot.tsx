@@ -101,26 +101,14 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     return segments;
   }, [text, query]);
 
+  // Highlight rendering removed by user request — visual emphasis on matched
+  // terms looked jarring. We still split by match for potential future a11y
+  // hooks (aria-label, ref tracking), but render every segment as plain text.
   return (
     <>
-      {parts.map((p, i) =>
-        p.isMatch ? (
-          <mark
-            key={i}
-            style={{
-              background: 'rgba(0,171,78,0.18)',
-              color: 'inherit',
-              padding: '0 2px',
-              borderRadius: 2,
-              fontWeight: 600,
-            }}
-          >
-            {p.text}
-          </mark>
-        ) : (
-          <span key={i}>{p.text}</span>
-        )
-      )}
+      {parts.map((p, i) => (
+        <span key={i}>{p.text}</span>
+      ))}
     </>
   );
 }

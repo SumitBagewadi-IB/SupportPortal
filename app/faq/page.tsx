@@ -39,17 +39,11 @@ function formatDate(dateStr?: string): string {
   } catch { return ''; }
 }
 
-function highlight(text: string, term: string): React.ReactNode {
-  if (!term || !text) return text;
-  const idx = text.toLowerCase().indexOf(term.toLowerCase());
-  if (idx === -1) return text;
-  return (
-    <>
-      {text.slice(0, idx)}
-      <mark style={{ background: '#FEF08A', borderRadius: 2, padding: '0 2px' }}>{text.slice(idx, idx + term.length)}</mark>
-      {highlight(text.slice(idx + term.length), term)}
-    </>
-  );
+// Search-match highlighting removed by user request — the yellow background
+// (#FEF08A) was visually jarring. Return the text plain so the article title
+// renders in the default style. Kept as a wrapper so call sites don't change.
+function highlight(text: string, _term: string): React.ReactNode {
+  return text;
 }
 
 function FAQContent() {
