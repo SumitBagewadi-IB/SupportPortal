@@ -149,13 +149,14 @@ function buildCorsHeaders(origin) {
   // the requesting origin (or * when no origin header) without needing
   // Access-Control-Allow-Credentials.
   const allowedOrigin = ALLOWED_ORIGINS.length > 0
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : '*')
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : '')
     : (origin || '*');
-  return {
-    'Access-Control-Allow-Origin':  allowedOrigin,
+  const headers = {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,X-Master-Token,Authorization',
   };
+  if (allowedOrigin) headers['Access-Control-Allow-Origin'] = allowedOrigin;
+  return headers;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -210,8 +211,9 @@ function verifyJWT(token) {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [header, body, sig] = parts;
-    const expected = b64url(createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest());
-    if (sig !== expected) return null;
+    const expectedBuf = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest();
+    const sigBuf = Buffer.from(sig, 'base64url');
+    if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null;
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
@@ -255,7 +257,7 @@ function verifyMasterToken(token) {
 
 function extractAuth(req) {
   const authHdr  = req.headers['authorization'] || '';
-  const xMaster  = req.headers['x-master-token'] || req.query?.['_mt'] || '';
+  const xMaster  = req.headers['x-master-token'] || '';
   const xSecret  = req.headers['x-admin-secret'] || '';
 
   const bearerToken = authHdr.startsWith('Bearer ') ? authHdr.slice(7) : null;

@@ -33,24 +33,21 @@ export function getMasterToken(): string {
 }
 
 /**
- * Standard JSON headers for master-authenticated requests. The master
- * token is passed as a query string parameter (?_mt=…) via masterUrl(),
- * not as a header — this keeps the API surface symmetric with curl usage.
+ * Standard JSON headers for master-authenticated requests.
+ * Token is passed via X-Master-Token header — never in the URL to prevent
+ * it appearing in GCP logs, browser history, or Referrer headers.
  */
 export function getMasterHeaders(): Record<string, string> {
-  return { 'Content-Type': 'application/json' };
+  const token = getMasterToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['X-Master-Token'] = token;
+  return headers;
 }
 
 /**
- * Build a fully-qualified API URL with the master session token attached
- * as a `_mt` query parameter. Returns the URL unchanged if no token is set.
- *
- * @example
- *   await fetch(masterUrl('/managers'), { headers: getMasterHeaders() });
+ * Build a fully-qualified API URL for a master-admin request.
+ * Token is NOT appended to the URL — use getMasterHeaders() for auth.
  */
 export function masterUrl(path: string): string {
-  const token = getMasterToken();
-  if (!token) return `${API_BASE}${path}`;
-  const sep = path.includes('?') ? '&' : '?';
-  return `${API_BASE}${path}${sep}_mt=${encodeURIComponent(token)}`;
+  return `${API_BASE}${path}`;
 }
