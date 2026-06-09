@@ -92,6 +92,65 @@ const ALLOWED_TICKET_CATEGORIES = [
 // JSON-payload routes specifically.
 const MAX_BODY_BYTES = 100 * 1024; // 100 KB
 
+// ─── Published-article cache ──────────────────────────────────────────────
+//
+// Fetching the full article collection on every search is O(n) and wasteful.
+// Instead we keep published articles in module-scope memory, refreshed on a
+// 5-minute TTL. Any write that changes article data (create, update, delete)
+// also calls invalidateArticleCache() so the very next search sees fresh data
+// without waiting for the TTL.
+//
+// Cache is per-container, same as rate limiting — acceptable because Cloud
+// Functions Gen 2 reuses containers aggressively and the TTL is a backstop.
+//
+// Each cached entry pre-computes the lowercase + HTML-stripped fields used
+// by the search scorer, so that work happens once at load time rather than
+// on every query.
+
+const ARTICLE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+let _articleCache = null;  // { articles: CachedArticle[], loadedAt: number } | null
+
+function invalidateArticleCache() {
+  _articleCache = null;
+}
+
+async function getPublishedArticles() {
+  const now = Date.now();
+  if (_articleCache && now - _articleCache.loadedAt < ARTICLE_CACHE_TTL_MS) {
+    return _articleCache.articles;
+  }
+
+  // Cache miss — fetch from Firestore. Filter to published server-side so
+  // draft content never enters memory and bandwidth is minimal.
+  const snap = await db.collection(FAQ_COL).where('status', '==', 'published').get();
+
+  const articles = snap.docs.map(d => {
+    const a = d.data();
+    // Pre-process fields used by the search scorer.
+    // Doing this once at cache-load time vs. on every search query.
+    return {
+      id:         a.id,
+      title:      a.title      || '',
+      category:   a.category   || '',
+      content:    a.content    || '',
+      updatedAt:  a.updatedAt  || a.createdAt || '',
+      // Pre-computed for scoring — lowercase + HTML stripped
+      _titleLow:    (a.title    || '').toLowerCase(),
+      _categoryLow: (a.category || '').toLowerCase(),
+      _contentLow:  (a.content  || '').toLowerCase().replace(/<[^>]+>/g, ' '),
+    };
+  });
+
+  if (articles.length > 2000) {
+    console.warn(JSON.stringify({ severity: 'WARNING', message: 'Article cache is large', count: articles.length }));
+  }
+
+  console.log(JSON.stringify({ severity: 'INFO', message: 'Article cache refreshed', count: articles.length }));
+  _articleCache = { articles, loadedAt: now };
+  return articles;
+}
+
 // ─── Rate limiting (in-memory, per-container) ─────────────────────────────
 //
 // Per-IP token bucket kept in the container's RAM. Limits work within a
@@ -820,22 +879,27 @@ async function _handler(req, res) {
   // Smart KB search: returns top N articles ranked by relevance to query.
   // Public endpoint — only returns published articles.
   // Scoring: title (10x) > category (3x) > content (1x). Fuzzy matches each query word.
+  //
+  // Articles are served from an in-memory cache (5-min TTL, invalidated on
+  // writes) so the common search path makes zero Firestore reads.
   if (method === 'GET' && path === '/faq/search') {
     const q = String(req.query?.q || '').trim().toLowerCase();
     const limit = Math.min(parseInt(req.query?.limit || '5', 10) || 5, 20);
     if (!q || q.length < 2) return r(200, { results: [], total: 0, query: q });
 
-    const snap = await db.collection(FAQ_COL).get();
-    const items = snap.docs.map(d => d.data()).filter(i => i.status === 'published');
-
     // Split query into individual words for multi-word matching
     const words = q.split(/\s+/).filter(w => w.length >= 2);
     if (words.length === 0) return r(200, { results: [], total: 0, query: q });
 
-    const scored = items.map(article => {
-      const title    = (article.title    || '').toLowerCase();
-      const category = (article.category || '').toLowerCase();
-      const content  = (article.content  || '').toLowerCase().replace(/<[^>]+>/g, ' ');
+    // Fetch from cache (or Firestore on miss). Pre-computed lowercase fields
+    // (_titleLow, _categoryLow, _contentLow) are used directly — no per-query
+    // toLowerCase() or HTML stripping.
+    const articles = await getPublishedArticles();
+
+    const scored = articles.map(article => {
+      const title    = article._titleLow;
+      const category = article._categoryLow;
+      const content  = article._contentLow;
 
       let score = 0;
       let matchedWords = 0;
@@ -857,7 +921,7 @@ async function _handler(req, res) {
       // Penalty: only matched some words (likely irrelevant)
       if (matchedWords < words.length) score = score * (matchedWords / words.length);
 
-      // Extract a snippet around the first match in content
+      // Extract a snippet around the first match in (pre-stripped) content
       let snippet = '';
       if (content) {
         const firstMatch = words.map(w => content.indexOf(w)).filter(i => i >= 0).sort((a, b) => a - b)[0];
@@ -871,20 +935,19 @@ async function _handler(req, res) {
       }
 
       return {
-        id: article.id,
-        title: article.title,
-        category: article.category,
+        id:        article.id,
+        title:     article.title,
+        category:  article.category,
         snippet,
-        updatedAt: article.updatedAt || article.createdAt,
+        updatedAt: article.updatedAt,
         score,
       };
     });
 
     const results = scored
-      .filter(r => r.score > 0)
+      .filter(a => a.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
-      // Remove internal score before returning
       .map(({ score, ...rest }) => rest);
 
     return r(200, { results, total: results.length, query: q });
@@ -905,6 +968,7 @@ async function _handler(req, res) {
         status: body.status || 'published',
         updatedAt: new Date().toISOString(),
       });
+      invalidateArticleCache();
       await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: existingSnap.data().title, performedBy: auth.performedBy, meta: { newStatus: body.status } });
       return r(200, { ok: true });
     }
@@ -918,6 +982,7 @@ async function _handler(req, res) {
     const item = { id: newId, title, category, content, status, createdAt: now, updatedAt: now };
     if (sortOrder !== undefined) item.sortOrder = sortOrder;
     await db.collection(FAQ_COL).doc(newId).set(item);
+    invalidateArticleCache();
     await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: title, performedBy: auth.performedBy, meta: { category, status } });
     return r(201, { id: newId, ok: true });
   }
@@ -948,6 +1013,7 @@ async function _handler(req, res) {
     if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
 
     await db.collection(FAQ_COL).doc(id).update(updateData);
+    invalidateArticleCache();
     await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existingSnap.data().title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
     return r(200, { ok: true });
   }
@@ -962,6 +1028,7 @@ async function _handler(req, res) {
     if (!existingSnap.exists) return r(404, { error: 'Article not found' });
     const title = existingSnap.data().title || id;
     await db.collection(FAQ_COL).doc(id).delete();
+    invalidateArticleCache();
     await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy });
     return r(200, { ok: true });
   }

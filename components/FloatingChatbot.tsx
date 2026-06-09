@@ -100,7 +100,15 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     return segments;
   }, [text, query]);
 
-  return <>{parts.map((p, i) => <span key={i}>{p.text}</span>)}</>;
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.isMatch
+          ? <mark key={i} style={{ background: 'rgba(0,171,78,0.14)', color: 'inherit', borderRadius: 2, padding: '0 1px', fontWeight: 600 }}>{p.text}</mark>
+          : <span key={i}>{p.text}</span>
+      )}
+    </>
+  );
 }
 
 function loadSession(): Message[] {
@@ -126,6 +134,10 @@ function saveSession(messages: Message[]) {
 
 export default function FloatingChatbot() {
   const [open, setOpen] = useState(false);
+  const [hasSeen, setHasSeen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('ib_chatbot_seen') === '1';
+  });
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [inputVal, setInputVal] = useState('');
   const [searching, setSearching] = useState(false);
@@ -178,13 +190,15 @@ export default function FloatingChatbot() {
   const streamTextIntoMessage = useCallback((
     messageId: number,
     fullText: string,
-    charsPerTick = 3,
-    tickMs = 20
+    charsPerTick = 1,
+    tickMs = 26
   ): Promise<void> => {
     return new Promise(resolve => {
       let i = 0;
       const interval = setInterval(() => {
-        i = Math.min(i + charsPerTick, fullText.length);
+        // Natural rhythm: slightly vary speed at word boundaries
+        const step = fullText[i] === ' ' ? 1 : charsPerTick;
+        i = Math.min(i + step, fullText.length);
         setMessages(prev =>
           prev.map(m =>
             m.id === messageId ? { ...m, text: fullText.slice(0, i), isStreaming: i < fullText.length } : m
@@ -195,18 +209,64 @@ export default function FloatingChatbot() {
     });
   }, []);
 
+  // Build a contextual, natural intro that echoes the user's query intent.
+  // Never says "popular topic" — that was a false signal on any 5-result query.
+  const buildIntro = useCallback((trimmed: string, count: number, topCategory: string): string => {
+    // Detect if the query was a chip click (short, clean label) vs free-form typing
+    const isShortChip = trimmed.split(' ').length <= 4 && trimmed.length <= 30;
+    const topic = trimmed.length <= 40
+      ? `"${trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()}"`
+      : null;
+
+    if (count === 1) {
+      return topic
+        ? `Here's the most relevant article for ${topic}:`
+        : "Here's the most relevant article I found:";
+    }
+
+    // Category-aware intro when all results share one category
+    const categoryIntros: Record<string, string> = {
+      'IPO':               `Here are ${count} articles on IPO:`,
+      'Account Opening':   `Here are ${count} articles on account opening:`,
+      'Funds':             `Here are ${count} articles on funds & payments:`,
+      'Trading':           `Here are ${count} articles on trading:`,
+      'Charges & Brokerage': `Here are ${count} articles on charges:`,
+      'F&O':               `Here are ${count} articles on F&O:`,
+      'Mutual Funds':      `Here are ${count} articles on mutual funds:`,
+      'MTF':               `Here are ${count} articles on margin trading:`,
+      'NRI/HUF Accounts':  `Here are ${count} articles on NRI/HUF accounts:`,
+    };
+
+    if (isShortChip && categoryIntros[topCategory]) {
+      return categoryIntros[topCategory];
+    }
+
+    // Free-form query — echo the topic back naturally
+    if (topic && count <= 3) return `Found ${count} articles for ${topic}:`;
+    if (topic) return `Here's what I found for ${topic}:`;
+    return count === 1 ? "Here's the most relevant article:" : `Here are ${count} articles that should help:`;
+  }, []);
+
   const runSearch = useCallback(async (q: string) => {
     const trimmed = q.trim();
     if (!trimmed || !API_BASE || searching) return;
+    if (trimmed.length < 2) {
+      addMessage({ role: 'bot', text: 'Please type at least 2 characters to search.' });
+      return;
+    }
     // Prevent re-searching identical consecutive query
     if (trimmed.toLowerCase() === lastQuery.toLowerCase()) return;
 
     setLastQuery(trimmed);
     addMessage({ role: 'user', text: trimmed });
 
-    const skeletonId = addMessage({ role: 'bot', isSkeleton: true });
+    // 300ms typing dots — makes the bot feel alive before skeleton appears
+    const typingId = addMessage({ role: 'bot', isTyping: true });
     setSearching(true);
     trackEvent({ eventType: 'chatbot_message', chatInput: trimmed.slice(0, 200) });
+    await new Promise(r => setTimeout(r, 320));
+    setMessages(prev => prev.filter(m => m.id !== typingId));
+    const skeletonId = addMessage({ role: 'bot', isSkeleton: true });
 
     try {
       const res = await fetch(`${API_BASE}/faq/search?q=${encodeURIComponent(trimmed)}&limit=5`);
@@ -215,12 +275,8 @@ export default function FloatingChatbot() {
 
       if (data.results && data.results.length > 0) {
         const count = data.results.length;
-        const introText =
-          count === 1
-            ? "Here's the most relevant article I found:"
-            : count >= 5
-            ? "This is a popular topic — here are the top articles:"
-            : `Found ${count} articles that should help:`;
+        const topCategory = data.results[0]?.category || '';
+        const introText = buildIntro(trimmed, count, topCategory);
 
         const followUps = Array.from(
           new Set(
@@ -238,7 +294,10 @@ export default function FloatingChatbot() {
           query: trimmed,
           followUps,
         });
-        await streamTextIntoMessage(botMsgId, introText);
+        // Short intros (≤ 60 chars) stream at 3 chars/tick — feels snappy like ChatGPT.
+        // Longer texts use the default 1 char/tick for readability.
+        const speed = introText.length <= 60 ? 3 : 1;
+        await streamTextIntoMessage(botMsgId, introText, speed);
         trackEvent({ eventType: 'search', searchTerm: trimmed.slice(0, 200), searchResultCount: count });
       } else {
         const botMsgId = addMessage({
@@ -249,7 +308,7 @@ export default function FloatingChatbot() {
           showTicketCTA: true,
           query: trimmed,
         });
-        await streamTextIntoMessage(botMsgId, "I couldn't find an exact match. Try one of these or raise a support ticket:");
+        await streamTextIntoMessage(botMsgId, `I couldn't find anything for "${trimmed}". Try one of these or raise a support ticket:`);
         trackEvent({ eventType: 'search', searchTerm: trimmed.slice(0, 200), searchResultCount: 0 });
       }
     } catch {
@@ -258,7 +317,7 @@ export default function FloatingChatbot() {
     } finally {
       setSearching(false);
     }
-  }, [searching, lastQuery, addMessage, streamTextIntoMessage]);
+  }, [searching, lastQuery, addMessage, streamTextIntoMessage, buildIntro]);
 
   const handleSend = () => {
     const text = inputVal.trim();
@@ -290,16 +349,20 @@ export default function FloatingChatbot() {
     <div className="chatbot-container">
       {/* Floating bubble */}
       <button
-        className="chatbot-bubble"
+        className={`chatbot-bubble${open ? ' chat-open' : ''}`}
         onClick={() => {
           const opening = !open;
           setOpen(o => !o);
-          if (opening) trackEvent({ eventType: 'chatbot_open' });
+          if (opening) {
+            setHasSeen(true);
+            localStorage.setItem('ib_chatbot_seen', '1');
+            trackEvent({ eventType: 'chatbot_open' });
+          }
         }}
         aria-label="Open support chat"
       >
         <i className="fas fa-comment-dots"></i>
-        <span className="bubble-ping"></span>
+        {!hasSeen && <span className="bubble-ping"></span>}
       </button>
 
       {/* Chat window */}
@@ -351,11 +414,7 @@ export default function FloatingChatbot() {
               {msg.isSkeleton ? (
                 <div style={{ marginLeft: '2.5rem', padding: '0.5rem 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {[0, 1, 2].map(i => (
-                    <div
-                      key={i}
-                      className="chatbot-skeleton-card"
-                      style={{ padding: '0.65rem 0.85rem', background: 'var(--bg-subtle, #F9FAFB)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '0.5rem' }}
-                    >
+                    <div key={i} className="chatbot-skeleton-card" style={{ padding: '0.65rem 0.85rem' }}>
                       <div className="chatbot-skeleton-line" style={{ width: '30%', height: 8, marginBottom: 8, borderRadius: 3 }}></div>
                       <div className="chatbot-skeleton-line" style={{ width: '85%', height: 12, marginBottom: 6, borderRadius: 3 }}></div>
                       <div className="chatbot-skeleton-line" style={{ width: '65%', height: 10, borderRadius: 3 }}></div>
@@ -379,7 +438,7 @@ export default function FloatingChatbot() {
                     </div>
                   </div>
 
-                  {/* Article result cards */}
+                  {/* Article result cards — only render after streaming so cards animate in cleanly */}
                   {msg.results && msg.results.length > 0 && !msg.isStreaming && (
                     <>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem 0', marginLeft: '2.5rem' }}>
@@ -391,39 +450,15 @@ export default function FloatingChatbot() {
                           >
                             <Link
                               href={`/faq/?q=${encodeURIComponent(r.title)}`}
+                              className="chatbot-result-link"
                               onClick={() => trackEvent({ eventType: 'article_view', articleId: r.id, articleTitle: r.title, category: r.category })}
-                              style={{
-                                display: 'block',
-                                padding: '0.65rem 0.85rem',
-                                paddingRight: '2.5rem',
-                                background: 'var(--bg-subtle, #F9FAFB)',
-                                border: '1px solid var(--border, #E5E7EB)',
-                                borderRadius: '0.5rem',
-                                textDecoration: 'none',
-                                color: 'inherit',
-                                transition: 'border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s',
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.borderColor = '#00AB4E';
-                                e.currentTarget.style.background = 'rgba(0,171,78,0.04)';
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,171,78,0.08)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = '';
-                                e.currentTarget.style.background = '';
-                                e.currentTarget.style.transform = '';
-                                e.currentTarget.style.boxShadow = '';
-                              }}
                             >
-                              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#00AB4E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
-                                {r.category}
-                              </div>
-                              <div style={{ fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.3, marginBottom: '0.2rem', color: 'var(--text, #111827)' }}>
+                              <div className="chatbot-result-category">{r.category}</div>
+                              <div className="chatbot-result-title">
                                 <HighlightedText text={r.title} query={msg.query || ''} />
                               </div>
                               {r.snippet && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #6B7280)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                <div className="chatbot-result-snippet">
                                   <HighlightedText text={r.snippet} query={msg.query || ''} />
                                 </div>
                               )}
@@ -450,9 +485,10 @@ export default function FloatingChatbot() {
                         ))}
                       </div>
 
-                      {/* See all results in FAQ */}
-                      <div style={{
+                      {/* See all results in FAQ — only meaningful when there are multiple results */}
+                      {msg.results.length > 1 && <div style={{
                         marginLeft: '2.5rem',
+                        marginTop: '0.25rem',
                         animation: `chatbotCardFadeIn 0.35s ease both`,
                         animationDelay: `${msg.results.length * 60 + 50}ms`,
                       }}>
@@ -461,18 +497,24 @@ export default function FloatingChatbot() {
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.3rem',
-                            fontSize: '0.75rem',
+                            gap: '0.4rem',
+                            fontSize: '0.8rem',
                             color: '#00AB4E',
                             fontWeight: 600,
                             textDecoration: 'none',
-                            padding: '0.3rem 0',
+                            padding: '0.4rem 0.85rem',
+                            border: '1.5px solid rgba(0,171,78,0.3)',
+                            borderRadius: 99,
+                            background: 'rgba(0,171,78,0.04)',
+                            transition: 'background 0.15s, border-color 0.15s',
                           }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,171,78,0.1)'; e.currentTarget.style.borderColor = '#00AB4E'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,171,78,0.04)'; e.currentTarget.style.borderColor = 'rgba(0,171,78,0.3)'; }}
                         >
                           See all results in Knowledge Base
-                          <i className="fas fa-arrow-right" style={{ fontSize: '0.65rem' }}></i>
+                          <i className="fas fa-arrow-right" style={{ fontSize: '0.7rem' }}></i>
                         </Link>
-                      </div>
+                      </div>}
                     </>
                   )}
 
@@ -505,6 +547,7 @@ export default function FloatingChatbot() {
                           <button key={h} className="action-chip" onClick={() => runSearch(h)} disabled={searching}>{h}</button>
                         ))}
                       </div>
+                      <div style={{ height: 1, background: 'var(--border)', margin: '0.5rem 0' }} />
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <Link
                           href={`/contact/?subject=${encodeURIComponent(lastQuery)}`}
@@ -527,8 +570,8 @@ export default function FloatingChatbot() {
             </div>
           ))}
 
-          {/* Popular topics — shown when conversation is fresh */}
-          {isInitial && (
+          {/* Popular topics — shown on fresh chat OR as "explore more" after a conversation */}
+          {isInitial ? (
             <div style={{ marginTop: '1rem' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted, #6B7280)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
                 Popular topics
@@ -541,32 +584,47 @@ export default function FloatingChatbot() {
                 ))}
               </div>
             </div>
+          ) : !searching && (
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted, #6B7280)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>
+                Explore other topics
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                {POPULAR_TOPICS.map(t => (
+                  <button key={t.q} className="action-chip" onClick={() => runSearch(t.q)} disabled={searching} style={{ fontSize: '0.72rem' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
         {/* Input footer */}
         <div className="chat-footer">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
-            autoComplete="off"
-            value={inputVal}
-            maxLength={300}
-            disabled={searching}
-            onChange={e => setInputVal(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSend()}
-          />
-          <button
-            onClick={handleSend}
-            disabled={searching || !inputVal.trim()}
-            aria-label="Send message"
-          >
-            {searching
-              ? <i className="fas fa-spinner fa-spin"></i>
-              : <i className="fas fa-paper-plane"></i>
-            }
-          </button>
+          <div className="chat-footer-inner">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
+              autoComplete="off"
+              value={inputVal}
+              maxLength={300}
+              disabled={searching}
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSend()}
+            />
+            <button
+              onClick={handleSend}
+              disabled={searching || !inputVal.trim()}
+              aria-label="Send message"
+            >
+              {searching
+                ? <i className="fas fa-spinner fa-spin" style={{ fontSize: '0.8rem' }}></i>
+                : <i className="fas fa-paper-plane" style={{ fontSize: '0.8rem' }}></i>
+              }
+            </button>
+          </div>
         </div>
       </div>
     </div>
