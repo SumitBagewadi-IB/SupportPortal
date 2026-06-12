@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# gcp/.env.yaml has no secrets (only GOOGLE_CLOUD_PROJECT + ALLOWED_ORIGINS); safe to commit
+!gcp/.env.yaml
 
 # vercel
 .vercel
