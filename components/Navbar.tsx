@@ -48,8 +48,7 @@ export default function Navbar() {
         {/* Desktop nav links */}
         <ul className="nav-links">
           <li><Link href="/faq" className={pathname === '/faq' ? 'active' : ''}>Knowledge Base</Link></li>
-          <li><Link href="/contact" className={pathname === '/contact' ? 'active' : ''}>Contact Us</Link></li>
-          <li><Link href="/my-tickets" className={pathname === '/my-tickets' ? 'active' : ''}>My Tickets</Link></li>
+          {/* Contact Us and My Tickets hidden for initial launch — re-enable when ready */}
         </ul>
 
         {/* Desktop CTA buttons */}
@@ -81,8 +80,7 @@ export default function Navbar() {
         <div className="mobile-menu" role="dialog" aria-label="Mobile navigation">
           <ul>
             <li><Link href="/faq" className={pathname === '/faq' ? 'active' : ''}>Knowledge Base</Link></li>
-            <li><Link href="/contact" className={pathname === '/contact' ? 'active' : ''}>Contact Us</Link></li>
-            <li><Link href="/my-tickets" className={pathname === '/my-tickets' ? 'active' : ''}>My Tickets</Link></li>
+            {/* Contact Us and My Tickets hidden for initial launch — re-enable when ready */}
           </ul>
           <div className="mobile-menu-cta">
             <a href="https://stocks-onboarding.indiabullssecurities.com/login?_gl=1*gubd0s*_gcl_au*NTYzNDE2NTg2LjE3NzU4Mjg1Njg." target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--green)', color: 'white', border: 'none' }} onClick={() => trackEvent({ eventType: 'cta_click', ctaName: 'open_account', ctaTarget: 'https://stocks-onboarding.indiabullssecurities.com' })}>Open Account</a>

@@ -25,8 +25,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
             <div className="footer-col">
               <p className="footer-col-title">Support</p>
               <Link href="/faq">Knowledge Base</Link>
-              <Link href="/contact">Contact Us</Link>
-              <Link href="/my-tickets">My Tickets</Link>
+              {/* Contact Us and My Tickets hidden for initial launch */}
             </div>
             <div className="footer-col">
               <p className="footer-col-title">Legal</p>

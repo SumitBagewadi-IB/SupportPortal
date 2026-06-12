@@ -292,24 +292,7 @@ export default function HomePage() {
                 </Link>
               );
             })}
-            <Link
-              href="/contact"
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-                padding: '1.75rem 1.25rem', background: 'var(--bg, #fff)',
-                border: '1px solid var(--border, #e5e7eb)', borderRadius: '16px',
-                textDecoration: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                transition: 'transform 0.25s ease, box-shadow 0.25s ease',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 20px -5px rgba(0,0,0,0.08)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
-            >
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem', marginBottom: '1rem', background: '#FFF9C4', color: '#CA8A04' }}>
-                <i className="fas fa-headset"></i>
-              </div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark, #111)', margin: '0 0 0.35rem' }}>Contact Us</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted, #6b7280)', lineHeight: 1.4, margin: 0 }}>Chat, call, raise ticket</p>
-            </Link>
+            {/* Contact Us card hidden for initial launch */}
           </div>
         </div>
 
@@ -359,9 +342,8 @@ export default function HomePage() {
             <p>Support team available <strong>Mon–Sat, 8 AM – 8 PM IST</strong> across chat, phone and email.</p>
           </div>
           <div className="contact-actions">
-            <Link href="/contact" className="btn-primary"><i className="fas fa-comment-dots"></i> Start a Chat</Link>
-            <a href="tel:02261446300" className="btn-secondary"><i className="fas fa-phone"></i> Call Us</a>
-            <Link href="/my-tickets" className="btn-secondary"><i className="fas fa-ticket"></i> My Tickets</Link>
+            <a href="tel:02261446300" className="btn-primary"><i className="fas fa-phone"></i> Call Us</a>
+            {/* Contact Us and My Tickets buttons hidden for initial launch */}
           </div>
         </div>
 

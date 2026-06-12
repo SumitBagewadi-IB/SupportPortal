@@ -549,15 +549,7 @@ export default function FloatingChatbot() {
                       </div>
                       <div style={{ height: 1, background: 'var(--border)', margin: '0.5rem 0' }} />
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <Link
-                          href={`/contact/?subject=${encodeURIComponent(lastQuery)}`}
-                          className="action-chip"
-                          style={{ background: '#00AB4E', color: 'white', borderColor: '#00AB4E' }}
-                          onClick={() => trackEvent({ eventType: 'ticket_submit', ticketCategory: 'chatbot_fallback', chatInput: lastQuery.slice(0, 200) })}
-                        >
-                          <i className="fas fa-headset" style={{ marginRight: '0.4rem' }}></i>
-                          Create a ticket
-                        </Link>
+                        {/* Create a ticket link hidden for initial launch */}
                         <Link href="/faq/" className="action-chip">
                           <i className="fas fa-book" style={{ marginRight: '0.4rem' }}></i>
                           Browse Knowledge Base
