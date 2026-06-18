@@ -286,6 +286,7 @@ nav .container {
     display: flex;
     gap: 0.25rem;
     list-style: none;
+    margin-left: 7rem;
 }
 
 .nav-links a {
@@ -325,6 +326,7 @@ nav .container {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    margin-left: auto;
 }
 
 .btn-open-account {
