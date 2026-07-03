@@ -62,6 +62,98 @@ const AUDIT_COL     = process.env.AUDIT_COLLECTION     || 'audit-log';
 const ANALYTICS_COL = process.env.ANALYTICS_COLLECTION || 'analytics';
 const MANAGERS_COL  = process.env.MANAGERS_COLLECTION  || 'managers';
 const CATEGORIES_COL= process.env.CATEGORIES_COLLECTION|| 'categories';
+const FEEDBACK_COL  = process.env.FEEDBACK_COLLECTION   || 'feedback';
+
+// Backend-enforced profanity / explicit-language filter for public feedback.
+// Frontend checks can be bypassed (direct API calls), so the function is the authority.
+const PROFANITY = [
+  'fuck','fucking','fucker','motherfucker','shit','bullshit','bitch','bastard',
+  'asshole','dick','dickhead','pussy','cunt','slut','whore','wanker','prick',
+  'cock','fag','faggot','nigger','retard','rape','rapist',
+  // common English respellings / vowel-drops / acronyms
+  'fck','fuk','fuq','phuck','phuk','fcuk','shyt','shite','azzhole','biatch',
+  'arse','arsehole','twat','wank','wtf','stfu','gtfo',
+  // common Hindi / Hinglish abuses (+ acronyms / respellings)
+  'chutiya','chutia','chutiye','chutiyapa','bhenchod','behenchod','madarchod','maderchod',
+  'gandu','gaand','randi','lund','bhosdike','bhosdi','bhosda','harami','kamina',
+  'kamine','kutta','kutte','chinal','lavde','lawde','jhatu','bsdk','bkl','mkc','chodu',
+];
+// Pass 0 — normalize unicode tricks to plain ASCII before any matching:
+// strip diacritics & zero-width chars (NFKD also folds fullwidth ＦＵＣＫ -> FUCK),
+// then map common Cyrillic/Greek/symbol homoglyphs so "ѕhit"/"ƒuck" can't slip past.
+const CONFUSABLES = {
+  'а':'a','е':'e','ё':'e','о':'o','р':'p','с':'c','ѕ':'s','х':'x','у':'y','к':'k','і':'i','ј':'j','м':'m','н':'h','т':'t','в':'b','ԁ':'d',
+  'α':'a','ε':'e','ο':'o','υ':'u','ι':'i','κ':'k','ρ':'p','τ':'t','ν':'v',
+  'ƒ':'f','ı':'i','ⅼ':'l','ⅰ':'i','ℓ':'l',
+};
+function normalizeUnicode(text) {
+  const t = String(text)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')                       // diacritic marks
+    .replace(/[\u200b-\u200d\u2060\ufeff\u00ad]/g, '');    // zero-width / soft hyphen
+  return t.split('').map((c) => CONFUSABLES[c] || c).join('');
+}
+// Pass A — fold common leetspeak to letters, then plain word-boundary match.
+// Catches: "fuck", "sh1t"->shit, "@ss"->ass, "fuuuck" (elongation collapsed).
+function leetFold(text) {
+  return String(text).toLowerCase()
+    .replace(/[@4]/g, 'a').replace(/[$5]/g, 's').replace(/0/g, 'o')
+    .replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/7/g, 't')
+    .replace(/(.)\1+/g, '$1');
+}
+// Pass B — masking-tolerant regex per word (words are plain a-z, no escaping needed):
+//  · up to 2 non-letters allowed between letters  -> "f u c k", "f.u.c.k", "f*u*c*k"
+//  · at most ONE interior letter may be a single non-letter mask -> "f*ck", "f@ck", "sh!t"
+//  · first & last letters stay literal; lookarounds keep word boundaries so
+//    "class", "pass", "assist", "cockpit", "grape" never match.
+function maskRegex(word) {
+  const L = word.split('');
+  const gap = '[^a-z]{0,2}';
+  const variants = [L.join(gap)];
+  for (let i = 1; i < L.length - 1; i++) {
+    variants.push(L.map((c, j) => (j === i ? '[^a-z]' : c)).join(gap));
+  }
+  return new RegExp(`(?<![a-z])(?:${variants.join('|')})(?:es|s)?(?![a-z])`);
+}
+// Collapse elongation in the denylist too, so doubled-letter words ("bullshit",
+// "asshole") still match after the text's own elongation has been collapsed.
+const COLLAPSED = PROFANITY.map((w) => w.replace(/(.)\1+/g, '$1'));
+const WORD_RES = COLLAPSED.map((w) => new RegExp(`\\b${w}(?:es|s)?\\b`));
+const MASK_RES = COLLAPSED.map(maskRegex);
+
+function containsProfanity(text) {
+  const norm = normalizeUnicode(text);
+  const folded = leetFold(norm);
+  if (WORD_RES.some((re) => re.test(folded))) return true;
+  // Keep symbols/digits as non-letter masks here; only collapse elongation.
+  const masked = norm.toLowerCase().replace(/(.)\1+/g, '$1');
+  return MASK_RES.some((re) => re.test(masked));
+}
+
+// Data minimization: feedback is anonymous, so sensitive identifiers should never be
+// stored. Redact (not reject) so legit feedback still lands, minus the PII. Order matters:
+// phone before the longer-digit rules; (?!\d) stops phone matching inside 12-19 digit runs.
+function redactPII(text) {
+  return String(text)
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[email removed]')
+    .replace(/\b[A-Za-z]{5}\d{4}[A-Za-z]\b/g, '[PAN removed]')               // PAN
+    .replace(/(?<!\d)(?:\+?91[ -]?|0)?[6-9](?:[ -]?\d){9}(?!\d)/g, '[phone removed]')
+    .replace(/(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g, '[card/account removed]')  // 13-19 digits
+    .replace(/(?<!\d)\d(?:[ -]?\d){11}(?!\d)/g, '[ID removed]');              // 12-digit Aadhaar
+}
+
+// Sanitize short plain-text fields (article title, category name) that must never
+// contain markup. Strips HTML tags + control chars and collapses whitespace.
+// (VAPT IDX-001: improper input validation — HTML-like content accepted in title.)
+// NOT applied to article CONTENT, which legitimately contains chars like "< 12 months".
+function sanitizeText(s, maxLen = 300) {
+  return String(s == null ? "" : s)
+    .replace(/<[^>]*>/g, "")                       // remove HTML tags
+    .replace(/[\u0000-\u001F\u007F]/g, " ")     // strip control chars
+    .replace(/\s+/g, " ")                          // collapse whitespace
+    .trim()
+    .slice(0, maxLen);
+}
 
 const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
@@ -74,7 +166,12 @@ if (!MASTER_ADMIN_SECRET) console.error('[STARTUP] WARNING: MASTER_ADMIN_SECRET 
 const TOKEN_TTL_SECS        = 7200;  // 2 hours — manager JWT
 const MASTER_TOKEN_TTL_SECS = 28800; // 8 hours — master session token
 
-const db = new Firestore();
+//const db = new Firestore();
+
+const db = new Firestore({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT,
+  databaseId: process.env.FIRESTORE_DATABASE_ID || '(default)',
+});
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
@@ -129,15 +226,18 @@ async function getPublishedArticles() {
     const a = d.data();
     // Pre-process fields used by the search scorer.
     // Doing this once at cache-load time vs. on every search query.
+    // Title/category are sanitized so search never emits raw markup (IDX-001).
+    const title    = sanitizeText(a.title, 300);
+    const category = sanitizeText(a.category, 100);
     return {
       id:         a.id,
-      title:      a.title      || '',
-      category:   a.category   || '',
+      title,
+      category,
       content:    a.content    || '',
       updatedAt:  a.updatedAt  || a.createdAt || '',
       // Pre-computed for scoring — lowercase + HTML stripped
-      _titleLow:    (a.title    || '').toLowerCase(),
-      _categoryLow: (a.category || '').toLowerCase(),
+      _titleLow:    title.toLowerCase(),
+      _categoryLow: category.toLowerCase(),
       _contentLow:  (a.content  || '').toLowerCase().replace(/<[^>]+>/g, ' '),
     };
   });
@@ -149,6 +249,62 @@ async function getPublishedArticles() {
   console.log(JSON.stringify({ severity: 'INFO', message: 'Article cache refreshed', count: articles.length }));
   _articleCache = { articles, loadedAt: now };
   return articles;
+}
+
+// ─── Search relevance helpers ─────────────────────────────────────────────
+//
+// Matching is "prefix-of-word" (anchored at a word start, suffix-flexible) so
+// "charge" matches "charges"/"charged" but "sign" does NOT match "eSign".
+const escapeRe   = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const wordStartRe = (w) => new RegExp('(?:^|[^a-z0-9])' + escapeRe(w));
+
+// Multi-word colloquialisms normalised to domain terms BEFORE tokenising.
+const SEARCH_PHRASES = [
+  [/\bcash(?:ing)?[ -]?out\b/g, 'withdraw'],
+  [/\btake out (?:my |the )?(?:money|funds|cash)\b/g, 'withdraw'],
+  [/\bmoney out\b/g, 'withdraw'],
+  [/\bput (?:my |the )?(?:money|funds|cash) in\b/g, 'add funds'],
+  [/\badd (?:money|cash)\b/g, 'add funds'],
+  [/\bsign[ -]?in\b/g, 'login'],
+  [/\blog[ -]?in\b/g, 'login'],
+  [/\bcan'?t (?:log ?in|sign ?in|access)\b/g, 'login'],
+];
+
+// Single-word synonyms. A query word also matches its synonyms, but a synonym-only
+// hit scores LESS than a literal hit so exact-word articles keep their edge.
+const SYNONYMS = {
+  withdraw:   ['withdrawal', 'redeem', 'redemption', 'payout'],
+  withdrawal: ['withdraw', 'redeem', 'redemption', 'payout'],
+  deposit:    ['deposits'],
+  login:      ['signin', 'credential', 'credentials'],
+  password:   ['passcode', 'credential', 'credentials'],
+  fees:       ['fee', 'charge', 'charges', 'brokerage'],
+  fee:        ['fees', 'charge', 'charges', 'brokerage'],
+  charges:    ['charge', 'fee', 'fees', 'brokerage'],
+  charge:     ['charges', 'fee', 'fees', 'brokerage'],
+  brokerage:  ['charge', 'charges', 'fee', 'fees'],
+  kyc:        ['verification'],
+  mtf:        ['margin'],
+  margin:     ['mtf'],
+  nominee:    ['nomination', 'nominees'],
+  nominees:   ['nomination', 'nominee'],
+  nomination: ['nominee', 'nominees'],
+  statement:  ['statements'],
+};
+
+// IDF-lite: words that appear in a large share of titles/categories (e.g.
+// "trading", "account", "demat") get a smaller title weight so they don't
+// dominate MULTI-word queries. Cached per article-cache generation.
+let _dfCache = { ref: null, df: null, n: 0 };
+function getSearchDF(articles) {
+  if (_dfCache.ref === articles) return _dfCache;
+  const df = new Map();
+  for (const a of articles) {
+    const seen = new Set((a._titleLow + ' ' + a._categoryLow).split(/[^a-z0-9]+/).filter(w => w.length >= 2));
+    for (const w of seen) df.set(w, (df.get(w) || 0) + 1);
+  }
+  _dfCache = { ref: articles, df, n: articles.length || 1 };
+  return _dfCache;
 }
 
 // ─── Rate limiting (in-memory, per-container) ─────────────────────────────
@@ -866,7 +1022,12 @@ async function _handler(req, res) {
     }
 
     const snap = await query.get();
-    let items = snap.docs.map(d => d.data());
+    // Sanitize title/category on the way out so existing raw-markup rows (IDX-001)
+    // are never served as HTML to the FAQ page; content is left intact.
+    let items = snap.docs.map(d => {
+      const a = d.data();
+      return { ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) };
+    });
     if (categoryFilter) {
       const filterLower = String(categoryFilter).toLowerCase();
       items = items.filter(i => i.category?.toLowerCase() === filterLower);
@@ -878,23 +1039,86 @@ async function _handler(req, res) {
   // ── GET /faq/search?q=... ─────────────────────────────────────────────────
   // Smart KB search: returns top N articles ranked by relevance to query.
   // Public endpoint — only returns published articles.
-  // Scoring: title (10x) > category (3x) > content (1x). Fuzzy matches each query word.
+  // Scoring: title (10x, literal > synonym, IDF-lite downweight for common words)
+  //   > category (3x) > content (1x), with full-phrase title boost, typo-tolerant
+  //   fuzzy fallback, colloquial-phrase + synonym expansion, and a relevance floor
+  //   so out-of-domain / barely-related queries return an explicit empty set.
   //
   // Articles are served from an in-memory cache (5-min TTL, invalidated on
   // writes) so the common search path makes zero Firestore reads.
   if (method === 'GET' && path === '/faq/search') {
+    const searchIp = sourceIp(req);
+    const searchRl = checkRateLimit(`search:${searchIp}`, 30, 60);
+    if (!searchRl.allowed) {
+      res.set('Retry-After', String(searchRl.retryAfterSecs));
+      return r(429, { error: 'Too many requests. Please slow down.' });
+    }
     const q = String(req.query?.q || '').trim().toLowerCase();
     const limit = Math.min(parseInt(req.query?.limit || '5', 10) || 5, 20);
-    if (!q || q.length < 2) return r(200, { results: [], total: 0, query: q });
+    // Min 3 chars: 1-2 char queries ("ac", "mt") only ever return substring noise.
+    if (!q || q.length < 3) return r(200, { results: [], total: 0, query: q });
 
-    // Split query into individual words for multi-word matching
-    const words = q.split(/\s+/).filter(w => w.length >= 2);
+    // Normalise colloquial phrases ("cash out" -> "withdraw", "sign in" -> "login")
+    // before tokenising, so everyday wording maps onto the KB's domain terms.
+    let qNorm = q;
+    for (const [re, canon] of SEARCH_PHRASES) qNorm = qNorm.replace(re, canon);
+
+    // Split query into individual words for multi-word matching.
+    // Drop stop-words so filler ("what can you do") doesn't match noise; keep meaningful terms.
+    const STOPWORDS = new Set(['the','is','a','an','of','to','for','in','on','at','my','me','do','does','you','your','can','could','how','what','where','when','why','which','who','are','am','was','be','will','should','would','if','it','this','that','and','or','with','about','from','as','by','i']);
+    const words = qNorm.split(/\s+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
     if (words.length === 0) return r(200, { results: [], total: 0, query: q });
+
+    // Capped Levenshtein + token fuzzy-match for typo tolerance ("withdrawl" -> "withdrawal").
+    const lev = (a, b) => {
+      const m = a.length, n = b.length;
+      if (Math.abs(m - n) > 2) return 3;
+      let prev = Array.from({ length: n + 1 }, (_, j) => j);
+      for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) {
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        }
+        prev = cur;
+      }
+      return prev[n];
+    };
+    const fuzzyInTokens = (word, tokens) => {
+      const tol = word.length >= 6 ? 2 : 1;
+      const wp = word.slice(0, 2);
+      for (const t of tokens) {
+        // Require a shared 2-char prefix before a fuzzy match: keeps real typos
+        // (witdraw->withdraw, brokrage->brokerage, trding->trading) but drops
+        // out-of-domain near-misses like "weather"->"whether".
+        if (t.slice(0, 2) !== wp) continue;
+        if (Math.abs(t.length - word.length) <= tol && lev(word, t) <= tol) return true;
+      }
+      return false;
+    };
+
+    // Each query word -> a "group": the literal word plus its synonyms, pre-compiled
+    // to prefix-of-word matchers. A literal hit outscores a synonym-only hit.
+    const groups = words.map(w => ({
+      primary: w,
+      primRe:  wordStartRe(w),
+      synRes:  (SYNONYMS[w] || []).map(wordStartRe),
+    }));
 
     // Fetch from cache (or Firestore on miss). Pre-computed lowercase fields
     // (_titleLow, _categoryLow, _contentLow) are used directly — no per-query
     // toLowerCase() or HTML stripping.
     const articles = await getPublishedArticles();
+    const { df, n: docCount } = getSearchDF(articles);
+    const multi = groups.length > 1;
+    // IDF-lite: common words ("trading","account") get a smaller title weight so
+    // they don't dominate multi-word queries. Single-word queries stay full-weight.
+    const idf = (w) => {
+      if (!multi) return 1;
+      const f = (df.get(w) || 0) / docCount;
+      if (f > 0.30) return 0.25;
+      if (f > 0.15) return 0.6;
+      return 1;
+    };
 
     const scored = articles.map(article => {
       const title    = article._titleLow;
@@ -902,35 +1126,60 @@ async function _handler(req, res) {
       const content  = article._contentLow;
 
       let score = 0;
-      let matchedWords = 0;
+      let matched = 0;
+      let titleTokens = null;
+      const hitPos = [];
 
-      for (const w of words) {
-        const inTitle    = title.includes(w);
-        const inCategory = category.includes(w);
-        const inContent  = content.includes(w);
-        if (inTitle || inCategory || inContent) matchedWords++;
-        if (inTitle)    score += 10;
-        if (inCategory) score += 3;
-        if (inContent)  score += 1;
+      for (const g of groups) {
+        const litTitle = g.primRe.test(title);
+        const litCat   = g.primRe.test(category);
+        let cPos = -1; { const m = content.match(g.primRe); if (m) cPos = m.index; }
+        let synTitle = false, synCat = false;
+        for (const re of g.synRes) {
+          if (!litTitle && !synTitle && re.test(title)) synTitle = true;
+          if (!litCat   && !synCat   && re.test(category)) synCat = true;
+          if (cPos < 0) { const m = content.match(re); if (m) cPos = m.index; }
+        }
+        const inTitle = litTitle || synTitle, inCat = litCat || synCat, inContent = cPos >= 0;
+        if (inTitle || inCat || inContent) {
+          matched++;
+          if (inTitle) score += (litTitle ? 10 : 7) * idf(g.primary);
+          if (inCat)   score += litCat ? 3 : 2;
+          if (inContent) { score += 1; hitPos.push(cPos); }
+        } else if (g.primary.length >= 4) {
+          // No literal/synonym match — try a typo-tolerant match against title + category tokens.
+          if (titleTokens === null) titleTokens = (title + ' ' + category).split(/\s+/).filter(Boolean);
+          if (fuzzyInTokens(g.primary, titleTokens)) { matched++; score += 6; }
+        }
       }
 
-      // Boost: exact full-phrase match in title is strongest signal
-      if (title.includes(q))    score += 25;
-      if (category.includes(q)) score += 8;
+      // Boost: exact full-phrase match in title is the strongest signal.
+      if (title.includes(qNorm))    score += 25;
+      if (category.includes(qNorm)) score += 8;
 
-      // Penalty: only matched some words (likely irrelevant)
-      if (matchedWords < words.length) score = score * (matchedWords / words.length);
+      // Penalty: only some query words matched (likely less relevant).
+      if (matched < groups.length) score = score * (matched / groups.length);
 
-      // Extract a snippet around the first match in (pre-stripped) content
+      // Snippet: pick the densest match region (most hits nearby), not just the
+      // first match, and trim to word boundaries so it starts/ends cleanly.
       let snippet = '';
       if (content) {
-        const firstMatch = words.map(w => content.indexOf(w)).filter(i => i >= 0).sort((a, b) => a - b)[0];
-        if (firstMatch !== undefined && firstMatch >= 0) {
-          const start = Math.max(0, firstMatch - 50);
-          const end = Math.min(content.length, firstMatch + 150);
+        let center = -1;
+        if (hitPos.length) {
+          let best = -1;
+          for (const p of hitPos) {
+            const near = hitPos.filter(o => o >= p - 40 && o <= p + 180).length;
+            if (near > best) { best = near; center = p; }
+          }
+        }
+        if (center >= 0) {
+          let start = Math.max(0, center - 50);
+          let end   = Math.min(content.length, center + 150);
+          if (start > 0) { const sp = content.indexOf(' ', start); if (sp >= 0 && sp < center) start = sp + 1; }
+          if (end < content.length) { const sp = content.lastIndexOf(' ', end); if (sp > center) end = sp; }
           snippet = (start > 0 ? '…' : '') + content.slice(start, end).trim() + (end < content.length ? '…' : '');
         } else {
-          snippet = content.slice(0, 150) + (content.length > 150 ? '…' : '');
+          snippet = content.slice(0, 150).trim() + (content.length > 150 ? '…' : '');
         }
       }
 
@@ -944,9 +1193,12 @@ async function _handler(req, res) {
       };
     });
 
-    const results = scored
-      .filter(a => a.score > 0)
-      .sort((a, b) => b.score - a.score)
+    const ranked = scored.filter(a => a.score > 0).sort((a, b) => b.score - a.score);
+    // Relevance floor: once there is a clear top result, drop weak tails (a single
+    // incidental hit) so barely-related / out-of-domain noise is filtered out.
+    const floor = ranked.length ? Math.max(1, ranked[0].score * 0.12) : 0;
+    const results = ranked
+      .filter(a => a.score >= floor)
       .slice(0, limit)
       .map(({ score, ...rest }) => rest);
 
@@ -977,13 +1229,18 @@ async function _handler(req, res) {
     if (title.length > 300) return r(400, { error: 'title too long (max 300 chars)' });
     if (content.length > 50000) return r(400, { error: 'content too long (max 50000 chars)' });
     if (!VALID_FAQ_STATUSES.includes(status)) return r(400, { error: `Invalid status. Allowed: ${VALID_FAQ_STATUSES.join(', ')}` });
+    // IDX-001: strip markup/control chars from the plain-text title & category.
+    const cleanTitle = sanitizeText(title, 300);
+    const cleanCategory = sanitizeText(category, 100);
+    if (!cleanTitle) return r(400, { error: 'title must contain valid text' });
+    if (!cleanCategory) return r(400, { error: 'category must contain valid text' });
     const newId = id || `art-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
-    const item = { id: newId, title, category, content, status, createdAt: now, updatedAt: now };
+    const item = { id: newId, title: cleanTitle, category: cleanCategory, content, status, createdAt: now, updatedAt: now };
     if (sortOrder !== undefined) item.sortOrder = sortOrder;
     await db.collection(FAQ_COL).doc(newId).set(item);
     invalidateArticleCache();
-    await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: title, performedBy: auth.performedBy, meta: { category, status } });
+    await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: cleanTitle, performedBy: auth.performedBy, meta: { category: cleanCategory, status } });
     return r(201, { id: newId, ok: true });
   }
 
@@ -1006,8 +1263,12 @@ async function _handler(req, res) {
     if (!existingSnap.exists) return r(404, { error: 'Article not found' });
 
     const updateData = { updatedAt: new Date().toISOString() };
-    if (title) updateData.title = title;
-    if (category) updateData.category = category;
+    if (title) {
+      const cleanTitle = sanitizeText(title, 300);   // IDX-001
+      if (!cleanTitle) return r(400, { error: 'title must contain valid text' });
+      updateData.title = cleanTitle;
+    }
+    if (category) updateData.category = sanitizeText(category, 100);
     if (content) updateData.content = content;
     if (status !== undefined) updateData.status = status;
     if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
@@ -1113,6 +1374,61 @@ async function _handler(req, res) {
     return r(201, { id: ticketId, ok: true });
   }
 
+  // ── POST /feedback (public) ───────────────────────────────────────────────
+  // Site-wide feedback. Public, rate-limited, and profanity-filtered server-side.
+  if (method === 'POST' && path === '/feedback') {
+    const fbIp = sourceIp(req);
+    const fbRl = checkRateLimit(`feedback:${fbIp}`, 5, 60);
+    if (!fbRl.allowed) {
+      res.set('Retry-After', String(fbRl.retryAfterSecs));
+      return r(429, { error: 'Too many submissions. Please wait a moment.' });
+    }
+    const message = String(body?.message ?? '').replace(/<[^>]+>/g, '').trim();
+    const page = String(body?.page ?? '').slice(0, 300);
+    if (!message)              return r(400, { error: 'Feedback message is required.' });
+    if (message.length < 3)    return r(400, { error: 'Please add a little more detail.' });
+    if (message.length > 2000) return r(400, { error: 'Feedback too long (max 2000 characters).' });
+    if (containsProfanity(message)) {
+      return r(400, { error: 'Please remove inappropriate language and resubmit your feedback.' });
+    }
+    // Strip any PII before storing — feedback is anonymous and must not retain
+    // PAN / Aadhaar / card / account / phone / email.
+    const cleanMessage = redactPII(message);
+    const fbId = `FB-${Math.floor(100000 + Math.random() * 900000)}`;
+    const now = new Date().toISOString();
+    await db.collection(FEEDBACK_COL).doc(fbId).set({
+      id: fbId, message: cleanMessage, page, status: 'new',
+      createdAt: now, date: now.slice(0, 10),
+      ipAddress: fbIp, userAgent: userAgent(req),
+    });
+    await writeAudit({
+      action: 'CREATE_FEEDBACK', entity: 'feedback', entityId: fbId,
+      entityTitle: cleanMessage.slice(0, 60), performedBy: 'public', meta: { page, ip: fbIp },
+    });
+    return r(201, { id: fbId, ok: true });
+  }
+
+  // ── GET /feedback (admin / master) ────────────────────────────────────────
+  if (method === 'GET' && path === '/feedback') {
+    const auth = await requireManagerOrMaster(req);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
+    const snap = await db.collection(FEEDBACK_COL).orderBy('createdAt', 'desc').get();
+    return r(200, snap.docs.map(d => d.data()));
+  }
+
+  // ── DELETE /feedback/{id} (admin / master) ────────────────────────────────
+  const feedbackDeleteMatch = path.match(/^\/feedback\/([^/]+)$/);
+  if (method === 'DELETE' && feedbackDeleteMatch) {
+    const auth = await requireManagerOrMaster(req);
+    if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
+    const fbId = feedbackDeleteMatch[1];
+    const existingSnap = await db.collection(FEEDBACK_COL).doc(fbId).get();
+    if (!existingSnap.exists) return r(404, { error: 'Feedback not found' });
+    await db.collection(FEEDBACK_COL).doc(fbId).delete();
+    await writeAudit({ action: 'DELETE_FEEDBACK', entity: 'feedback', entityId: fbId, entityTitle: (existingSnap.data().message || '').slice(0, 60), performedBy: auth.performedBy });
+    return r(200, { ok: true });
+  }
+
   // ── PUT /tickets/{id} ─────────────────────────────────────────────────────
   const ticketPutMatch = path.match(/^\/tickets\/([^/]+)$/);
   if (method === 'PUT' && ticketPutMatch) {
@@ -1177,9 +1493,10 @@ async function _handler(req, res) {
   if (method === 'POST' && path === '/categories') {
     const auth = await requireManagerOrMaster(req);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
-    const { name, icon, parentId, sortOrder } = body;
+    const { name, icon, parentId, sortOrder, description } = body;
     if (!name || !name.trim()) return r(400, { error: 'name required' });
     if (name.length > 100) return r(400, { error: 'name too long (max 100 chars)' });
+    if (description && String(description).length > 120) return r(400, { error: 'description too long (max 120 chars)' });
     const id = `cat-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
     await db.collection(CATEGORIES_COL).doc(id).set({
@@ -1187,6 +1504,7 @@ async function _handler(req, res) {
       name: name.trim(),
       icon: icon || 'fas fa-folder',
       parentId: parentId || null,
+      description: description ? String(description).replace(/<[^>]+>/g, '').trim() : '',
       sortOrder: sortOrder ?? 999999,
       status: 'active',
       createdAt: now,
@@ -1207,6 +1525,10 @@ async function _handler(req, res) {
     const updateData = { updatedAt: new Date().toISOString() };
     if (body.name) updateData.name = body.name.trim();
     if (body.icon !== undefined) updateData.icon = body.icon;
+    if (body.description !== undefined) {
+      if (String(body.description).length > 120) return r(400, { error: 'description too long (max 120 chars)' });
+      updateData.description = String(body.description).replace(/<[^>]+>/g, '').trim();
+    }
     if (body.sortOrder !== undefined) updateData.sortOrder = body.sortOrder;
     if (body.status !== undefined) {
       if (!['active', 'inactive'].includes(body.status)) return r(400, { error: 'Invalid status' });
