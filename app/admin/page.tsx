@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { API_BASE } from '@/lib/api';
 import { STATIC_CATEGORY_NAMES as FALLBACK_CATEGORIES } from '@/lib/constants';
+import { parseValidJwt } from '@/lib/jwt';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 900; // 15 minutes — matches server-side lockout
@@ -18,6 +19,7 @@ interface Category {
   name: string;
   icon: string;
   parentId: string | null;
+  description?: string;
   sortOrder?: number;
   status?: string;
 }
@@ -44,6 +46,15 @@ interface Ticket {
   description?: string;
   message?: string;
   phone?: string;
+}
+
+interface Feedback {
+  id: string;
+  message: string;
+  page?: string;
+  status?: string;
+  createdAt?: string;
+  date?: string;
 }
 
 const emptyForm = { title: '', category: '', content: '', status: 'published' };
@@ -89,13 +100,13 @@ export default function AdminPage() {
   const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
 
   // Sidebar view
-  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets' | 'audit' | 'categories'>('articles');
+  const [activeView, setActiveView] = useState<'articles' | 'add' | 'tickets' | 'audit' | 'categories' | 'feedback'>('articles');
 
   // Categories
   const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
   const [catLoading, setCatLoading] = useState(false);
   const [catError, setCatError] = useState('');
-  const [catForm, setCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '' });
+  const [catForm, setCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '', description: '' });
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catFormMsg, setCatFormMsg] = useState('');
   const [catSubmitting, setCatSubmitting] = useState(false);
@@ -109,6 +120,13 @@ export default function AdminPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsError, setTicketsError] = useState('');
+
+  // Feedback
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackConfirmId, setFeedbackConfirmId] = useState<string | null>(null);
+  const [feedbackDeletingId, setFeedbackDeletingId] = useState<string | null>(null);
 
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -135,18 +153,16 @@ export default function AdminPage() {
     const token = sessionStorage.getItem('mgr_token');
     const info = sessionStorage.getItem('mgr_info');
     if (token && info) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
-          setManagerToken(token);
-          setManagerInfo(JSON.parse(info));
-          setSessionExpiresAt(payload.exp);
-          setAuthed(true);
-        } else {
-          sessionStorage.removeItem('mgr_token');
-          sessionStorage.removeItem('mgr_info');
-        }
-      } catch { /* stale token */ }
+      const payload = parseValidJwt(token);
+      if (payload && payload.exp) {
+        setManagerToken(token);
+        try { setManagerInfo(JSON.parse(info)); } catch { /* ignore bad info */ }
+        setSessionExpiresAt(payload.exp);
+        setAuthed(true);
+      } else {
+        sessionStorage.removeItem('mgr_token');
+        sessionStorage.removeItem('mgr_info');
+      }
     }
     const theme = localStorage.getItem('theme');
     if (theme === 'dark') setDarkMode(true);
@@ -196,6 +212,34 @@ export default function AdminPage() {
       .finally(() => setTicketsLoading(false));
   }, []);
 
+  const fetchFeedback = useCallback((token: string) => {
+    if (!API_BASE) return;
+    setFeedbackLoading(true);
+    setFeedbackError('');
+    fetch(`${API_BASE}/feedback`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+      .then((data) => setFeedback(Array.isArray(data) ? data : []))
+      .catch(() => setFeedbackError('Could not load feedback. Check your connection or API config.'))
+      .finally(() => setFeedbackLoading(false));
+  }, []);
+
+  const deleteFeedback = async (id: string) => {
+    if (!API_BASE) return;
+    setFeedbackDeletingId(id);
+    try {
+      const res = await fetch(`${API_BASE}/feedback/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${managerToken}` } });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      if (!res.ok) throw new Error(`${res.status}`);
+      setFeedback((prev) => prev.filter((f) => f.id !== id));
+      setFeedbackConfirmId(null);
+      showToast('Feedback deleted');
+    } catch {
+      showToast('Could not delete feedback. Try again.');
+    } finally {
+      setFeedbackDeletingId(null);
+    }
+  };
+
   const handleSessionExpired = useCallback(() => {
     setManagerToken('');
     setAuthed(false);
@@ -235,10 +279,11 @@ export default function AdminPage() {
   useEffect(() => {
     if (authed && managerToken) {
       fetchTickets(managerToken);
+      fetchFeedback(managerToken);
       fetchAuditLogs(managerToken);
       fetchCategories();
     }
-  }, [authed, managerToken, fetchTickets, fetchAuditLogs, fetchCategories]);
+  }, [authed, managerToken, fetchTickets, fetchFeedback, fetchAuditLogs, fetchCategories]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,14 +299,19 @@ export default function AdminPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        // IDX-002: don't trust the 200 alone — only authenticate the UI when the
+        // response actually carries a structurally valid, unexpired JWT. A forced/
+        // tampered 200 with no real token now fails closed instead of rendering admin.
+        const payload = parseValidJwt(data?.token);
+        if (!payload) {
+          setAuthError('Login failed. Please try again.');
+          return;
+        }
         sessionStorage.setItem('mgr_token', data.token);
         sessionStorage.setItem('mgr_info', JSON.stringify({ managerId: data.managerId, displayName: data.displayName, role: data.role }));
         setManagerToken(data.token);
         setManagerInfo({ managerId: data.managerId, displayName: data.displayName, role: data.role });
-        try {
-          const p = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-          if (p.exp) setSessionExpiresAt(p.exp);
-        } catch { /* ignore */ }
+        if (payload.exp) setSessionExpiresAt(payload.exp);
         setAuthed(true);
         setAttempts(0);
       } else {
@@ -621,11 +671,12 @@ export default function AdminPage() {
             { id: 'articles', label: 'FAQ Articles', icon: 'fa-list' },
             { id: 'add', label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
             { id: 'tickets', label: 'Support Tickets', icon: 'fa-envelope' },
+            { id: 'feedback', label: 'Feedback', icon: 'fa-comment-dots' },
             { id: 'audit', label: 'Audit Log', icon: 'fa-scroll' },
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => { setActiveView(item.id as 'articles' | 'add' | 'tickets'); if (item.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } }}
+              onClick={() => { setActiveView(item.id as 'articles' | 'add' | 'tickets' | 'audit' | 'categories' | 'feedback'); if (item.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: activeView === item.id ? 'white' : '#A0AEC0', background: activeView === item.id ? '#2D3748' : 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, transition: 'all 0.15s', marginBottom: '0.125rem', border: 'none', width: '100%', textAlign: 'left' }}
             >
               <i className={`fas ${item.icon}`} style={{ width: 16, textAlign: 'center' }}></i>
@@ -690,11 +741,12 @@ export default function AdminPage() {
             { id: 'add',        label: editingId ? 'Edit Article' : 'Add Article', icon: 'fa-plus' },
             { id: 'categories', label: 'Categories', icon: 'fa-folder-tree' },
             { id: 'tickets',    label: 'Tickets', icon: 'fa-envelope' },
+            { id: 'feedback',   label: 'Feedback', icon: 'fa-comment-dots' },
             { id: 'audit',      label: 'Audit Log', icon: 'fa-scroll' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveView(tab.id as 'articles' | 'add' | 'tickets' | 'audit' | 'categories'); if (tab.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } setSidebarOpen(false); }}
+              onClick={() => { setActiveView(tab.id as 'articles' | 'add' | 'tickets' | 'audit' | 'categories' | 'feedback'); if (tab.id !== 'add') { setEditingId(null); setForm(emptyForm); setFormMsg(''); } setSidebarOpen(false); }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.75rem 0.875rem', background: 'none', border: 'none', borderBottom: `2px solid ${activeView === tab.id ? '#00AB4E' : 'transparent'}`, color: activeView === tab.id ? '#00AB4E' : 'var(--admin-text-secondary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: activeView === tab.id ? 700 : 500, whiteSpace: 'nowrap', flexShrink: 0, transition: 'color 0.15s' }}
             >
               <i className={`fas ${tab.icon}`} style={{ fontSize: '0.8rem' }}></i>
@@ -1058,11 +1110,11 @@ export default function AdminPage() {
                     try {
                       const method = editingCatId ? 'PUT' : 'POST';
                       const url = editingCatId ? `${API_BASE}/categories/${editingCatId}` : `${API_BASE}/categories`;
-                      const res = await fetch(url, { method, headers: authHeaders(managerToken), body: JSON.stringify({ name: catForm.name.trim(), icon: catForm.icon, parentId: catForm.parentId || null }) });
+                      const res = await fetch(url, { method, headers: authHeaders(managerToken), body: JSON.stringify({ name: catForm.name.trim(), icon: catForm.icon, parentId: catForm.parentId || null, description: catForm.description.trim() }) });
                       if (res.status === 401) { handleSessionExpired(); return; }
                       if (!res.ok) throw new Error('Failed');
                       setCatFormMsg(editingCatId ? '✓ Category updated!' : '✓ Category created!');
-                      setCatForm({ name: '', icon: 'fas fa-folder', parentId: '' });
+                      setCatForm({ name: '', icon: 'fas fa-folder', parentId: '', description: '' });
                       setEditingCatId(null);
                       fetchCategories();
                       setTimeout(() => setCatFormMsg(''), 3000);
@@ -1072,6 +1124,11 @@ export default function AdminPage() {
                     <div style={{ marginBottom: '0.75rem' }}>
                       <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--admin-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Name *</label>
                       <input type="text" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} placeholder="e.g. Funds, Trading…" maxLength={100} style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }} />
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--admin-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Description <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--admin-text-muted)' }}>— shown under the category on the site (optional)</span></label>
+                      <input type="text" value={catForm.description} onChange={e => setCatForm({ ...catForm, description: e.target.value })} placeholder="e.g. Orders, GTT, Basket, AMO" maxLength={120} style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }} />
+                      <div style={{ fontSize: '0.65rem', color: 'var(--admin-text-muted)', marginTop: '0.25rem', textAlign: 'right' }}>{catForm.description.length}/120</div>
                     </div>
                     <div style={{ marginBottom: '0.75rem' }}>
                       <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--admin-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Type</label>
@@ -1107,7 +1164,7 @@ export default function AdminPage() {
                         {catSubmitting ? <><i className="fas fa-spinner fa-spin" style={{ marginRight: '0.375rem' }}></i>{editingCatId ? 'Saving…' : 'Creating…'}</> : (editingCatId ? 'Save Changes' : 'Create Category')}
                       </button>
                       {editingCatId && (
-                        <button type="button" onClick={() => { setEditingCatId(null); setCatForm({ name: '', icon: 'fas fa-folder', parentId: '' }); setCatFormMsg(''); }} style={{ padding: '0.5rem 0.75rem', background: 'none', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-secondary)' }}>Cancel</button>
+                        <button type="button" onClick={() => { setEditingCatId(null); setCatForm({ name: '', icon: 'fas fa-folder', parentId: '', description: '' }); setCatFormMsg(''); }} style={{ padding: '0.5rem 0.75rem', background: 'none', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-secondary)' }}>Cancel</button>
                       )}
                     </div>
                   </form>
@@ -1147,10 +1204,10 @@ export default function AdminPage() {
                                 <div style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)' }}>{subs.length > 0 ? `${subs.length} subcategor${subs.length === 1 ? 'y' : 'ies'}` : 'Top-level · no subcategories'}</div>
                               </div>
                               <div style={{ display: 'flex', gap: '0.375rem' }}>
-                                <button title="Add subcategory" onClick={() => { setCatForm({ name: '', icon: 'fas fa-folder', parentId: cat.id }); setEditingCatId(null); setCatFormMsg(''); }} style={{ height: 28, padding: '0 0.5rem', borderRadius: 6, border: '1.5px solid #9AE6B4', background: '#F0FFF4', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#00AB4E', fontSize: '0.7rem', fontWeight: 600 }}>
+                                <button title="Add subcategory" onClick={() => { setCatForm({ name: '', icon: 'fas fa-folder', parentId: cat.id, description: '' }); setEditingCatId(null); setCatFormMsg(''); }} style={{ height: 28, padding: '0 0.5rem', borderRadius: 6, border: '1.5px solid #9AE6B4', background: '#F0FFF4', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#00AB4E', fontSize: '0.7rem', fontWeight: 600 }}>
                                   <i className="fas fa-plus" style={{ fontSize: '0.55rem' }}></i> Sub
                                 </button>
-                                <button title="Edit" onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: '' }); setCatFormMsg(''); }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                                <button title="Edit" onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: '', description: cat.description || '' }); setCatFormMsg(''); }} style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
                                   <i className="fas fa-pen" style={{ fontSize: '0.6rem' }}></i>
                                 </button>
                                 <button title="Delete" disabled={!!deletingCatId} onClick={async () => {
@@ -1180,7 +1237,7 @@ export default function AdminPage() {
                                     </div>
                                     <span style={{ flex: 1, fontSize: '0.875rem', color: 'var(--admin-text-primary)', fontWeight: 500 }}>{sub.name}</span>
                                     <div style={{ display: 'flex', gap: '0.3rem' }}>
-                                      <button title="Edit" onClick={() => { setEditingCatId(sub.id); setCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '' }); setCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                                      <button title="Edit" onClick={() => { setEditingCatId(sub.id); setCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '', description: sub.description || '' }); setCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
                                         <i className="fas fa-pen" style={{ fontSize: '0.55rem' }}></i>
                                       </button>
                                       <button title="Delete" disabled={!!deletingCatId} onClick={async () => {
@@ -1208,7 +1265,7 @@ export default function AdminPage() {
                         <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 1rem', background: '#FFFBEB', borderRadius: 10, border: '1px solid #FCD34D' }}>
                           <i className="fas fa-triangle-exclamation" style={{ color: '#D97706', fontSize: '0.75rem' }}></i>
                           <span style={{ flex: 1, fontSize: '0.8125rem', color: '#92400E', fontWeight: 500 }}>{cat.name} <span style={{ fontWeight: 400, opacity: 0.8 }}>— orphaned subcategory (parent deleted)</span></span>
-                          <button onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: cat.parentId || '' }); setCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                          <button onClick={() => { setEditingCatId(cat.id); setCatForm({ name: cat.name, icon: cat.icon, parentId: cat.parentId || '', description: cat.description || '' }); setCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
                             <i className="fas fa-pen" style={{ fontSize: '0.55rem' }}></i>
                           </button>
                         </div>
@@ -1306,6 +1363,63 @@ export default function AdminPage() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+          {/* FEEDBACK VIEW */}
+          {activeView === 'feedback' && (
+            <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
+              <div style={{ padding: '1.125rem 1.25rem', borderBottom: '1px solid var(--admin-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--admin-text-primary)' }}>
+                  User Feedback <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({feedback.length} {feedback.length === 1 ? 'submission' : 'submissions'})</span>
+                </h2>
+                <button onClick={() => fetchFeedback(managerToken)} aria-label="Refresh feedback" style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem' }}>
+                  <i className={`fas fa-sync-alt ${feedbackLoading ? 'fa-spin' : ''}`}></i>
+                </button>
+              </div>
+              {feedbackLoading ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
+                  <i className="fas fa-spinner fa-spin" style={{ fontSize: '1.5rem', marginBottom: '0.75rem', display: 'block' }}></i>
+                  <p style={{ fontSize: '0.875rem' }}>Loading feedback…</p>
+                </div>
+              ) : feedbackError ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.75rem', color: '#E53E3E' }}><i className="fas fa-exclamation-circle"></i></div>
+                  <p style={{ color: '#E53E3E', fontSize: '0.875rem', marginBottom: '1rem' }}>{feedbackError}</p>
+                  <button onClick={() => fetchFeedback(managerToken)} style={{ padding: '0.5rem 1rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Retry</button>
+                </div>
+              ) : feedback.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--admin-text-muted)' }}><i className="fas fa-comment-dots"></i></div>
+                  <p style={{ fontSize: '0.875rem' }}>No feedback yet. Comments submitted via the Feedback button on the site will appear here.</p>
+                </div>
+              ) : (
+                <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {feedback.map((fb) => (
+                    <div key={fb.id} style={{ border: '1px solid var(--admin-border-subtle)', borderRadius: 10, padding: '1rem 1.125rem', background: 'var(--admin-bg)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--admin-text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{fb.message}</p>
+                        <div style={{ marginTop: '0.625rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.7rem', color: 'var(--admin-text-muted)' }}>
+                          <span style={{ fontFamily: 'monospace' }}>{fb.id}</span>
+                          {fb.page && <span><i className="fas fa-location-dot" style={{ marginRight: '0.3rem' }}></i>{fb.page}</span>}
+                          {fb.createdAt && <span><i className="fas fa-clock" style={{ marginRight: '0.3rem' }}></i>{new Date(fb.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        </div>
+                      </div>
+                      {feedbackConfirmId === fb.id ? (
+                        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                          <button onClick={() => deleteFeedback(fb.id)} disabled={feedbackDeletingId === fb.id} style={{ padding: '0.3rem 0.6rem', background: '#E53E3E', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: feedbackDeletingId === fb.id ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
+                            {feedbackDeletingId === fb.id ? <i className="fas fa-spinner fa-spin"></i> : 'Delete'}
+                          </button>
+                          <button onClick={() => setFeedbackConfirmId(null)} disabled={feedbackDeletingId === fb.id} style={{ padding: '0.3rem 0.6rem', background: 'var(--admin-surface)', color: 'var(--admin-text-secondary)', border: '1.5px solid var(--admin-border)', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setFeedbackConfirmId(fb.id)} aria-label="Delete feedback" title="Delete feedback" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--admin-border)', background: 'var(--admin-surface)', cursor: 'pointer', color: '#E53E3E', fontSize: '0.8rem' }}>
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {/* AUDIT LOG VIEW */}

@@ -16,6 +16,7 @@ export interface Category {
   name: string;
   icon: string;
   parentId: string | null;
+  description?: string;
   sortOrder?: number;
   status?: string;
 }

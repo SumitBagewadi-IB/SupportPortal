@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { API_BASE, getMasterToken, getMasterHeaders, masterUrl } from '@/lib/api';
+import { parseValidJwt } from '@/lib/jwt';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,16 @@ interface Article {
   updatedAt?: string;
 }
 
-type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics' | 'categories';
+interface Feedback {
+  id: string;
+  message: string;
+  page?: string;
+  status?: string;
+  createdAt?: string;
+  date?: string;
+}
+
+type Tab = 'overview' | 'managers' | 'audit' | 'tickets' | 'faq' | 'analytics' | 'categories' | 'feedback';
 
 // Master token helpers (getMasterToken, getMasterHeaders, masterUrl) are imported from @/lib/api
 
@@ -121,6 +131,9 @@ export default function MasterAdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [feedbackConfirmId, setFeedbackConfirmId] = useState<string | null>(null);
+  const [feedbackDeletingId, setFeedbackDeletingId] = useState<string | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -151,10 +164,10 @@ export default function MasterAdminPage() {
   const [analyticsDays, setAnalyticsDays] = useState(30);
 
   // Categories
-  const [maCats, setMaCats] = useState<{ id: string; name: string; icon: string; parentId: string | null; sortOrder?: number; status?: string }[]>([]);
+  const [maCats, setMaCats] = useState<{ id: string; name: string; icon: string; parentId: string | null; description?: string; sortOrder?: number; status?: string }[]>([]);
   const [maCatLoading, setMaCatLoading] = useState(false);
   const [maCatError, setMaCatError] = useState('');
-  const [maCatForm, setMaCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '' });
+  const [maCatForm, setMaCatForm] = useState({ name: '', icon: 'fas fa-folder', parentId: '', description: '' });
   const [editingMaCatId, setEditingMaCatId] = useState<string | null>(null);
   const [maCatFormMsg, setMaCatFormMsg] = useState('');
   const [maCatSubmitting, setMaCatSubmitting] = useState(false);
@@ -171,14 +184,9 @@ export default function MasterAdminPage() {
     // Validate stored master token expiry on mount — don't wait for first API call
     const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') : null;
     if (stored) {
-      try {
-        const payload = JSON.parse(atob(stored.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.exp && payload.exp > Math.floor(Date.now() / 1000)) {
-          setAuthed(true);
-        } else {
-          sessionStorage.removeItem('master_token');
-        }
-      } catch {
+      if (parseValidJwt(stored)) {
+        setAuthed(true);
+      } else {
         sessionStorage.removeItem('master_token');
       }
     }
@@ -210,6 +218,12 @@ export default function MasterAdminPage() {
 
       if (res.ok) {
         const data = await res.json();
+        // IDX-002: require a structurally valid, unexpired JWT — a forced/tampered
+        // 200 with no real token must not unlock the master-admin UI.
+        if (!parseValidJwt(data?.token)) {
+          setAuthError('Login failed. Please try again.');
+          return;
+        }
         sessionStorage.setItem('master_token', data.token);
         setAuthed(true);
         setAuthError('');
@@ -236,6 +250,22 @@ export default function MasterAdminPage() {
     setAuthed(false);
     setAuthError('Your session has expired. Please log in again.');
   }, []);
+
+  const deleteFeedback = async (id: string) => {
+    if (!API_BASE) return;
+    setFeedbackDeletingId(id);
+    try {
+      const res = await fetch(masterUrl(`/feedback/${id}`), { method: 'DELETE', headers: getMasterHeaders() });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      if (!res.ok) throw new Error(`${res.status}`);
+      setFeedback((prev) => prev.filter((f) => f.id !== id));
+      setFeedbackConfirmId(null);
+    } catch {
+      alert('Could not delete feedback. Please try again.');
+    } finally {
+      setFeedbackDeletingId(null);
+    }
+  };
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -280,10 +310,11 @@ export default function MasterAdminPage() {
     setLoading(true);
     setLoadError('');
     try {
-      const [ticketsRes, faqRes, auditRes] = await Promise.allSettled([
+      const [ticketsRes, faqRes, auditRes, feedbackRes] = await Promise.allSettled([
         fetch(masterUrl('/tickets'), { headers: getMasterHeaders() }),
         fetch(`${API_BASE}/faq`),
         fetch(masterUrl('/audit-log'), { headers: getMasterHeaders() }),
+        fetch(masterUrl('/feedback'), { headers: getMasterHeaders() }),
       ]);
 
       // Any 401 on authenticated resources means the master session expired
@@ -294,6 +325,10 @@ export default function MasterAdminPage() {
 
       if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
         setTickets(await ticketsRes.value.json());
+      }
+      if (feedbackRes.status === 'fulfilled' && feedbackRes.value.ok) {
+        const fb = await feedbackRes.value.json();
+        setFeedback(Array.isArray(fb) ? fb : []);
       }
       if (faqRes.status === 'fulfilled' && faqRes.value.ok) {
         setArticles(await faqRes.value.json());
@@ -375,6 +410,7 @@ export default function MasterAdminPage() {
     { id: 'audit',       label: 'Audit Log',        icon: 'fa-history' },
     { id: 'analytics',   label: 'Analytics',        icon: 'fa-chart-bar' },
     { id: 'tickets',     label: 'Tickets',          icon: 'fa-ticket-alt' },
+    { id: 'feedback',    label: 'Feedback',         icon: 'fa-comment-dots' },
     { id: 'faq',         label: 'FAQ Articles',     icon: 'fa-book' },
     { id: 'categories',  label: 'Categories',       icon: 'fa-folder-tree' },
   ];
@@ -1066,6 +1102,57 @@ export default function MasterAdminPage() {
                     );
                   })}
                 </div>
+
+                {/* By Category breakdown — articles + feedback + tickets per category */}
+                <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.9375rem', marginBottom: '0.875rem' }}>
+                    <i className="fas fa-folder-tree" style={{ color: '#00AB4E', marginRight: '0.5rem' }}></i>By Category
+                  </h3>
+                  {(() => {
+                    type Row = { name: string; articles: number; helpful: number; notHelpful: number; tickets: number };
+                    const map: Record<string, Row> = {};
+                    const ensure = (k: string): Row => (map[k] = map[k] || { name: k, articles: 0, helpful: 0, notHelpful: 0, tickets: 0 });
+                    articles.forEach(a => { if (a.category) ensure(a.category).articles++; });
+                    (analytics.article_feedback || []).forEach(f => { if (f.category) { const m = ensure(f.category); m.helpful += f.helpful; m.notHelpful += f.not_helpful; } });
+                    Object.entries(analytics.tickets_by_category || {}).forEach(([k, v]) => { ensure(k).tickets += Number(v) || 0; });
+                    const rows = Object.values(map).sort((a, b) => b.articles - a.articles || (b.helpful + b.notHelpful) - (a.helpful + a.notHelpful));
+                    if (rows.length === 0) return <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No category data yet.</p>;
+                    const headers: { label: string; align: 'left' | 'right' }[] = [
+                      { label: 'Category', align: 'left' }, { label: 'Articles', align: 'right' },
+                      { label: 'Helpful', align: 'right' }, { label: 'Not helpful', align: 'right' },
+                      { label: 'Helpful %', align: 'right' }, { label: 'Tickets', align: 'right' },
+                    ];
+                    return (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
+                              {headers.map(h => (
+                                <th key={h.label} style={{ padding: '0.6rem 0.75rem', textAlign: h.align, fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h.label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((r, i) => {
+                              const fb = r.helpful + r.notHelpful;
+                              const pct = fb > 0 ? Math.round((r.helpful / fb) * 100) : null;
+                              return (
+                                <tr key={r.name} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: 'var(--text-dark)' }}>{r.name}</td>
+                                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: 'var(--text-dark)' }}>{r.articles}</td>
+                                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#065F46' }}>{r.helpful}</td>
+                                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: '#B91C1C' }}>{r.notHelpful}</td>
+                                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600 }}>{pct === null ? '—' : `${pct}%`}</td>
+                                  <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>{r.tickets}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </div>
               </>
             )}
           </>
@@ -1132,6 +1219,53 @@ export default function MasterAdminPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── FEEDBACK TAB ── */}
+        {activeTab === 'feedback' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-dark)' }}>User Feedback <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '1rem' }}>({feedback.length})</span></h2>
+              <button onClick={() => exportCSV(feedback, 'feedback.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <i className="fas fa-download"></i> Export CSV
+              </button>
+            </div>
+
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              {loading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}><i className="fas fa-spinner fa-spin"></i> Loading feedback…</div>
+              ) : feedback.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No feedback submitted yet.</div>
+              ) : (
+                <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {feedback.map((fb) => (
+                    <div key={fb.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '1rem 1.125rem', background: 'var(--bg-subtle)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{fb.message}</p>
+                        <div style={{ marginTop: '0.625rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontFamily: 'monospace' }}>{fb.id}</span>
+                          {fb.page && <span><i className="fas fa-location-dot" style={{ marginRight: '0.3rem' }}></i>{fb.page}</span>}
+                          {fb.createdAt && !isNaN(new Date(fb.createdAt).getTime()) && <span><i className="fas fa-clock" style={{ marginRight: '0.3rem' }}></i>{new Date(fb.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        </div>
+                      </div>
+                      {feedbackConfirmId === fb.id ? (
+                        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                          <button onClick={() => deleteFeedback(fb.id)} disabled={feedbackDeletingId === fb.id} style={{ padding: '0.3rem 0.6rem', background: '#DC2626', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: feedbackDeletingId === fb.id ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
+                            {feedbackDeletingId === fb.id ? <i className="fas fa-spinner fa-spin"></i> : 'Delete'}
+                          </button>
+                          <button onClick={() => setFeedbackConfirmId(null)} disabled={feedbackDeletingId === fb.id} style={{ padding: '0.3rem 0.6rem', background: 'var(--bg)', color: 'var(--text-muted)', border: '1.5px solid var(--border)', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setFeedbackConfirmId(fb.id)} aria-label="Delete feedback" title="Delete feedback" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', color: '#DC2626', fontSize: '0.8rem' }}>
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1281,11 +1415,11 @@ export default function MasterAdminPage() {
                   try {
                     const method = editingMaCatId ? 'PUT' : 'POST';
                     const url = editingMaCatId ? masterUrl(`/categories/${editingMaCatId}`) : masterUrl('/categories');
-                    const res = await fetch(url, { method, headers: getMasterHeaders(), body: JSON.stringify({ name: maCatForm.name.trim(), icon: maCatForm.icon, parentId: maCatForm.parentId || null }) });
+                    const res = await fetch(url, { method, headers: getMasterHeaders(), body: JSON.stringify({ name: maCatForm.name.trim(), icon: maCatForm.icon, parentId: maCatForm.parentId || null, description: maCatForm.description.trim() }) });
                     if (res.status === 401) { handleSessionExpired(); return; }
                     if (!res.ok) throw new Error('Failed');
                     setMaCatFormMsg(editingMaCatId ? '✓ Category updated!' : '✓ Category created!');
-                    setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '' });
+                    setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '', description: '' });
                     setEditingMaCatId(null);
                     fetchMaCats();
                     setTimeout(() => setMaCatFormMsg(''), 3000);
@@ -1295,6 +1429,12 @@ export default function MasterAdminPage() {
                   <div style={{ marginBottom: '0.875rem' }}>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Name *</label>
                     <input type="text" value={maCatForm.name} onChange={e => setMaCatForm({ ...maCatForm, name: e.target.value })} placeholder="e.g. Funds, Trading, IPO…" maxLength={100} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '0.875rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Description <span style={{ textTransform: 'none', fontWeight: 400 }}>— shown under the category on the site (optional)</span></label>
+                    <input type="text" value={maCatForm.description} onChange={e => setMaCatForm({ ...maCatForm, description: e.target.value })} placeholder="e.g. Orders, GTT, Basket, AMO" maxLength={120} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'right' }}>{maCatForm.description.length}/120</div>
                   </div>
 
                   <div style={{ marginBottom: '0.875rem' }}>
@@ -1339,7 +1479,7 @@ export default function MasterAdminPage() {
                       {maCatSubmitting ? <><i className="fas fa-spinner fa-spin" style={{ marginRight: '0.375rem' }}></i>{editingMaCatId ? 'Saving…' : 'Creating…'}</> : (editingMaCatId ? 'Save Changes' : 'Create Category')}
                     </button>
                     {editingMaCatId && (
-                      <button type="button" onClick={() => { setEditingMaCatId(null); setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '' }); setMaCatFormMsg(''); }} style={{ padding: '0.625rem 0.875rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-muted)' }}>Cancel</button>
+                      <button type="button" onClick={() => { setEditingMaCatId(null); setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: '', description: '' }); setMaCatFormMsg(''); }} style={{ padding: '0.625rem 0.875rem', background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-muted)' }}>Cancel</button>
                     )}
                   </div>
                 </form>
@@ -1384,10 +1524,10 @@ export default function MasterAdminPage() {
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '0.375rem' }}>
-                              <button title="Add subcategory" onClick={() => { setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: cat.id }); setEditingMaCatId(null); setMaCatFormMsg(''); }} style={{ height: 30, padding: '0 0.625rem', borderRadius: 6, border: '1.5px solid #BBF7D0', background: '#F0FDF4', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#00AB4E', fontSize: '0.75rem', fontWeight: 600 }}>
+                              <button title="Add subcategory" onClick={() => { setMaCatForm({ name: '', icon: 'fas fa-folder', parentId: cat.id, description: '' }); setEditingMaCatId(null); setMaCatFormMsg(''); }} style={{ height: 30, padding: '0 0.625rem', borderRadius: 6, border: '1.5px solid #BBF7D0', background: '#F0FDF4', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#00AB4E', fontSize: '0.75rem', fontWeight: 600 }}>
                                 <i className="fas fa-plus" style={{ fontSize: '0.6rem' }}></i> Sub
                               </button>
-                              <button title="Edit" onClick={() => { setEditingMaCatId(cat.id); setMaCatForm({ name: cat.name, icon: cat.icon, parentId: '' }); setMaCatFormMsg(''); }} style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
+                              <button title="Edit" onClick={() => { setEditingMaCatId(cat.id); setMaCatForm({ name: cat.name, icon: cat.icon, parentId: '', description: cat.description || '' }); setMaCatFormMsg(''); }} style={{ width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
                                 <i className="fas fa-pen" style={{ fontSize: '0.65rem' }}></i>
                               </button>
                               <button title="Delete" disabled={!!deletingMaCatId} onClick={async () => {
@@ -1421,7 +1561,7 @@ export default function MasterAdminPage() {
                                   </div>
                                   <span style={{ flex: 1, fontSize: '0.875rem', color: 'var(--text-dark)', fontWeight: 500 }}>{sub.name}</span>
                                   <div style={{ display: 'flex', gap: '0.375rem' }}>
-                                    <button title="Edit" onClick={() => { setEditingMaCatId(sub.id); setMaCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '' }); setMaCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
+                                    <button title="Edit" onClick={() => { setEditingMaCatId(sub.id); setMaCatForm({ name: sub.name, icon: sub.icon, parentId: sub.parentId || '', description: sub.description || '' }); setMaCatFormMsg(''); }} style={{ width: 26, height: 26, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1E40AF' }}>
                                       <i className="fas fa-pen" style={{ fontSize: '0.6rem' }}></i>
                                     </button>
                                     <button title="Delete" disabled={!!deletingMaCatId} onClick={async () => {
