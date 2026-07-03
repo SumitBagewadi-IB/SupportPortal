@@ -366,11 +366,18 @@ function buildCorsHeaders(origin) {
   const allowedOrigin = ALLOWED_ORIGINS.length > 0
     ? (ALLOWED_ORIGINS.includes(origin) ? origin : '')
     : (origin || '*');
+  // Only emit CORS headers when the origin is actually permitted. A disallowed
+  // origin gets a bare response — no ACAO/ACAM/ACAH — so the browser blocks it
+  // instead of us advertising the accepted methods and headers to arbitrary
+  // sites. Vary: Origin stops shared caches from serving one origin's
+  // Access-Control-Allow-Origin to a different origin.
+  if (!allowedOrigin) return {};
   const headers = {
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Admin-Secret,X-Master-Token,Authorization',
   };
-  if (allowedOrigin) headers['Access-Control-Allow-Origin'] = allowedOrigin;
+  if (allowedOrigin !== '*') headers['Vary'] = 'Origin';
   return headers;
 }
 
