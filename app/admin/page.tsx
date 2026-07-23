@@ -725,8 +725,13 @@ export default function AdminPage() {
     ? [...dynamicCategories.map(c => c.name), ...articleOnlyCategories]
     : FALLBACK_CATEGORIES;
 
-  const publishedCount = articles.filter((a) => a.status === 'published' || a.status === 'active').length;
-  const draftCount = articles.filter((a) => a.status === 'draft').length;
+  // Stat cards scope to the selected category filter, so admins see
+  // category-wise counts (Total / Published / Drafts for that category);
+  // with "All Categories" selected they show the whole library.
+  const scopedArticles = catFilter ? articles.filter((a) => a.category === catFilter) : articles;
+  const totalCount = scopedArticles.length;
+  const publishedCount = scopedArticles.filter((a) => a.status === 'published' || a.status === 'active').length;
+  const draftCount = scopedArticles.filter((a) => a.status === 'draft').length;
   const openTickets = tickets.filter((t) => t.status !== 'solved' && t.status !== 'resolved').length;
 
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
@@ -921,9 +926,17 @@ export default function AdminPage() {
 
           {/* STATS */}
           {activeView === 'articles' && (
+            <>
+            {catFilter && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
+                <i className="fas fa-filter" style={{ fontSize: '0.7rem' }}></i>
+                Counts for <strong style={{ color: 'var(--admin-text-primary)' }}>{catFilter}</strong>
+                <button onClick={() => { setCatFilter(''); setPage(1); }} style={{ background: 'none', border: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: 'inherit', fontWeight: 600, padding: 0 }}>Show all categories</button>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               {[
-                { label: 'Total Articles', value: articles.length, icon: 'fa-file-lines', color: '#EFF6FF', iconColor: '#3B82F6' },
+                { label: catFilter ? `${catFilter} Articles` : 'Total Articles', value: totalCount, icon: 'fa-file-lines', color: '#EFF6FF', iconColor: '#3B82F6' },
                 { label: 'Published', value: publishedCount, icon: 'fa-circle-check', color: '#F0FFF4', iconColor: '#38A169' },
                 { label: 'Drafts', value: draftCount, icon: 'fa-file-pen', color: '#FFFBEB', iconColor: '#D97706' },
                 { label: 'Open Tickets', value: openTickets, icon: 'fa-ticket', color: '#FAF5FF', iconColor: '#7C3AED' },
@@ -941,6 +954,7 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+            </>
           )}
 
           {/* ARTICLES VIEW */}
