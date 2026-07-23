@@ -831,6 +831,24 @@ html:not([data-theme="dark"]) .fa-sun {
 .kb-sidebar {
     position: sticky;
     top: 76px;
+    /* Keep the topic list within the viewport and let it scroll on its own,
+       so a long list of topics no longer gets cut off at the bottom and the
+       sidebar scroll doesn't chain into the article list. */
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+.kb-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+.kb-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+.kb-sidebar::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .kb-sidebar-title {
@@ -1420,6 +1438,10 @@ footer {
     .kb-sidebar {
         position: static;
         top: auto;
+        /* On mobile the sidebar becomes a horizontal chip row — no height cap
+           or internal scroll (that is a desktop-only concern). */
+        max-height: none;
+        overflow: visible;
     }
 
     .kb-sidebar-nav {
