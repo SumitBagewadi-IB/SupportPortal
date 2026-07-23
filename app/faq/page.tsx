@@ -215,34 +215,64 @@ function FAQContent() {
   const selectedSub = useMemo(() => allCategories.find(c => c.id === selectedSubId), [allCategories, selectedSubId]);
   const subcategories = useMemo(() => selectedCatId ? getSubcategories(selectedCatId) : [], [selectedCatId, getSubcategories]);
 
-  // Filter articles based on navigation state
-  const filtered = useMemo(() => articles.filter(a => {
-    const matchesSearch = !search ||
-      a.title?.toLowerCase().includes(search.toLowerCase()) ||
-      (a.content || a.answer || '')?.toLowerCase().includes(search.toLowerCase()) ||
-      a.category?.toLowerCase().includes(search.toLowerCase());
-    if (!matchesSearch) return false;
-    // Search is global: while a query is present it spans every topic, so the
-    // selected topic only scopes browsing, never search.
-    if (search) return true;
-    if (selectedSubId && selectedSub) {
-      // A subcategory shows only the articles tagged directly to it.
-      return articleMatchesCategory(a, selectedSub.name);
-    }
-    if (selectedCatId && selectedCat) {
-      // A topic shows its own articles PLUS everything in its subcategories.
-      const subs = getSubcategories(selectedCatId);
-      return articleMatchesCategory(a, selectedCat.name) || subs.some(s => articleMatchesCategory(a, s.name));
-    }
-    return true;
-  }), [articles, selectedSubId, selectedSub, selectedCatId, selectedCat, getSubcategories, search]);
+  // Filter (and, when searching, RANK) articles based on navigation state.
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const qWords = q.split(/\s+/).filter(w => w.length >= 2);
+    // Relevance score: a title hit ranks far above a body-only mention, so the
+    // article actually ABOUT the query (e.g. "What is TPIN?") comes first
+    // instead of being buried under articles that merely mention it.
+    const scoreOf = (a: Article) => {
+      const title = (a.title || a.question || '').toLowerCase();
+      const content = (a.content || a.answer || '').toLowerCase();
+      const cat = (a.category || '').toLowerCase();
+      let s = 0;
+      if (title === q) s += 1000;
+      else if (title.startsWith(q)) s += 600;
+      else if (title.includes(q)) s += 300;
+      if (cat.includes(q)) s += 40;
+      if (content.includes(q)) s += 20;
+      for (const w of qWords) {
+        if (title.includes(w)) s += 25;
+        if (cat.includes(w)) s += 8;
+        if (content.includes(w)) s += 3;
+      }
+      return s;
+    };
+    const matched = articles.filter(a => {
+      const matchesSearch = !q ||
+        a.title?.toLowerCase().includes(q) ||
+        (a.content || a.answer || '')?.toLowerCase().includes(q) ||
+        a.category?.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      // Search is global: while a query is present it spans every topic, so the
+      // selected topic only scopes browsing, never search.
+      if (q) return true;
+      if (selectedSubId && selectedSub) {
+        // A subcategory shows only the articles tagged directly to it.
+        return articleMatchesCategory(a, selectedSub.name);
+      }
+      if (selectedCatId && selectedCat) {
+        // A topic shows its own articles PLUS everything in its subcategories.
+        const subs = getSubcategories(selectedCatId);
+        return articleMatchesCategory(a, selectedCat.name) || subs.some(s => articleMatchesCategory(a, s.name));
+      }
+      return true;
+    });
+    return q ? [...matched].sort((a, b) => scoreOf(b) - scoreOf(a)) : matched;
+  }, [articles, selectedSubId, selectedSub, selectedCatId, selectedCat, getSubcategories, search]);
 
-  const grouped: Record<string, Article[]> = useMemo(() => filtered.reduce<Record<string, Article[]>>((acc, a) => {
-    const cat = a.category || 'General';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(a);
-    return acc;
-  }, {}), [filtered]);
+  const grouped: Record<string, Article[]> = useMemo(() => {
+    // While searching, keep the single relevance-ranked order — don't regroup
+    // by category, which would scatter the best matches down the page.
+    if (search.trim()) return { '': filtered };
+    return filtered.reduce<Record<string, Article[]>>((acc, a) => {
+      const cat = a.category || 'General';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(a);
+      return acc;
+    }, {});
+  }, [filtered, search]);
 
   const getArticleCount = (cat: Category): number => {
     const subs = getSubcategories(cat.id);
@@ -476,7 +506,7 @@ function FAQContent() {
           ) : (
             (Object.entries(grouped) as [string, Article[]][]).map(([cat, items]) => (
               <div key={cat} className="article-group" data-cat={cat.toLowerCase()}>
-                {(search || Object.keys(grouped).length > 1) && <p className="article-group-title">{cat}</p>}
+                {!search.trim() && Object.keys(grouped).length > 1 && <p className="article-group-title">{cat}</p>}
                 {items.map((article: Article) => (
                   <div key={article.id} className="article-card" id={article.id}>
                     <button
