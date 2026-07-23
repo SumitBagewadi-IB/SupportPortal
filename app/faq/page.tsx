@@ -194,8 +194,10 @@ function FAQContent() {
       const found = allCategories.find(c => normalise(c.name) === catParam || c.id === catParam);
       if (found) {
         if (found.parentId) {
+          // Deep link to a subcategory. If that sub has no articles of its own,
+          // fall back to its parent so the link never lands on an empty page.
           setSelectedCatId(found.parentId);
-          setSelectedSubId(found.id);
+          setSelectedSubId(getSubOwnCount(found) > 0 ? found.id : '');
         } else {
           setSelectedCatId(found.id);
           setSelectedSubId('');
@@ -203,9 +205,16 @@ function FAQContent() {
         return;
       }
     }
-    setSelectedCatId('');
+    // No (or unrecognised) category in the URL: land on the first topic that
+    // actually has articles, so the first paint is never an empty state; only
+    // fall back to the first topic overall if somehow none have any. Search
+    // still spans all topics regardless of what is selected here.
+    const firstPopulated = topLevel.find(c =>
+      articles.some(a => articleMatchesCategory(a, c.name) ||
+        getSubcategories(c.id).some(s => articleMatchesCategory(a, s.name))));
+    setSelectedCatId((firstPopulated || topLevel[0])?.id || '');
     setSelectedSubId('');
-  }, [allCategories, catParam, loading]);
+  }, [allCategories, catParam, loading, topLevel, getSubOwnCount, articles, getSubcategories]);
 
   const selectedCat = useMemo(() => allCategories.find(c => c.id === selectedCatId), [allCategories, selectedCatId]);
   const selectedSub = useMemo(() => allCategories.find(c => c.id === selectedSubId), [allCategories, selectedSubId]);
@@ -213,22 +222,24 @@ function FAQContent() {
 
   // Filter articles based on navigation state
   const filtered = useMemo(() => articles.filter(a => {
-    let matchesCat = true;
-    if (selectedSubId && selectedSub) {
-      // A subcategory shows only the articles tagged directly to it.
-      matchesCat = articleMatchesCategory(a, selectedSub.name);
-    } else if (selectedCatId && selectedCat) {
-      // The category ("all") view shows parent-tagged articles PLUS everything
-      // in any of its subcategories — this is where parent-only articles live.
-      const subs = getSubcategories(selectedCatId);
-      matchesCat = articleMatchesCategory(a, selectedCat.name) ||
-        subs.some(s => articleMatchesCategory(a, s.name));
-    }
     const matchesSearch = !search ||
       a.title?.toLowerCase().includes(search.toLowerCase()) ||
       (a.content || a.answer || '')?.toLowerCase().includes(search.toLowerCase()) ||
       a.category?.toLowerCase().includes(search.toLowerCase());
-    return matchesCat && matchesSearch;
+    if (!matchesSearch) return false;
+    // Search is global: while a query is present it spans every topic, so the
+    // selected topic only scopes browsing, never search.
+    if (search) return true;
+    if (selectedSubId && selectedSub) {
+      // A subcategory shows only the articles tagged directly to it.
+      return articleMatchesCategory(a, selectedSub.name);
+    }
+    if (selectedCatId && selectedCat) {
+      // A topic shows its own articles PLUS everything in its subcategories.
+      const subs = getSubcategories(selectedCatId);
+      return articleMatchesCategory(a, selectedCat.name) || subs.some(s => articleMatchesCategory(a, s.name));
+    }
+    return true;
   }), [articles, selectedSubId, selectedSub, selectedCatId, selectedCat, getSubcategories, search]);
 
   const grouped: Record<string, Article[]> = useMemo(() => filtered.reduce<Record<string, Article[]>>((acc, a) => {
@@ -245,17 +256,13 @@ function FAQContent() {
     ).length;
   };
 
-  const heading = selectedSub?.name || selectedCat?.name || 'All Topics';
+  const heading = selectedSub?.name || selectedCat?.name || 'Knowledge Base';
 
   const selectTopLevel = (catId: string) => {
-    if (selectedCatId === catId) {
-      // Toggle collapse
-      setSelectedCatId('');
-      setSelectedSubId('');
-    } else {
-      setSelectedCatId(catId);
-      setSelectedSubId('');
-    }
+    // Always keep a topic selected — there is no "All Topics" state to fall
+    // back to. Re-clicking the active topic just clears any subcategory filter.
+    setSelectedCatId(catId);
+    setSelectedSubId('');
     setSearch('');
   };
 
@@ -271,16 +278,6 @@ function FAQContent() {
       <aside className="kb-sidebar">
         <p className="kb-sidebar-title">Topics</p>
         <div className="kb-sidebar-nav" id="kbSidebar">
-
-          {/* All Topics button */}
-          <button
-            className={`kb-nav-link${!selectedCatId ? ' active' : ''}`}
-            onClick={() => { setSelectedCatId(''); setSelectedSubId(''); setSearch(''); }}
-          >
-            <i className="fas fa-border-all" style={{ width: '14px' }}></i>
-            All Topics
-            {articles.length > 0 && <span className="nav-count">{articles.length}</span>}
-          </button>
 
           {topLevel.map((cat) => {
             const count = getArticleCount(cat);
@@ -391,11 +388,10 @@ function FAQContent() {
           <span><strong>Verified content:</strong> All articles are cross-referenced with official Indiabulls Securities policies.</span>
         </div>
 
-        {/* Breadcrumb when inside a category */}
-        {selectedCatId && (
+        {/* Breadcrumb — the selected topic (and subcategory). Hidden while
+            searching, since search spans every topic, not just this one. */}
+        {selectedCatId && !search && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            <button onClick={() => { setSelectedCatId(''); setSelectedSubId(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: 'inherit' }}>All Topics</button>
-            <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
             <button onClick={() => setSelectedSubId('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedSubId ? 'var(--text-muted)' : 'var(--text-dark)', padding: 0, fontSize: 'inherit', fontWeight: selectedSubId ? 400 : 600 }}>{selectedCat?.name}</button>
             {selectedSub && (<>
               <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
@@ -404,11 +400,10 @@ function FAQContent() {
           </div>
         )}
 
-        {/* Subcategory pill filters — shown only when the selected category has
-            subcategories that actually contain their own articles. The parent
-            ("All Topics › <category>" breadcrumb) is the implicit "all" view,
-            so no redundant "All" pill is rendered here. */}
-        {selectedCatId && subcategories.length > 0 && (
+        {/* Subcategory pill filters — shown only when the selected topic has
+            subcategories that actually contain their own articles, and not
+            while searching (search is global, so topic-scoped pills don't apply). */}
+        {selectedCatId && !search && subcategories.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             {subcategories.map(sub => (
               <button
@@ -426,10 +421,10 @@ function FAQContent() {
         <div className="kb-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
             <div>
-              <h1 id="kbHeading">{heading}</h1>
+              <h1 id="kbHeading">{search ? 'Search results' : heading}</h1>
               <p id="kbSubheading">
-                {!selectedCatId
-                  ? 'Browse all support articles or filter by topic from the sidebar.'
+                {search
+                  ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${search}"`
                   : `${filtered.length} article${filtered.length !== 1 ? 's' : ''} in this topic.`}
               </p>
             </div>

@@ -1516,7 +1516,7 @@ async function _handler(req, res) {
   // lexicographic range comparisons are chronological.
   //   ?from=ISO   inclusive lower bound (oldest to include)
   //   ?to=ISO     inclusive upper bound (newest to include)
-  //   ?before=ISO exclusive cursor for the next older page
+  //   ?before=ISO inclusive cursor for the next older page (client dedups)
   //   ?limit=N    page size (manager ≤500, master ≤1000)
   // Response stays a plain array (newest first); callers page by passing the
   // oldest returned timestamp back as `before`. All range filters stay on the
@@ -1531,14 +1531,18 @@ async function _handler(req, res) {
     const before = req.query?.before ? String(req.query.before) : null;
     const isManager = auth.role === 'manager';
     const cap = isManager ? 500 : 1000;
-    const limit = Math.min(parseInt(req.query?.limit || String(cap), 10) || cap, cap);
+    // Clamp to [1, cap] so a malformed or negative ?limit can't throw.
+    const limit = Math.min(Math.max(parseInt(req.query?.limit || String(cap), 10) || cap, 1), cap);
 
     let query = db.collection(AUDIT_COL);
     // Managers only ever see their own entries (unchanged behaviour).
     if (isManager) query = query.where('performedBy', '==', auth.performedBy);
     if (from)   query = query.where('timestamp', '>=', from);
     if (to)     query = query.where('timestamp', '<=', to);
-    if (before) query = query.where('timestamp', '<', before);
+    // Inclusive cursor: callers pass the oldest loaded timestamp as `before`.
+    // The boundary row re-appears but the client dedups by id, and same-
+    // timestamp siblings at the boundary are no longer skipped.
+    if (before) query = query.where('timestamp', '<=', before);
     query = query.orderBy('timestamp', 'desc').limit(limit);
 
     const snap = await query.get();

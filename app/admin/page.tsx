@@ -488,13 +488,18 @@ export default function AdminPage() {
   // Read + validate the chosen CSV. Nothing is uploaded here — we build a
   // preview so the user confirms before any write. Rows whose title already
   // exists (or repeats within the file) are skipped to avoid duplicates.
+  const IMPORT_MAX_ROWS = 2000;
+  const IMPORT_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
+
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (importInputRef.current) importInputRef.current.value = ''; // allow re-selecting the same file
     if (!file) return;
+    if (file.size > IMPORT_MAX_BYTES) { showToast(`File too large (max ${IMPORT_MAX_BYTES / 1024 / 1024} MB).`); return; }
     try {
       const rows = parseCSV(await file.text()).filter(r => r.some(c => c.trim() !== ''));
       if (rows.length < 2) { showToast('CSV is empty or has no data rows.'); return; }
+      if (rows.length - 1 > IMPORT_MAX_ROWS) { showToast(`Too many rows (${(rows.length - 1).toLocaleString()}). Split into files of ${IMPORT_MAX_ROWS.toLocaleString()} or fewer.`); return; }
       const header = rows[0].map(h => h.trim().toLowerCase());
       const col = (names: string[]) => { for (const n of names) { const i = header.indexOf(n); if (i >= 0) return i; } return -1; };
       const ti = col(['title', 'question']);
@@ -503,9 +508,30 @@ export default function AdminPage() {
       const si = col(['status']);
       if (ti < 0 || ci < 0 || coi < 0) { showToast('CSV needs title, category and content columns.'); return; }
 
+      // Dedup against ALL existing articles — including drafts — not just the
+      // published set in `articles`. Managers see everything via an authed
+      // GET /faq; fall back to the loaded (published) set if that call fails.
+      // Fall back to the already-loaded set if the authed fetch can't be
+      // trusted, so we never dedup against an empty list (which would let
+      // duplicates through).
+      const loadedTitles = () => new Set(articles.map(a => (a.title || a.question || '').trim().toLowerCase()));
+      let existingTitles: Set<string>;
+      try {
+        const res = await fetch(`${API_BASE}/faq`, { headers: authHeaders(managerToken) });
+        if (res.status === 401) { handleSessionExpired(); return; }
+        if (res.ok) {
+          const all = await res.json();
+          const list: Article[] = Array.isArray(all) ? all : (all.items || all.articles || []);
+          existingTitles = new Set(list.map(a => (a.title || a.question || '').trim().toLowerCase()));
+        } else {
+          existingTitles = loadedTitles();
+        }
+      } catch {
+        existingTitles = loadedTitles();
+      }
+
       const valid: { title: string; category: string; content: string; status: string }[] = [];
       const issues: { row: number; reason: string }[] = [];
-      const existingTitles = new Set(articles.map(a => (a.title || a.question || '').trim().toLowerCase()));
       const seenInFile = new Set<string>();
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
@@ -520,7 +546,9 @@ export default function AdminPage() {
         if (existingTitles.has(key)) { issues.push({ row: n, reason: `Already exists: "${title}"` }); continue; }
         if (seenInFile.has(key)) { issues.push({ row: n, reason: `Duplicate in file: "${title}"` }); continue; }
         seenInFile.add(key);
-        valid.push({ title, category, content, status: status || 'published' });
+        // Default to draft so a bulk upload never reaches end users until it is
+        // reviewed and published. An explicit status column is still honoured.
+        valid.push({ title, category, content, status: status || 'draft' });
       }
       setImportResult(null);
       setImportPreview({ valid, issues });
@@ -563,7 +591,7 @@ export default function AdminPage() {
   };
 
   const downloadTemplate = () => {
-    const sample = 'title,category,content,status\n"How do I reset my password?","Account","Go to Settings then Security and choose Reset Password.",published\n';
+    const sample = 'title,category,content,status\n"How do I reset my password?","Account","Go to Settings then Security and choose Reset Password.",draft\n';
     const url = URL.createObjectURL(new Blob([sample], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url; a.download = 'faq-import-template.csv';
@@ -1700,9 +1728,13 @@ export default function AdminPage() {
               </div>
             ) : (
               <>
-                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.5 }}>
+                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem', lineHeight: 1.5 }}>
                   <strong style={{ color: 'var(--admin-text-primary)' }}>{importPreview.valid.length}</strong> article{importPreview.valid.length !== 1 ? 's' : ''} ready to import
                   {importPreview.issues.length > 0 && <> · <strong style={{ color: '#DD6B20' }}>{importPreview.issues.length}</strong> row{importPreview.issues.length !== 1 ? 's' : ''} skipped</>}.
+                </p>
+                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', marginBottom: '1rem', lineHeight: 1.5, display: 'flex', gap: '0.4rem' }}>
+                  <i className="fas fa-circle-info" style={{ color: '#00AB4E', marginTop: '0.15rem' }}></i>
+                  <span>Imported as <strong>drafts</strong> (unless a row sets <code>status</code>), so they won&apos;t appear on the public portal until you publish them.</span>
                 </p>
                 {importPreview.issues.length > 0 && (
                   <div style={{ overflowY: 'auto', maxHeight: 200, border: '1px solid var(--admin-border)', borderRadius: 8, marginBottom: '1.25rem' }}>

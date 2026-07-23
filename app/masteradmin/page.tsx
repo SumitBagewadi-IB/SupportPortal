@@ -152,6 +152,7 @@ export default function MasterAdminPage() {
   const [auditTo, setAuditTo] = useState('');
   const [auditHasMore, setAuditHasMore] = useState(false);
   const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+  const [auditExporting, setAuditExporting] = useState(false);
   const [ticketSearch, setTicketSearch] = useState('');
   const [faqSearch, setFaqSearch] = useState('');
 
@@ -356,14 +357,23 @@ export default function MasterAdminPage() {
     }
   }, [handleSessionExpired]);
 
+  // Build the from/to query params for the current date range. Both ends are
+  // anchored to the viewer's LOCAL day (start-of-day / end-of-day) so a
+  // single-day filter isn't skewed across the UTC boundary.
+  const auditRangeParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (auditFrom) p.set('from', new Date(`${auditFrom}T00:00:00`).toISOString());
+    if (auditTo) p.set('to', new Date(`${auditTo}T23:59:59.999`).toISOString());
+    return p;
+  }, [auditFrom, auditTo]);
+
   // Fetch audit entries with the current date range. When `before` is given the
   // page is appended (load-older); otherwise it replaces the list (date filter
-  // apply / clear). `to` is expanded to end-of-day so the range is inclusive.
+  // apply / clear).
   const loadAudit = useCallback(async (opts: { before?: string; append?: boolean } = {}) => {
     if (!API_BASE) return;
-    const params = new URLSearchParams({ limit: String(AUDIT_PAGE) });
-    if (auditFrom) params.set('from', new Date(auditFrom).toISOString());
-    if (auditTo) { const end = new Date(auditTo); end.setHours(23, 59, 59, 999); params.set('to', end.toISOString()); }
+    const params = auditRangeParams();
+    params.set('limit', String(AUDIT_PAGE));
     if (opts.before) params.set('before', opts.before);
     if (opts.append) setAuditLoadingMore(true); else setLoading(true);
     try {
@@ -372,15 +382,18 @@ export default function MasterAdminPage() {
       if (!res.ok) return;
       const logs: AuditLog[] = await res.json();
       const sorted = logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setAuditHasMore(logs.length >= AUDIT_PAGE);
       setAuditLogs(prev => {
-        if (!opts.append) return sorted;
+        if (!opts.append) { setAuditHasMore(logs.length >= AUDIT_PAGE); return sorted; }
         const seen = new Set(prev.map(l => l.id));
-        return [...prev, ...sorted.filter(l => !seen.has(l.id))];
+        const fresh = sorted.filter(l => !seen.has(l.id));
+        // Stop paging if a full page returned but nothing was new (e.g. a
+        // cluster of identical timestamps at the boundary) — avoids a loop.
+        setAuditHasMore(logs.length >= AUDIT_PAGE && fresh.length > 0);
+        return [...prev, ...fresh];
       });
     } catch { /* ignore transient errors */ }
     finally { if (opts.append) setAuditLoadingMore(false); else setLoading(false); }
-  }, [auditFrom, auditTo, handleSessionExpired]);
+  }, [auditRangeParams, handleSessionExpired]);
 
   useEffect(() => {
     if (authed) {
@@ -438,6 +451,37 @@ export default function MasterAdminPage() {
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Export the FULL audit history for the current date range — not just the
+  // page currently on screen — so a compliance export is complete. Pages via
+  // the `before` cursor up to a safety cap and dedups defensively.
+  const handleExportAudit = async () => {
+    if (!API_BASE) return;
+    setAuditExporting(true);
+    try {
+      const MAX = 20000;
+      const all: AuditLog[] = [];
+      const seen = new Set<string>();
+      let before: string | undefined;
+      while (all.length < MAX) {
+        const params = auditRangeParams();
+        params.set('limit', '1000');
+        if (before) params.set('before', before);
+        const res = await fetch(masterUrl(`/audit-log?${params.toString()}`), { headers: getMasterHeaders() });
+        if (res.status === 401) { handleSessionExpired(); return; }
+        if (!res.ok) break;
+        const page: AuditLog[] = await res.json();
+        const fresh = page.filter(l => !seen.has(l.id));
+        fresh.forEach(l => seen.add(l.id));
+        all.push(...fresh);
+        if (page.length < 1000 || fresh.length === 0) break;
+        before = page.reduce((min, l) => (l.timestamp < min ? l.timestamp : min), page[0].timestamp);
+      }
+      all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      exportCSV(all, 'audit-log.csv');
+    } catch { /* ignore */ }
+    finally { setAuditExporting(false); }
   };
 
   // ── Must be defined before any early return (Rules of Hooks) ─────────────
@@ -846,8 +890,8 @@ export default function MasterAdminPage() {
                     Clear dates
                   </button>
                 )}
-                <button onClick={() => exportCSV(auditLogs, 'audit-log.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <i className="fas fa-download"></i> Export CSV
+                <button onClick={handleExportAudit} disabled={auditExporting} title="Export the full audit history for the selected date range" style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: auditExporting ? 'default' : 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: auditExporting ? 0.6 : 1 }}>
+                  {auditExporting ? <><i className="fas fa-spinner fa-spin"></i> Exporting…</> : <><i className="fas fa-download"></i> Export CSV</>}
                 </button>
               </div>
             </div>
@@ -887,8 +931,11 @@ export default function MasterAdminPage() {
               )}
             </div>
 
-            {auditHasMore && filteredLogs.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+            {auditHasMore && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginTop: '1rem' }}>
+                {(auditSearch || auditFilter !== 'all') && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Not finding it? Older entries aren&apos;t loaded yet.</span>
+                )}
                 <button
                   onClick={() => loadAudit({ before: auditLogs[auditLogs.length - 1]?.timestamp, append: true })}
                   disabled={auditLoadingMore}
