@@ -349,29 +349,6 @@ function FAQContent() {
             <i className="fas fa-comment-dots"></i> Contact Support
           </Link>
         </div>
-
-        <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: '10px', flexShrink: 0 }}>
-          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>
-            Regulatory Links
-          </p>
-          {[
-            { href: 'https://www.sebi.gov.in', label: 'SEBI' },
-            { href: 'https://www.nseindia.com', label: 'NSE India' },
-            { href: 'https://www.bseindia.com', label: 'BSE India' },
-            { href: 'https://www.cdslindia.com', label: 'CDSL' },
-            { href: 'https://scores.sebi.gov.in', label: 'SCORES Grievance' },
-          ].map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-mid)', padding: '0.3rem 0', textDecoration: 'none' }}
-            >
-              <i className="fas fa-external-link-alt" style={{ fontSize: '0.6rem' }}></i> {link.label}
-            </a>
-          ))}
-        </div>
       </aside>
 
       {/* MAIN ARTICLES */}
