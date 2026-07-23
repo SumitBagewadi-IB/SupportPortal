@@ -174,6 +174,18 @@ function FAQContent() {
   const topLevel = useMemo(() => allCategories.filter(c => !c.parentId), [allCategories]);
   const getSubcategories = useCallback((parentId: string) => allCategories.filter(c => c.parentId === parentId), [allCategories]);
 
+  // Articles tagged DIRECTLY to a subcategory — its own content, never the
+  // parent's. This is the honest count; parent-only articles belong to the
+  // parent total, not to any individual subcategory.
+  const getSubOwnCount = useCallback((sub: Category) =>
+    articles.filter(a => articleMatchesCategory(a, sub.name)).length, [articles]);
+
+  // Only subcategories that actually contain their own articles are shown.
+  // Subcategories defined in the category tree but with no articles tagged to
+  // them are hidden, so the UI never renders duplicative or zero-count filters.
+  const getVisibleSubcategories = useCallback((parentId: string) =>
+    getSubcategories(parentId).filter(s => getSubOwnCount(s) > 0), [getSubcategories, getSubOwnCount]);
+
   // Resolve URL catParam to a category ID whenever allCategories or catParam changes.
   // Both categories AND articles must be loaded before resolving.
   useEffect(() => {
@@ -197,21 +209,17 @@ function FAQContent() {
 
   const selectedCat = useMemo(() => allCategories.find(c => c.id === selectedCatId), [allCategories, selectedCatId]);
   const selectedSub = useMemo(() => allCategories.find(c => c.id === selectedSubId), [allCategories, selectedSubId]);
-  const subcategories = useMemo(() => selectedCatId ? getSubcategories(selectedCatId) : [], [selectedCatId, getSubcategories]);
+  const subcategories = useMemo(() => selectedCatId ? getVisibleSubcategories(selectedCatId) : [], [selectedCatId, getVisibleSubcategories]);
 
   // Filter articles based on navigation state
   const filtered = useMemo(() => articles.filter(a => {
     let matchesCat = true;
-    if (selectedSubId && selectedSub && selectedCat) {
-      const allSiblingSubs = getSubcategories(selectedCatId);
-      const taggedExactlyToThisSub = articleMatchesCategory(a, selectedSub.name);
-      // Also show parent-tagged articles that don't belong to any specific sibling subcategory
-      // This ensures existing articles tagged with a top-level name remain visible
-      const taggedToParentOnly = articleMatchesCategory(a, selectedCat.name) &&
-        !allSiblingSubs.some(s => s.id !== selectedSubId && articleMatchesCategory(a, s.name));
-      matchesCat = taggedExactlyToThisSub || taggedToParentOnly;
+    if (selectedSubId && selectedSub) {
+      // A subcategory shows only the articles tagged directly to it.
+      matchesCat = articleMatchesCategory(a, selectedSub.name);
     } else if (selectedCatId && selectedCat) {
-      // Show articles for the top-level category AND all its subcategories
+      // The category ("all") view shows parent-tagged articles PLUS everything
+      // in any of its subcategories — this is where parent-only articles live.
       const subs = getSubcategories(selectedCatId);
       matchesCat = articleMatchesCategory(a, selectedCat.name) ||
         subs.some(s => articleMatchesCategory(a, s.name));
@@ -235,19 +243,6 @@ function FAQContent() {
     return articles.filter(a =>
       articleMatchesCategory(a, cat.name) || subs.some(s => articleMatchesCategory(a, s.name))
     ).length;
-  };
-
-  const getSubCount = (sub: Category): number => {
-    if (!sub.parentId) return articles.filter(a => articleMatchesCategory(a, sub.name)).length;
-    const parent = allCategories.find(c => c.id === sub.parentId);
-    const siblings = getSubcategories(sub.parentId);
-    return articles.filter(a => {
-      if (articleMatchesCategory(a, sub.name)) return true;
-      // Count parent-tagged articles that don't belong to any other sibling sub
-      if (parent && articleMatchesCategory(a, parent.name) &&
-          !siblings.some(s => s.id !== sub.id && articleMatchesCategory(a, s.name))) return true;
-      return false;
-    }).length;
   };
 
   const heading = selectedSub?.name || selectedCat?.name || 'All Topics';
@@ -289,7 +284,7 @@ function FAQContent() {
 
           {topLevel.map((cat) => {
             const count = getArticleCount(cat);
-            const subs = getSubcategories(cat.id);
+            const subs = getVisibleSubcategories(cat.id);
             const isExpanded = selectedCatId === cat.id;
             return (
               <div key={cat.id}>
@@ -324,7 +319,7 @@ function FAQContent() {
                 {isExpanded && subs.length > 0 && (
                   <div style={{ marginLeft: '1rem', borderLeft: '2px solid var(--border)', paddingLeft: '0.5rem', marginBottom: '0.25rem' }}>
                     {subs.map(sub => {
-                      const subCount = getSubCount(sub);
+                      const subCount = getSubOwnCount(sub);
                       return (
                         <button
                           key={sub.id}
@@ -409,15 +404,12 @@ function FAQContent() {
           </div>
         )}
 
-        {/* Subcategory pill filters — shown when a top-level category is selected and has subcats */}
+        {/* Subcategory pill filters — shown only when the selected category has
+            subcategories that actually contain their own articles. The parent
+            ("All Topics › <category>" breadcrumb) is the implicit "all" view,
+            so no redundant "All" pill is rendered here. */}
         {selectedCatId && subcategories.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            <button
-              onClick={() => setSelectedSubId('')}
-              style={{ padding: '0.375rem 0.875rem', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, border: '1.5px solid', borderColor: !selectedSubId ? 'var(--green)' : 'var(--border)', background: !selectedSubId ? 'var(--green)' : 'var(--bg)', color: !selectedSubId ? 'white' : 'var(--text-muted)', cursor: 'pointer' }}
-            >
-              All
-            </button>
             {subcategories.map(sub => (
               <button
                 key={sub.id}
