@@ -175,16 +175,11 @@ function FAQContent() {
   const getSubcategories = useCallback((parentId: string) => allCategories.filter(c => c.parentId === parentId), [allCategories]);
 
   // Articles tagged DIRECTLY to a subcategory — its own content, never the
-  // parent's. This is the honest count; parent-only articles belong to the
-  // parent total, not to any individual subcategory.
+  // parent's. This is the honest count (0 for an empty subcategory), so a
+  // subcategory with no articles simply shows no count badge rather than
+  // inheriting the parent's total.
   const getSubOwnCount = useCallback((sub: Category) =>
     articles.filter(a => articleMatchesCategory(a, sub.name)).length, [articles]);
-
-  // Only subcategories that actually contain their own articles are shown.
-  // Subcategories defined in the category tree but with no articles tagged to
-  // them are hidden, so the UI never renders duplicative or zero-count filters.
-  const getVisibleSubcategories = useCallback((parentId: string) =>
-    getSubcategories(parentId).filter(s => getSubOwnCount(s) > 0), [getSubcategories, getSubOwnCount]);
 
   // Resolve URL catParam to a category ID whenever allCategories or catParam changes.
   // Both categories AND articles must be loaded before resolving.
@@ -194,10 +189,10 @@ function FAQContent() {
       const found = allCategories.find(c => normalise(c.name) === catParam || c.id === catParam);
       if (found) {
         if (found.parentId) {
-          // Deep link to a subcategory. If that sub has no articles of its own,
-          // fall back to its parent so the link never lands on an empty page.
+          // Deep link to a subcategory — select it directly. An empty sub shows
+          // a clear empty state rather than being hidden.
           setSelectedCatId(found.parentId);
-          setSelectedSubId(getSubOwnCount(found) > 0 ? found.id : '');
+          setSelectedSubId(found.id);
         } else {
           setSelectedCatId(found.id);
           setSelectedSubId('');
@@ -214,11 +209,11 @@ function FAQContent() {
         getSubcategories(c.id).some(s => articleMatchesCategory(a, s.name))));
     setSelectedCatId((firstPopulated || topLevel[0])?.id || '');
     setSelectedSubId('');
-  }, [allCategories, catParam, loading, topLevel, getSubOwnCount, articles, getSubcategories]);
+  }, [allCategories, catParam, loading, topLevel, articles, getSubcategories]);
 
   const selectedCat = useMemo(() => allCategories.find(c => c.id === selectedCatId), [allCategories, selectedCatId]);
   const selectedSub = useMemo(() => allCategories.find(c => c.id === selectedSubId), [allCategories, selectedSubId]);
-  const subcategories = useMemo(() => selectedCatId ? getVisibleSubcategories(selectedCatId) : [], [selectedCatId, getVisibleSubcategories]);
+  const subcategories = useMemo(() => selectedCatId ? getSubcategories(selectedCatId) : [], [selectedCatId, getSubcategories]);
 
   // Filter articles based on navigation state
   const filtered = useMemo(() => articles.filter(a => {
@@ -281,7 +276,7 @@ function FAQContent() {
 
           {topLevel.map((cat) => {
             const count = getArticleCount(cat);
-            const subs = getVisibleSubcategories(cat.id);
+            const subs = getSubcategories(cat.id);
             const isExpanded = selectedCatId === cat.id;
             return (
               <div key={cat.id}>
@@ -388,15 +383,15 @@ function FAQContent() {
           <span><strong>Verified content:</strong> All articles are cross-referenced with official Indiabulls Securities policies.</span>
         </div>
 
-        {/* Breadcrumb — the selected topic (and subcategory). Hidden while
-            searching, since search spans every topic, not just this one. */}
-        {selectedCatId && !search && (
+        {/* Breadcrumb — shown ONLY inside a subcategory, where it adds context
+            ("Topic › Sub") and a way back to the topic. For a plain top-level
+            topic it would just repeat the <h1> below, so it is omitted. Hidden
+            while searching, since search spans every topic. */}
+        {selectedSub && !search && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            <button onClick={() => setSelectedSubId('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedSubId ? 'var(--text-muted)' : 'var(--text-dark)', padding: 0, fontSize: 'inherit', fontWeight: selectedSubId ? 400 : 600 }}>{selectedCat?.name}</button>
-            {selectedSub && (<>
-              <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
-              <span style={{ color: 'var(--text-dark)', fontWeight: 600 }}>{selectedSub.name}</span>
-            </>)}
+            <button onClick={() => setSelectedSubId('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: 'inherit', fontWeight: 400 }}>{selectedCat?.name}</button>
+            <i className="fas fa-chevron-right" style={{ fontSize: '0.6rem' }}></i>
+            <span style={{ color: 'var(--text-dark)', fontWeight: 600 }}>{selectedSub.name}</span>
           </div>
         )}
 
@@ -463,8 +458,14 @@ function FAQContent() {
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '5rem 0' }}>
-              <i className="fas fa-search" style={{ fontSize: '2rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'block' }}></i>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>No articles found{search ? ` for "${search}"` : ` in ${heading}`}</p>
+              <i className={`fas ${search ? 'fa-search' : 'fa-folder-open'}`} style={{ fontSize: '2rem', color: 'var(--text-muted)', marginBottom: '1rem', display: 'block' }}></i>
+              {search ? (
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>No articles found for &quot;{search}&quot;</p>
+              ) : selectedSub ? (
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>No articles in <strong>{selectedSub.name}</strong> yet. This sub-category has been created but no articles are assigned to it.</p>
+              ) : (
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>No articles in {heading} yet.</p>
+              )}
               {search && (
                 <button onClick={() => setSearch('')} className="btn-secondary" style={{ marginRight: '0.75rem' }}>
                   Clear Search
@@ -475,7 +476,7 @@ function FAQContent() {
           ) : (
             (Object.entries(grouped) as [string, Article[]][]).map(([cat, items]) => (
               <div key={cat} className="article-group" data-cat={cat.toLowerCase()}>
-                <p className="article-group-title">{cat}</p>
+                {(search || Object.keys(grouped).length > 1) && <p className="article-group-title">{cat}</p>}
                 {items.map((article: Article) => (
                   <div key={article.id} className="article-card" id={article.id}>
                     <button
