@@ -174,13 +174,6 @@ function FAQContent() {
   const topLevel = useMemo(() => allCategories.filter(c => !c.parentId), [allCategories]);
   const getSubcategories = useCallback((parentId: string) => allCategories.filter(c => c.parentId === parentId), [allCategories]);
 
-  // Articles tagged DIRECTLY to a subcategory — its own content, never the
-  // parent's. This is the honest count (0 for an empty subcategory), so a
-  // subcategory with no articles simply shows no count badge rather than
-  // inheriting the parent's total.
-  const getSubOwnCount = useCallback((sub: Category) =>
-    articles.filter(a => articleMatchesCategory(a, sub.name)).length, [articles]);
-
   // Resolve URL catParam to a category ID whenever allCategories or catParam changes.
   // Both categories AND articles must be loaded before resolving.
   useEffect(() => {
@@ -274,13 +267,6 @@ function FAQContent() {
     }, {});
   }, [filtered, search]);
 
-  const getArticleCount = (cat: Category): number => {
-    const subs = getSubcategories(cat.id);
-    return articles.filter(a =>
-      articleMatchesCategory(a, cat.name) || subs.some(s => articleMatchesCategory(a, s.name))
-    ).length;
-  };
-
   const heading = selectedSub?.name || selectedCat?.name || 'Knowledge Base';
 
   const selectTopLevel = (catId: string) => {
@@ -305,7 +291,6 @@ function FAQContent() {
         <div className="kb-sidebar-nav" id="kbSidebar">
 
           {topLevel.map((cat) => {
-            const count = getArticleCount(cat);
             const subs = getSubcategories(cat.id);
             const isExpanded = selectedCatId === cat.id;
             return (
@@ -320,7 +305,6 @@ function FAQContent() {
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                    {count > 0 && <span className="nav-count">{count}</span>}
                     {subs.length > 0 && (
                       <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'}`} style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginLeft: '0.125rem' }}></i>
                     )}
@@ -340,21 +324,17 @@ function FAQContent() {
                 {/* Subcategories — shown when parent is expanded */}
                 {isExpanded && subs.length > 0 && (
                   <div style={{ marginLeft: '1rem', borderLeft: '2px solid var(--border)', paddingLeft: '0.5rem', marginBottom: '0.25rem' }}>
-                    {subs.map(sub => {
-                      const subCount = getSubOwnCount(sub);
-                      return (
-                        <button
-                          key={sub.id}
-                          className={`kb-nav-link${selectedSubId === sub.id ? ' active' : ''}`}
-                          onClick={() => selectSub(sub.id)}
-                          style={{ fontSize: '0.8125rem', padding: '0.375rem 0.625rem' }}
-                        >
-                          <i className={sub.icon} style={{ width: '12px', fontSize: '0.75rem' }}></i>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>{sub.name}</span>
-                          {subCount > 0 && <span className="nav-count">{subCount}</span>}
-                        </button>
-                      );
-                    })}
+                    {subs.map(sub => (
+                      <button
+                        key={sub.id}
+                        className={`kb-nav-link${selectedSubId === sub.id ? ' active' : ''}`}
+                        onClick={() => selectSub(sub.id)}
+                        style={{ fontSize: '0.8125rem', padding: '0.375rem 0.625rem' }}
+                      >
+                        <i className={sub.icon} style={{ width: '12px', fontSize: '0.75rem' }}></i>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>{sub.name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -362,7 +342,7 @@ function FAQContent() {
           })}
         </div>
 
-        <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+        <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: '10px', flexShrink: 0 }}>
           <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '0.4rem' }}>Still stuck?</p>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Our team replies within 2 hours.</p>
           <Link href="/contact" className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: '0.8rem' }}>
@@ -370,7 +350,7 @@ function FAQContent() {
           </Link>
         </div>
 
-        <div style={{ marginTop: '1.25rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: '10px' }}>
+        <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: '10px', flexShrink: 0 }}>
           <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>
             Regulatory Links
           </p>
@@ -449,8 +429,8 @@ function FAQContent() {
               <h1 id="kbHeading">{search ? 'Search results' : heading}</h1>
               <p id="kbSubheading">
                 {search
-                  ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${search}"`
-                  : `${filtered.length} article${filtered.length !== 1 ? 's' : ''} in this topic.`}
+                  ? `Results for "${search}"`
+                  : 'Browse help articles in this topic.'}
               </p>
             </div>
             <div className="search-wrapper" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>

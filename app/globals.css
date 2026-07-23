@@ -831,23 +831,31 @@ html:not([data-theme="dark"]) .fa-sun {
 .kb-sidebar {
     position: sticky;
     top: 76px;
-    /* Keep the topic list within the viewport and let it scroll on its own,
-       so a long list of topics no longer gets cut off at the bottom and the
-       sidebar scroll doesn't chain into the article list. */
-    max-height: calc(100vh - 96px);
+    /* Fixed-height column pinned to the viewport: the Topics list (.kb-sidebar-nav)
+       scrolls on its own, while the "Still stuck?" and Regulatory boxes stay
+       pinned in the footer instead of scrolling away with the topics. */
+    height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+/* Only the topic list scrolls */
+.kb-sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 4px;
     scrollbar-width: thin;
 }
-.kb-sidebar::-webkit-scrollbar {
+.kb-sidebar-nav::-webkit-scrollbar {
     width: 6px;
 }
-.kb-sidebar::-webkit-scrollbar-thumb {
+.kb-sidebar-nav::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 3px;
 }
-.kb-sidebar::-webkit-scrollbar-track {
+.kb-sidebar-nav::-webkit-scrollbar-track {
     background: transparent;
 }
 
@@ -859,6 +867,7 @@ html:not([data-theme="dark"]) .fa-sun {
     letter-spacing: 0.08em;
     margin-bottom: 0.5rem;
     padding: 0 0.75rem;
+    flex-shrink: 0;
 }
 
 /* Sidebar Navigation Links */
@@ -1438,9 +1447,10 @@ footer {
     .kb-sidebar {
         position: static;
         top: auto;
-        /* On mobile the sidebar becomes a horizontal chip row — no height cap
+        /* On mobile the sidebar becomes a horizontal chip row — no fixed height
            or internal scroll (that is a desktop-only concern). */
-        max-height: none;
+        height: auto;
+        display: block;
         overflow: visible;
     }
 
@@ -1449,6 +1459,9 @@ footer {
         flex-wrap: wrap;
         gap: 0.375rem;
         margin-bottom: 1.5rem;
+        flex: none;
+        min-height: 0;
+        overflow: visible;
     }
 
     .kb-nav-link {

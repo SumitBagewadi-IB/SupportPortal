@@ -225,10 +225,6 @@ export default function HomePage() {
               const slug = normalise(cat.name);
               const href = `/faq?cat=${cat.id !== slug ? cat.id : slug}`;
               const catSubs = homeSubs.filter(s => s.parentId === cat.id);
-              const articleCount = allArticlesRef.current.filter(a =>
-                a.category?.toLowerCase() === cat.name.toLowerCase() ||
-                catSubs.some(s => a.category?.toLowerCase() === s.name.toLowerCase())
-              ).length;
               const STATIC_DESCS: Record<string, string> = {
                 'getting-started': 'Account, KYC, first trade',
                 'account-opening': 'KYC, documents, activation',
@@ -272,11 +268,6 @@ export default function HomePage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 20px -5px rgba(0,0,0,0.08)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
                 >
-                  {articleCount > 0 && (
-                    <span style={{ position: 'absolute', top: '0.625rem', right: '0.625rem', background: palette.bg, color: palette.color, fontSize: '0.65rem', fontWeight: 700, borderRadius: 20, padding: '0.1rem 0.45rem', lineHeight: 1.6 }}>
-                      {articleCount}
-                    </span>
-                  )}
                   <div style={{
                     width: '52px', height: '52px', borderRadius: '14px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -327,7 +318,7 @@ export default function HomePage() {
               {allArticlesRef.current.length > 8 && (
                 <div style={{ textAlign: 'center', padding: '1rem' }}>
                   <Link href="/faq" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.9rem' }}>
-                    View all {allArticlesRef.current.length} articles <i className="fas fa-arrow-right" style={{ marginLeft: '0.25rem' }}></i>
+                    View all articles <i className="fas fa-arrow-right" style={{ marginLeft: '0.25rem' }}></i>
                   </Link>
                 </div>
               )}
