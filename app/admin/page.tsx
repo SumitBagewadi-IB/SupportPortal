@@ -721,8 +721,17 @@ export default function AdminPage() {
   const articleOnlyCategories = Array.from(
     new Set(articles.map(a => a.category).filter(c => c && !dynamicCatNames.has(c.toLowerCase())))
   );
+  // Order the category filter to match the Knowledge Base: the canonical
+  // topics first (Getting Started, Account Opening, Trading, …), then any extra
+  // DB/article-only categories after — rather than the DB sortOrder, which
+  // buried "Getting Started" in the middle of the list.
+  const kbOrderIndex = (name: string) => {
+    const i = FALLBACK_CATEGORIES.findIndex(c => c.toLowerCase() === name.toLowerCase());
+    return i === -1 ? FALLBACK_CATEGORIES.length + 1 : i;
+  };
   const allCategoryNames: string[] = dynamicCategories.length > 0
     ? [...dynamicCategories.map(c => c.name), ...articleOnlyCategories]
+        .sort((a, b) => kbOrderIndex(a) - kbOrderIndex(b) || a.localeCompare(b))
     : FALLBACK_CATEGORIES;
 
   // Stat cards scope to the selected category filter, so admins see
