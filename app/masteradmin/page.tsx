@@ -15,8 +15,13 @@ interface AuditLog {
   entityId: string;
   entityTitle?: string;
   performedBy: string;
-  meta?: Record<string, string>;
+  // Values are strings for simple entries, or nested { from, to } / snapshot
+  // objects for edit diffs and delete snapshots — hence `unknown`.
+  meta?: Record<string, unknown>;
 }
+
+// Audit page size for date-filtered / "load older" requests to /audit-log.
+const AUDIT_PAGE = 200;
 
 interface Manager {
   managerId: string;
@@ -142,6 +147,11 @@ export default function MasterAdminPage() {
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [ticketFilter, setTicketFilter] = useState<string>('all');
   const [auditSearch, setAuditSearch] = useState('');
+  // Audit date range + pagination
+  const [auditFrom, setAuditFrom] = useState('');
+  const [auditTo, setAuditTo] = useState('');
+  const [auditHasMore, setAuditHasMore] = useState(false);
+  const [auditLoadingMore, setAuditLoadingMore] = useState(false);
   const [ticketSearch, setTicketSearch] = useState('');
   const [faqSearch, setFaqSearch] = useState('');
 
@@ -313,7 +323,7 @@ export default function MasterAdminPage() {
       const [ticketsRes, faqRes, auditRes, feedbackRes] = await Promise.allSettled([
         fetch(masterUrl('/tickets'), { headers: getMasterHeaders() }),
         fetch(`${API_BASE}/faq`),
-        fetch(masterUrl('/audit-log'), { headers: getMasterHeaders() }),
+        fetch(masterUrl(`/audit-log?limit=${AUDIT_PAGE}`), { headers: getMasterHeaders() }),
         fetch(masterUrl('/feedback'), { headers: getMasterHeaders() }),
       ]);
 
@@ -336,6 +346,7 @@ export default function MasterAdminPage() {
       if (auditRes.status === 'fulfilled' && auditRes.value.ok) {
         const logs: AuditLog[] = await auditRes.value.json();
         setAuditLogs(logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+        setAuditHasMore(logs.length >= AUDIT_PAGE);
       }
     } catch {
       setLoadError('Failed to load data from API.');
@@ -344,6 +355,32 @@ export default function MasterAdminPage() {
       setLastRefreshed(new Date());
     }
   }, [handleSessionExpired]);
+
+  // Fetch audit entries with the current date range. When `before` is given the
+  // page is appended (load-older); otherwise it replaces the list (date filter
+  // apply / clear). `to` is expanded to end-of-day so the range is inclusive.
+  const loadAudit = useCallback(async (opts: { before?: string; append?: boolean } = {}) => {
+    if (!API_BASE) return;
+    const params = new URLSearchParams({ limit: String(AUDIT_PAGE) });
+    if (auditFrom) params.set('from', new Date(auditFrom).toISOString());
+    if (auditTo) { const end = new Date(auditTo); end.setHours(23, 59, 59, 999); params.set('to', end.toISOString()); }
+    if (opts.before) params.set('before', opts.before);
+    if (opts.append) setAuditLoadingMore(true); else setLoading(true);
+    try {
+      const res = await fetch(masterUrl(`/audit-log?${params.toString()}`), { headers: getMasterHeaders() });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      if (!res.ok) return;
+      const logs: AuditLog[] = await res.json();
+      const sorted = logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setAuditHasMore(logs.length >= AUDIT_PAGE);
+      setAuditLogs(prev => {
+        if (!opts.append) return sorted;
+        const seen = new Set(prev.map(l => l.id));
+        return [...prev, ...sorted.filter(l => !seen.has(l.id))];
+      });
+    } catch { /* ignore transient errors */ }
+    finally { if (opts.append) setAuditLoadingMore(false); else setLoading(false); }
+  }, [auditFrom, auditTo, handleSessionExpired]);
 
   useEffect(() => {
     if (authed) {
@@ -799,6 +836,16 @@ export default function MasterAdminPage() {
                   <option value="CREATE_TICKET">Created Ticket</option>
                   <option value="LOGIN">Admin Login</option>
                 </select>
+                <input type="date" value={auditFrom} max={auditTo || undefined} onChange={e => setAuditFrom(e.target.value)} title="From date" aria-label="Audit from date" style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                <input type="date" value={auditTo} min={auditFrom || undefined} onChange={e => setAuditTo(e.target.value)} title="To date" aria-label="Audit to date" style={{ padding: '0.5rem 0.75rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)' }} />
+                <button onClick={() => loadAudit()} disabled={loading} style={{ padding: '0.5rem 0.875rem', background: 'var(--green)', border: '1.5px solid var(--green)', borderRadius: 8, cursor: loading ? 'default' : 'pointer', fontSize: '0.875rem', color: '#fff', fontWeight: 600, opacity: loading ? 0.6 : 1 }}>
+                  Apply
+                </button>
+                {(auditFrom || auditTo) && (
+                  <button onClick={() => { setAuditFrom(''); setAuditTo(''); fetchAll(); }} style={{ padding: '0.5rem 0.75rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                    Clear dates
+                  </button>
+                )}
                 <button onClick={() => exportCSV(auditLogs, 'audit-log.csv')} style={{ padding: '0.5rem 0.875rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                   <i className="fas fa-download"></i> Export CSV
                 </button>
@@ -839,6 +886,18 @@ export default function MasterAdminPage() {
                 })
               )}
             </div>
+
+            {auditHasMore && filteredLogs.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                <button
+                  onClick={() => loadAudit({ before: auditLogs[auditLogs.length - 1]?.timestamp, append: true })}
+                  disabled={auditLoadingMore}
+                  style={{ padding: '0.625rem 1.25rem', background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 8, cursor: auditLoadingMore ? 'default' : 'pointer', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: auditLoadingMore ? 0.6 : 1 }}
+                >
+                  {auditLoadingMore ? <><i className="fas fa-spinner fa-spin"></i> Loading…</> : <><i className="fas fa-clock-rotate-left"></i> Load older entries</>}
+                </button>
+              </div>
+            )}
           </>
         )}
 

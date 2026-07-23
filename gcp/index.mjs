@@ -159,9 +159,18 @@ const ADMIN_SECRET        = process.env.ADMIN_SECRET        || '';
 const MASTER_ADMIN_SECRET = process.env.MASTER_ADMIN_SECRET || '';
 const JWT_SECRET          = process.env.JWT_SECRET          || (() => { throw new Error('JWT_SECRET env var is required'); })();
 
+// The shared X-Admin-Secret header grants admin-level access with no individual
+// login, so any action taken through it is audited only as a generic "admin"
+// with no personal accountability. It is RETIRED by default. Set
+// ALLOW_LEGACY_ADMIN_SECRET=true only as a temporary rollover valve if some
+// out-of-band integration still depends on it — the admin portal itself always
+// authenticates with per-manager JWTs and never uses this path.
+const ALLOW_LEGACY_ADMIN_SECRET = process.env.ALLOW_LEGACY_ADMIN_SECRET === 'true';
+
 // Fail-fast: warn loudly if privileged secrets are missing
 if (!ADMIN_SECRET)        console.error('[STARTUP] WARNING: ADMIN_SECRET is not set — manager header auth is disabled');
 if (!MASTER_ADMIN_SECRET) console.error('[STARTUP] WARNING: MASTER_ADMIN_SECRET is not set — /auth/masterlogin will return 503');
+if (ADMIN_SECRET && !ALLOW_LEGACY_ADMIN_SECRET) console.warn('[STARTUP] Legacy X-Admin-Secret auth is DISABLED (set ALLOW_LEGACY_ADMIN_SECRET=true to re-enable during rollover)');
 
 const TOKEN_TTL_SECS        = 7200;  // 2 hours — manager JWT
 const MASTER_TOKEN_TTL_SECS = 28800; // 8 hours — master session token
@@ -489,7 +498,9 @@ function extractAuth(req) {
   const isMasterLegacy     = !masterTokenPayload && MASTER_ADMIN_SECRET && xSecret === MASTER_ADMIN_SECRET;
   const isMaster           = !!masterTokenPayload || isMasterLegacy;
 
-  const isAdmin    = !isMaster && ADMIN_SECRET && xSecret === ADMIN_SECRET;
+  // Legacy shared-secret admin path — disabled unless explicitly re-enabled
+  // via ALLOW_LEGACY_ADMIN_SECRET (see the flag definition for rationale).
+  const isAdmin    = ALLOW_LEGACY_ADMIN_SECRET && !isMaster && ADMIN_SECRET && xSecret === ADMIN_SECRET;
   const jwtPayload = bearerToken ? verifyJWT(bearerToken) : null;
 
   return { isMaster, isAdmin, jwtPayload };
@@ -510,7 +521,7 @@ const STATUS_CACHE_TTL_SECS = 300; // 5 minutes
 async function requireManagerOrMaster(req) {
   const auth = extractAuth(req);
   if (auth.isMaster) return { ok: true, performedBy: 'masteradmin', role: 'masteradmin' };
-  if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin', role: 'admin' };
+  if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin (legacy secret)', role: 'admin' };
 
   const jwt = auth.jwtPayload;
   if (!jwt?.managerId) return { ok: false };
@@ -557,6 +568,38 @@ async function writeAudit({ action, entity, entityId, entityTitle, performedBy, 
   } catch (e) {
     console.error('Audit write failed:', e.message);
   }
+}
+
+// Long field values are truncated so a single audit record stays small and
+// well under Firestore's 1 MB document limit even for large FAQ bodies.
+const AUDIT_VALUE_CAP = 2000;
+function capAuditValue(v) {
+  if (v === undefined) return null;
+  if (typeof v !== 'string') return v;
+  return v.length > AUDIT_VALUE_CAP ? `${v.slice(0, AUDIT_VALUE_CAP)}…[+${v.length - AUDIT_VALUE_CAP} chars]` : v;
+}
+
+// Builds a { field: { from, to } } diff for the fields that actually changed
+// between the stored document and the incoming update, so the audit log
+// records WHAT a value was before an edit — not just which field names changed.
+function buildChangeSet(oldData, updateData, fields) {
+  const changes = {};
+  for (const f of fields) {
+    if (!(f in updateData)) continue;
+    const before = oldData ? oldData[f] : undefined;
+    const after = updateData[f];
+    if (before === after) continue;
+    changes[f] = { from: capAuditValue(before), to: capAuditValue(after) };
+  }
+  return changes;
+}
+
+// Captures a bounded snapshot of a document's key fields — used on deletes so
+// the audit log preserves what was removed (otherwise unrecoverable).
+function auditSnapshot(data, fields) {
+  const out = {};
+  for (const f of fields) if (data && data[f] !== undefined) out[f] = capAuditValue(data[f]);
+  return out;
 }
 
 // ─── Cloud Function entry point ────────────────────────────────────────────
@@ -1228,7 +1271,7 @@ async function _handler(req, res) {
         updatedAt: new Date().toISOString(),
       });
       invalidateArticleCache();
-      await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: existingSnap.data().title, performedBy: auth.performedBy, meta: { newStatus: body.status } });
+      await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: existingSnap.data().title, performedBy: auth.performedBy, meta: { changes: { status: { from: existingSnap.data().status ?? null, to: body.status || 'published' } } } });
       return r(200, { ok: true });
     }
 
@@ -1282,7 +1325,8 @@ async function _handler(req, res) {
 
     await db.collection(FAQ_COL).doc(id).update(updateData);
     invalidateArticleCache();
-    await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existingSnap.data().title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
+    const faqChanges = buildChangeSet(existingSnap.data(), updateData, ['title', 'category', 'content', 'status', 'sortOrder']);
+    await writeAudit({ action: 'UPDATE_FAQ', entity: 'faq', entityId: id, entityTitle: title || existingSnap.data().title || id, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(faqChanges), changes: faqChanges } });
     return r(200, { ok: true });
   }
 
@@ -1295,9 +1339,10 @@ async function _handler(req, res) {
     const existingSnap = await db.collection(FAQ_COL).doc(id).get();
     if (!existingSnap.exists) return r(404, { error: 'Article not found' });
     const title = existingSnap.data().title || id;
+    const deletedSnapshot = auditSnapshot(existingSnap.data(), ['title', 'category', 'content', 'status']);
     await db.collection(FAQ_COL).doc(id).delete();
     invalidateArticleCache();
-    await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy });
+    await writeAudit({ action: 'DELETE_FAQ', entity: 'faq', entityId: id, entityTitle: title, performedBy: auth.performedBy, meta: { deleted: deletedSnapshot } });
     return r(200, { ok: true });
   }
 
@@ -1466,26 +1511,38 @@ async function _handler(req, res) {
   }
 
   // ── GET /audit-log ─────────────────────────────────────────────────────────
+  // Supports date-range filtering and "load older" pagination so history is no
+  // longer hidden behind a fixed cap. `timestamp` is an ISO-8601 string, so
+  // lexicographic range comparisons are chronological.
+  //   ?from=ISO   inclusive lower bound (oldest to include)
+  //   ?to=ISO     inclusive upper bound (newest to include)
+  //   ?before=ISO exclusive cursor for the next older page
+  //   ?limit=N    page size (manager ≤500, master ≤1000)
+  // Response stays a plain array (newest first); callers page by passing the
+  // oldest returned timestamp back as `before`. All range filters stay on the
+  // single `timestamp` field, so the existing (performedBy, timestamp) index
+  // covers the manager path and no new index is required.
   if (method === 'GET' && path === '/audit-log') {
     const auth = await requireManagerOrMaster(req);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
 
-    let items;
-    if (auth.role === 'manager') {
-      // Use Firestore where() query for O(1) manager-scoped lookup (replaces GSI)
-      const snap = await db.collection(AUDIT_COL)
-        .where('performedBy', '==', auth.performedBy)
-        .orderBy('timestamp', 'desc')
-        .limit(500)
-        .get();
-      items = snap.docs.map(d => d.data());
-    } else {
-      // Master admin: full collection with a safety cap
-      const snap = await db.collection(AUDIT_COL).orderBy('timestamp', 'desc').limit(1000).get();
-      items = snap.docs.map(d => d.data());
-    }
+    const from   = req.query?.from   ? String(req.query.from)   : null;
+    const to     = req.query?.to     ? String(req.query.to)     : null;
+    const before = req.query?.before ? String(req.query.before) : null;
+    const isManager = auth.role === 'manager';
+    const cap = isManager ? 500 : 1000;
+    const limit = Math.min(parseInt(req.query?.limit || String(cap), 10) || cap, cap);
 
-    return r(200, items);
+    let query = db.collection(AUDIT_COL);
+    // Managers only ever see their own entries (unchanged behaviour).
+    if (isManager) query = query.where('performedBy', '==', auth.performedBy);
+    if (from)   query = query.where('timestamp', '>=', from);
+    if (to)     query = query.where('timestamp', '<=', to);
+    if (before) query = query.where('timestamp', '<', before);
+    query = query.orderBy('timestamp', 'desc').limit(limit);
+
+    const snap = await query.get();
+    return r(200, snap.docs.map(d => d.data()));
   }
 
   // ── GET /categories ──────────────────────────────────────────────────────
@@ -1542,7 +1599,8 @@ async function _handler(req, res) {
       updateData.status = body.status;
     }
     await db.collection(CATEGORIES_COL).doc(catId).update(updateData);
-    await writeAudit({ action: 'UPDATE_CATEGORY', entity: 'category', entityId: catId, entityTitle: body.name || existingSnap.data().name, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(body) } });
+    const catChanges = buildChangeSet(existingSnap.data(), updateData, ['name', 'icon', 'description', 'sortOrder', 'status']);
+    await writeAudit({ action: 'UPDATE_CATEGORY', entity: 'category', entityId: catId, entityTitle: body.name || existingSnap.data().name, performedBy: auth.performedBy, meta: { fieldsChanged: Object.keys(catChanges), changes: catChanges } });
     return r(200, { ok: true });
   }
 
@@ -1554,8 +1612,9 @@ async function _handler(req, res) {
     const catId = catDeleteMatch[1];
     const existingSnap = await db.collection(CATEGORIES_COL).doc(catId).get();
     if (!existingSnap.exists) return r(404, { error: 'Category not found' });
+    const deletedCat = auditSnapshot(existingSnap.data(), ['name', 'icon', 'description', 'parentId', 'status']);
     await db.collection(CATEGORIES_COL).doc(catId).delete();
-    await writeAudit({ action: 'DELETE_CATEGORY', entity: 'category', entityId: catId, entityTitle: existingSnap.data().name, performedBy: auth.performedBy });
+    await writeAudit({ action: 'DELETE_CATEGORY', entity: 'category', entityId: catId, entityTitle: existingSnap.data().name, performedBy: auth.performedBy, meta: { deleted: deletedCat } });
     return r(200, { ok: true });
   }
 
