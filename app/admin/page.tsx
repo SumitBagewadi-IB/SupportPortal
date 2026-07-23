@@ -144,6 +144,12 @@ export default function AdminPage() {
   // Toast notification
   const [toast, setToast] = useState('');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bulk CSV import
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [importPreview, setImportPreview] = useState<{ valid: { title: string; category: string; content: string; status: string }[]; issues: { row: number; reason: string }[] } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const [importResult, setImportResult] = useState<{ created: number; failed: { title: string; reason: string }[] } | null>(null);
   // Ticket search + pagination
   const [ticketSearch, setTicketSearch] = useState('');
   const [ticketPage, setTicketPage] = useState(1);
@@ -456,6 +462,113 @@ export default function AdminPage() {
     setEditingId(article.id);
     setFormMsg('');
     setActiveView('add');
+  };
+
+  // ── Bulk CSV import ─────────────────────────────────────────────────────────
+  // Minimal RFC-4180 parser: handles quoted fields, escaped "" quotes, and
+  // commas/newlines inside quoted values (FAQ content routinely has both).
+  const parseCSV = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let field = '', row: string[] = [], inQuotes = false;
+    const s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (inQuotes) {
+        if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+        else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += c;
+    }
+    if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+    return rows;
+  };
+
+  // Read + validate the chosen CSV. Nothing is uploaded here — we build a
+  // preview so the user confirms before any write. Rows whose title already
+  // exists (or repeats within the file) are skipped to avoid duplicates.
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (importInputRef.current) importInputRef.current.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    try {
+      const rows = parseCSV(await file.text()).filter(r => r.some(c => c.trim() !== ''));
+      if (rows.length < 2) { showToast('CSV is empty or has no data rows.'); return; }
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const col = (names: string[]) => { for (const n of names) { const i = header.indexOf(n); if (i >= 0) return i; } return -1; };
+      const ti = col(['title', 'question']);
+      const ci = col(['category']);
+      const coi = col(['content', 'answer']);
+      const si = col(['status']);
+      if (ti < 0 || ci < 0 || coi < 0) { showToast('CSV needs title, category and content columns.'); return; }
+
+      const valid: { title: string; category: string; content: string; status: string }[] = [];
+      const issues: { row: number; reason: string }[] = [];
+      const existingTitles = new Set(articles.map(a => (a.title || a.question || '').trim().toLowerCase()));
+      const seenInFile = new Set<string>();
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const title = (r[ti] || '').trim();
+        const category = (r[ci] || '').trim();
+        const content = (r[coi] || '').trim();
+        const status = si >= 0 ? (r[si] || '').trim().toLowerCase() : '';
+        const n = i + 1;
+        if (!title || !category || !content) { issues.push({ row: n, reason: 'Missing title, category or content' }); continue; }
+        if (content.length > MAX_CONTENT) { issues.push({ row: n, reason: `Content exceeds ${MAX_CONTENT.toLocaleString()} chars` }); continue; }
+        const key = title.toLowerCase();
+        if (existingTitles.has(key)) { issues.push({ row: n, reason: `Already exists: "${title}"` }); continue; }
+        if (seenInFile.has(key)) { issues.push({ row: n, reason: `Duplicate in file: "${title}"` }); continue; }
+        seenInFile.add(key);
+        valid.push({ title, category, content, status: status || 'published' });
+      }
+      setImportResult(null);
+      setImportPreview({ valid, issues });
+    } catch { showToast('Could not read the CSV file.'); }
+  };
+
+  // Upload the confirmed rows one at a time via the existing POST /faq so each
+  // row is validated server-side and a per-row failure never aborts the batch.
+  const runImport = async () => {
+    if (!importPreview || !managerToken) return;
+    const { valid } = importPreview;
+    if (valid.length === 0) { setImportPreview(null); return; }
+    setImporting(true);
+    setImportProgress({ done: 0, total: valid.length });
+    const failed: { title: string; reason: string }[] = [];
+    let created = 0;
+    let sortOrder = articles.reduce((m, a) => Math.max(m, a.sortOrder ?? 0), 0) + 1;
+    for (let i = 0; i < valid.length; i++) {
+      const row = valid[i];
+      try {
+        const res = await fetch(`${API_BASE}/faq`, {
+          method: 'POST',
+          headers: authHeaders(managerToken),
+          body: JSON.stringify({ ...row, sortOrder: sortOrder++ }),
+        });
+        if (res.status === 401) { setImporting(false); setImportPreview(null); handleSessionExpired(); return; }
+        if (!res.ok) {
+          let reason = `HTTP ${res.status}`;
+          try { const j = await res.json(); if (j?.error) reason = j.error; } catch { /* keep status */ }
+          failed.push({ title: row.title, reason });
+        } else created++;
+      } catch { failed.push({ title: row.title, reason: 'Network error' }); }
+      setImportProgress({ done: i + 1, total: valid.length });
+    }
+    setImporting(false);
+    setImportPreview(null);
+    setImportResult({ created, failed });
+    showToast(`Import complete: ${created} added${failed.length ? `, ${failed.length} failed` : ''}.`);
+    fetchArticles();
+  };
+
+  const downloadTemplate = () => {
+    const sample = 'title,category,content,status\n"How do I reset my password?","Account","Go to Settings then Security and choose Reset Password.",published\n';
+    const url = URL.createObjectURL(new Blob([sample], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'faq-import-template.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleCancelEdit = () => { setForm(emptyForm); setEditingId(null); setFormMsg(''); setActiveView('articles'); };
@@ -861,6 +974,13 @@ export default function AdminPage() {
                         {savingOrder ? 'Saving...' : 'Save Order'}
                       </button>
                     )}
+                    <input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={handleImportFile} style={{ display: 'none' }} />
+                    <button onClick={downloadTemplate} title="Download a CSV template" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.75rem', background: 'var(--admin-surface)', color: 'var(--admin-text-secondary)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer' }}>
+                      <i className="fas fa-file-csv" style={{ fontSize: '0.7rem' }}></i> Template
+                    </button>
+                    <button onClick={() => importInputRef.current?.click()} title="Bulk-import articles from a CSV file" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: 'var(--admin-surface)', color: 'var(--admin-text-primary)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                      <i className="fas fa-file-import" style={{ fontSize: '0.7rem' }}></i> Import CSV
+                    </button>
                     <button onClick={() => { setEditingId(null); setForm(emptyForm); setFormMsg(''); setActiveView('add'); }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
                       <i className="fas fa-plus" style={{ fontSize: '0.7rem' }}></i> Add Article
                     </button>
@@ -1558,6 +1678,80 @@ export default function AdminPage() {
                 {deletingId ? <><i className="fas fa-spinner fa-spin" style={{ fontSize: '0.875rem' }}></i> Deleting...</> : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT PREVIEW / PROGRESS MODAL */}
+      {importPreview && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 520, width: '100%', padding: '1.75rem', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.5rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-file-import" style={{ color: '#00AB4E' }}></i> Import Articles from CSV
+            </h3>
+            {importing ? (
+              <div style={{ padding: '1rem 0' }}>
+                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+                  Uploading… {importProgress.done} of {importProgress.total}
+                </p>
+                <div style={{ height: 8, background: 'var(--admin-border)', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${importProgress.total ? (importProgress.done / importProgress.total) * 100 : 0}%`, background: '#00AB4E', transition: 'width 0.2s' }}></div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.5 }}>
+                  <strong style={{ color: 'var(--admin-text-primary)' }}>{importPreview.valid.length}</strong> article{importPreview.valid.length !== 1 ? 's' : ''} ready to import
+                  {importPreview.issues.length > 0 && <> · <strong style={{ color: '#DD6B20' }}>{importPreview.issues.length}</strong> row{importPreview.issues.length !== 1 ? 's' : ''} skipped</>}.
+                </p>
+                {importPreview.issues.length > 0 && (
+                  <div style={{ overflowY: 'auto', maxHeight: 200, border: '1px solid var(--admin-border)', borderRadius: 8, marginBottom: '1.25rem' }}>
+                    {importPreview.issues.map((iss) => (
+                      <div key={iss.row} style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)', color: 'var(--admin-text-secondary)' }}>
+                        <span style={{ fontWeight: 700, color: '#DD6B20', flexShrink: 0 }}>Row {iss.row}</span>
+                        <span>{iss.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button onClick={() => setImportPreview(null)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
+                    Cancel
+                  </button>
+                  <button onClick={runImport} disabled={importPreview.valid.length === 0} style={{ flex: 1, padding: '0.75rem', background: importPreview.valid.length === 0 ? 'var(--admin-border)' : '#00AB4E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: importPreview.valid.length === 0 ? 'not-allowed' : 'pointer' }}>
+                    Import {importPreview.valid.length > 0 ? importPreview.valid.length : ''}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT RESULT MODAL */}
+      {importResult && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 520, width: '100%', padding: '1.75rem', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.75rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-circle-check" style={{ color: '#00AB4E' }}></i> Import Complete
+            </h3>
+            <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: importResult.failed.length ? '1rem' : '1.5rem' }}>
+              <strong style={{ color: '#00AB4E' }}>{importResult.created}</strong> article{importResult.created !== 1 ? 's' : ''} added
+              {importResult.failed.length > 0 && <> · <strong style={{ color: '#E53E3E' }}>{importResult.failed.length}</strong> failed</>}.
+            </p>
+            {importResult.failed.length > 0 && (
+              <div style={{ overflowY: 'auto', maxHeight: 220, border: '1px solid var(--admin-border)', borderRadius: 8, marginBottom: '1.25rem' }}>
+                {importResult.failed.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--admin-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title}</span>
+                    <span style={{ color: '#E53E3E' }}>{f.reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setImportResult(null)} style={{ padding: '0.75rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
+              Done
+            </button>
           </div>
         </div>
       )}
