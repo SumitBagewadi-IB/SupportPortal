@@ -48,9 +48,10 @@
 
 import functions from '@google-cloud/functions-framework';
 import { Firestore } from '@google-cloud/firestore';
-import { createHmac, randomUUID } from 'crypto';
+import { createHmac, randomUUID, randomInt } from 'crypto';
 import { scrypt, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
+import nodemailer from 'nodemailer';
 
 const scryptAsync = promisify(scrypt);
 
@@ -63,6 +64,26 @@ const ANALYTICS_COL = process.env.ANALYTICS_COLLECTION || 'analytics';
 const MANAGERS_COL  = process.env.MANAGERS_COLLECTION  || 'managers';
 const CATEGORIES_COL= process.env.CATEGORIES_COLLECTION|| 'categories';
 const FEEDBACK_COL  = process.env.FEEDBACK_COLLECTION   || 'feedback';
+const OTP_COL       = process.env.OTP_COLLECTION        || 'login-otps';
+
+// ─── Email OTP login ─────────────────────────────────────────────────────────
+// Admin / master-admin sign in with their official email + a one-time code.
+// Only this domain may authenticate; authorisation still requires the email to
+// be provisioned in the managers collection (having a company email ≠ access).
+const OTP_ALLOWED_DOMAIN = (process.env.OTP_ALLOWED_DOMAIN || 'indiabulls.com').toLowerCase();
+const OTP_TTL_SECS       = 600;  // code valid for 10 minutes
+const OTP_MAX_ATTEMPTS   = 5;    // wrong-code attempts before the code is burned
+const OTP_LENGTH         = 6;
+// Corporate SMTP relay (provisioned as GCP secrets — never in the browser).
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const OTP_FROM_ADDR = process.env.OTP_FROM_ADDR || 'no-reply@indiabulls.com';
+// Comma-separated emails seeded as master admins so the first login isn't
+// locked out before anyone is provisioned via the Managers screen.
+const OTP_SEED_MASTERS = (process.env.OTP_SEED_MASTERS || 'sumit.bagewadi@indiabulls.com')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
 // Backend-enforced profanity / explicit-language filter for public feedback.
 // Frontend checks can be bypassed (direct API calls), so the function is the authority.
@@ -472,11 +493,87 @@ async function verifyPassword(password, hash) {
   }
 }
 
+// ─── Email OTP helpers ───────────────────────────────────────────────────────
+
+// A login email must be a well-formed address on the allowed corporate domain.
+function isAllowedLoginEmail(email) {
+  return typeof email === 'string' &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    email.toLowerCase().endsWith('@' + OTP_ALLOWED_DOMAIN);
+}
+
+// The managers collection IS the allow-list: an email only authenticates if it
+// has an active manager doc. Master admins are managers with role
+// 'masteradmin'. Seeded master emails resolve to masteradmin even before a doc
+// exists, so the very first login is never locked out. Returns null if the
+// email is not authorised (caller must not reveal which).
+async function resolveLoginIdentity(emailLower) {
+  let manager = null;
+  try {
+    const snap = await db.collection(MANAGERS_COL).where('email', '==', emailLower).limit(1).get();
+    if (!snap.empty) manager = snap.docs[0].data();
+  } catch (e) {
+    console.error('resolveLoginIdentity query failed:', e.message);
+  }
+  if (manager) {
+    if (manager.status && manager.status !== 'active') return null;
+    return {
+      email: emailLower,
+      role: manager.role === 'masteradmin' ? 'masteradmin' : 'manager',
+      displayName: manager.displayName || emailLower,
+      managerId: manager.managerId || null,
+    };
+  }
+  if (OTP_SEED_MASTERS.includes(emailLower)) {
+    return { email: emailLower, role: 'masteradmin', displayName: emailLower, managerId: null };
+  }
+  return null;
+}
+
+function generateOtpCode() {
+  return String(randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, '0');
+}
+
+let _otpTransport = null;
+function getOtpTransport() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  if (!_otpTransport) {
+    _otpTransport = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // 465 = implicit TLS, 587 = STARTTLS
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
+  return _otpTransport;
+}
+
+async function sendOtpEmail(email, code) {
+  const transport = getOtpTransport();
+  if (!transport) throw new Error('SMTP not configured');
+  const mins = Math.round(OTP_TTL_SECS / 60);
+  await transport.sendMail({
+    from: OTP_FROM_ADDR,
+    to: email,
+    subject: `Your Support Portal login code: ${code}`,
+    text: `Your one-time login code is ${code}. It expires in ${mins} minutes. If you did not request this, ignore this email.`,
+    html: `<p>Your one-time login code for the Indiabulls Securities Support Portal is:</p>`
+      + `<p style="font-size:26px;font-weight:700;letter-spacing:4px;margin:12px 0">${code}</p>`
+      + `<p>It expires in ${mins} minutes. If you did not request this, you can safely ignore this email.</p>`,
+  });
+}
+
 // ─── Auth extraction ────────────────────────────────────────────────────────
 
-function makeMasterToken() {
+function makeMasterToken(identity = {}) {
   const header  = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = b64url(JSON.stringify({ role: 'masteradmin', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + MASTER_TOKEN_TTL_SECS }));
+  const payload = b64url(JSON.stringify({
+    role: 'masteradmin',
+    email: identity.email || null,
+    displayName: identity.displayName || null,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + MASTER_TOKEN_TTL_SECS,
+  }));
   const sig     = b64url(createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest());
   return `${header}.${payload}.${sig}`;
 }
@@ -503,7 +600,12 @@ function extractAuth(req) {
   const isAdmin    = ALLOW_LEGACY_ADMIN_SECRET && !isMaster && ADMIN_SECRET && xSecret === ADMIN_SECRET;
   const jwtPayload = bearerToken ? verifyJWT(bearerToken) : null;
 
-  return { isMaster, isAdmin, jwtPayload };
+  // Individual identity of an OTP-authenticated master session (null for the
+  // legacy shared-secret path, which has no personal identity).
+  const masterEmail = masterTokenPayload?.email || null;
+  const masterDisplayName = masterTokenPayload?.displayName || null;
+
+  return { isMaster, isAdmin, jwtPayload, masterEmail, masterDisplayName };
 }
 
 // How long to trust the cached `status` field embedded in the JWT before
@@ -520,7 +622,9 @@ const STATUS_CACHE_TTL_SECS = 300; // 5 minutes
 // new fields after their next login.
 async function requireManagerOrMaster(req) {
   const auth = extractAuth(req);
-  if (auth.isMaster) return { ok: true, performedBy: 'masteradmin', role: 'masteradmin' };
+  // OTP-authenticated master sessions carry the person's email, so audit
+  // records attribute to the individual rather than a generic "masteradmin".
+  if (auth.isMaster) return { ok: true, performedBy: auth.masterEmail || 'masteradmin', role: 'masteradmin', displayName: auth.masterDisplayName || auth.masterEmail || 'Master Admin' };
   if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin (legacy secret)', role: 'admin' };
 
   const jwt = auth.jwtPayload;
@@ -543,7 +647,9 @@ async function requireManagerOrMaster(req) {
     }
   }
 
-  return { ok: true, performedBy: jwt.managerId, role: jwt.role, displayName: jwt.displayName };
+  // Prefer the email as the audit identity when the JWT carries one (OTP-based
+  // logins); fall back to managerId for older username/password JWTs.
+  return { ok: true, performedBy: jwt.email || jwt.managerId, role: jwt.role, displayName: jwt.displayName };
 }
 
 function requireMaster(req) {
@@ -658,6 +764,116 @@ async function _handler(req, res) {
   // so it stays fast and won't burn quota.
   if (method === 'GET' && path === '/_health') {
     return r(200, { status: 'ok', timestamp: new Date().toISOString() });
+  }
+
+  // ── POST /auth/request-otp ────────────────────────────────────────────────
+  // Step 1 of email-OTP login: caller submits their official email; if it is a
+  // valid @<domain> address AND is provisioned (active manager / seeded
+  // master), we email a one-time code. The response is deliberately generic so
+  // it never reveals whether an address is registered.
+  if (method === 'POST' && path === '/auth/request-otp') {
+    const email = String(body.email || '').trim().toLowerCase();
+    const ip = sourceIp(req);
+    const ua = userAgent(req);
+
+    // Rate-limit by IP and by email to blunt spamming / enumeration.
+    const ipRl = checkRateLimit(`otp-req-ip:${ip}`, 5, 60);
+    if (!ipRl.allowed) { res.set('Retry-After', String(ipRl.retryAfterSecs)); return r(429, { error: 'Too many requests. Try again shortly.' }); }
+
+    if (!isAllowedLoginEmail(email)) {
+      // Wrong domain / malformed — safe to be explicit about the domain rule.
+      return r(400, { error: `Use your @${OTP_ALLOWED_DOMAIN} email address.` });
+    }
+
+    const emailRl = checkRateLimit(`otp-req-email:${email}`, 3, 300);
+    const generic = { ok: true, message: 'If that email is authorised, a code has been sent.' };
+
+    const identity = await resolveLoginIdentity(email);
+    // Only actually send when authorised AND under the per-email limit; always
+    // return the same generic response either way.
+    if (identity && emailRl.allowed) {
+      const code = generateOtpCode();
+      let codeHash;
+      try { codeHash = await hashPassword(code); } catch { return r(500, { error: 'Login temporarily unavailable' }); }
+      try {
+        await db.collection(OTP_COL).doc(email).set({
+          email,
+          codeHash,
+          expiresAt: new Date(Date.now() + OTP_TTL_SECS * 1000).toISOString(),
+          attempts: 0,
+          createdAt: new Date().toISOString(),
+        });
+        await sendOtpEmail(email, code);
+        await writeAudit({ action: 'OTP_REQUESTED', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, role: identity.role } });
+      } catch (e) {
+        console.error('OTP send failed:', e.message);
+        if (String(e.message).includes('SMTP not configured')) return r(503, { error: 'Login email is not configured yet.' });
+        return r(502, { error: 'Could not send the code. Try again shortly.' });
+      }
+    }
+    return r(200, generic);
+  }
+
+  // ── POST /auth/verify-otp ─────────────────────────────────────────────────
+  // Step 2: caller submits email + code. On success we issue the session token
+  // for their role (manager JWT or master session token), both stamped with the
+  // email so every subsequent action is audited to the individual.
+  if (method === 'POST' && path === '/auth/verify-otp') {
+    const email = String(body.email || '').trim().toLowerCase();
+    const code = String(body.code || '').trim();
+    const ip = sourceIp(req);
+    const ua = userAgent(req);
+
+    const vRl = checkRateLimit(`otp-verify:${ip}`, 10, 60);
+    if (!vRl.allowed) { res.set('Retry-After', String(vRl.retryAfterSecs)); return r(429, { error: 'Too many attempts. Try again shortly.' }); }
+    if (!isAllowedLoginEmail(email) || !code) return r(400, { error: 'Email and code are required.' });
+
+    const otpRef = db.collection(OTP_COL).doc(email);
+    let otp;
+    try { const snap = await otpRef.get(); otp = snap.exists ? snap.data() : null; }
+    catch { return r(500, { error: 'Login temporarily unavailable' }); }
+
+    const invalid = async (reason) => {
+      await writeAudit({ action: 'OTP_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason } });
+      return r(401, { error: 'Invalid or expired code.' });
+    };
+
+    if (!otp) return invalid('no_code');
+    if (new Date(otp.expiresAt) < new Date()) { await otpRef.delete().catch(() => {}); return invalid('expired'); }
+    if ((otp.attempts || 0) >= OTP_MAX_ATTEMPTS) { await otpRef.delete().catch(() => {}); return invalid('too_many_attempts'); }
+
+    const okCode = await verifyPassword(code, otp.codeHash || '');
+    if (!okCode) {
+      await otpRef.update({ attempts: (otp.attempts || 0) + 1 }).catch(() => {});
+      return invalid('wrong_code');
+    }
+
+    // Code is single-use.
+    await otpRef.delete().catch(() => {});
+
+    const identity = await resolveLoginIdentity(email);
+    if (!identity) return invalid('not_authorised'); // e.g. deactivated between request and verify
+
+    let token, tokenField;
+    if (identity.role === 'masteradmin') {
+      token = makeMasterToken({ email: identity.email, displayName: identity.displayName });
+      tokenField = { token, role: 'masteradmin', email: identity.email, displayName: identity.displayName, expiresIn: MASTER_TOKEN_TTL_SECS };
+    } else {
+      token = makeJWT({
+        managerId: identity.managerId,
+        email: identity.email,
+        displayName: identity.displayName,
+        role: 'manager',
+        status: 'active',
+        statusCachedAt: Math.floor(Date.now() / 1000),
+      });
+      tokenField = { token, role: 'manager', email: identity.email, displayName: identity.displayName, managerId: identity.managerId };
+      if (identity.managerId) {
+        await db.collection(MANAGERS_COL).doc(identity.managerId).update({ lastLoginAt: new Date().toISOString() }).catch(() => {});
+      }
+    }
+    await writeAudit({ action: 'LOGIN_SUCCESS', entity: 'auth', entityId: email, entityTitle: identity.displayName, performedBy: email, meta: { ip, userAgent: ua, role: identity.role, method: 'otp' } });
+    return r(200, tokenField);
   }
 
   // ── POST /auth/login ─────────────────────────────────────────────────────

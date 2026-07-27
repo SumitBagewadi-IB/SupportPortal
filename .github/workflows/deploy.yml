@@ -82,7 +82,7 @@ jobs:
             --timeout=60s \
             --max-instances=10 \
             --env-vars-file=.env.yaml \
-            --set-secrets="JWT_SECRET=JWT_SECRET:latest,ADMIN_SECRET=ADMIN_SECRET:latest,MASTER_ADMIN_SECRET=MASTER_ADMIN_SECRET:latest" \
+            --set-secrets="JWT_SECRET=JWT_SECRET:latest,ADMIN_SECRET=ADMIN_SECRET:latest,MASTER_ADMIN_SECRET=MASTER_ADMIN_SECRET:latest,SMTP_USER=SMTP_USER:latest,SMTP_PASS=SMTP_PASS:latest" \
             --project=${{ env.GCP_PROJECT }}
 
       # ── Smoke test ──────────────────────────────────────────────────
