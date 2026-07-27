@@ -1168,12 +1168,16 @@ async function _handler(req, res) {
   // ── POST /managers ────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/managers') {
     if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
-    const { username, displayName, email, role, password } = body;
+    const { username, displayName, password } = body;
+    // Email is the OTP login identity — store it lowercased so the login lookup
+    // (which lowercases its input) matches.
+    const email = String(body.email || '').trim().toLowerCase();
+    const role = body.role;
     if (!username || !displayName || !email || !password) return r(400, { error: 'username, displayName, email, password required' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return r(400, { error: 'Invalid email format' });
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) return r(400, { error: 'Username must be 3-30 alphanumeric/underscore characters' });
     if (password.length < 8) return r(400, { error: 'Password must be at least 8 characters' });
-    const allowed_roles = ['manager', 'senior_manager'];
+    const allowed_roles = ['manager', 'senior_manager', 'masteradmin'];
     if (role && !allowed_roles.includes(role)) return r(400, { error: `Invalid role. Allowed: ${allowed_roles.join(', ')}` });
     const managerRole = role || 'manager';
 
@@ -1232,7 +1236,7 @@ async function _handler(req, res) {
       updates.displayName = body.displayName;
     }
     if (body.role) {
-      const allowed = ['manager', 'senior_manager'];
+      const allowed = ['manager', 'senior_manager', 'masteradmin'];
       if (!allowed.includes(body.role)) return r(400, { error: 'Invalid role' });
       updateData.role = body.role;
       updates.role = body.role;

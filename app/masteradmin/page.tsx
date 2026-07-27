@@ -897,7 +897,11 @@ export default function MasterAdminPage() {
                     <select value={managerForm.role} onChange={e => setManagerForm(f => ({ ...f, role: e.target.value }))} style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}>
                       <option value="manager">Manager</option>
                       <option value="senior_manager">Senior Manager</option>
+                      <option value="masteradmin">Master Admin (full access)</option>
                     </select>
+                    {managerForm.role === 'masteradmin' && (
+                      <p style={{ fontSize: '0.7rem', color: '#B45309', marginTop: '0.3rem' }}>Master admins can manage other admins and see all audit activity. Grant sparingly.</p>
+                    )}
                   </div>
                   {managerFormMsg && <p style={{ fontSize: '0.8125rem', color: managerFormMsg.startsWith('✓') ? '#065F46' : '#B91C1C', marginBottom: '0.75rem' }}>{managerFormMsg}</p>}
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -952,7 +956,7 @@ export default function MasterAdminPage() {
                           <td style={{ padding: '0.875rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mgr.username}</td>
                           <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: 'var(--text-dark)' }}>{mgr.displayName}</td>
                           <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)' }}>{mgr.email}</td>
-                          <td style={{ padding: '0.875rem 1rem' }}><span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 20, fontWeight: 600, background: mgr.role === 'senior_manager' ? '#DBEAFE' : '#F3F4F6', color: mgr.role === 'senior_manager' ? '#1E40AF' : '#374151' }}>{mgr.role === 'senior_manager' ? 'Senior Manager' : 'Manager'}</span></td>
+                          <td style={{ padding: '0.875rem 1rem' }}><span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 20, fontWeight: 600, background: mgr.role === 'masteradmin' ? '#FDE68A' : mgr.role === 'senior_manager' ? '#DBEAFE' : '#F3F4F6', color: mgr.role === 'masteradmin' ? '#92400E' : mgr.role === 'senior_manager' ? '#1E40AF' : '#374151' }}>{mgr.role === 'masteradmin' ? 'Master Admin' : mgr.role === 'senior_manager' ? 'Senior Manager' : 'Manager'}</span></td>
                           <td style={{ padding: '0.875rem 1rem' }}><span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 20, fontWeight: 600, background: mgr.status === 'active' ? '#D1FAE5' : '#FEE2E2', color: mgr.status === 'active' ? '#065F46' : '#991B1B' }}>{mgr.status}</span></td>
                           <td style={{ padding: '0.875rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{mgr.lastLoginAt ? new Date(mgr.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Never'}</td>
                           <td style={{ padding: '0.875rem 1rem' }}>
