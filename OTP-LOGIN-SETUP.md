@@ -1,90 +1,76 @@
-# Email-OTP Login — Setup & Staging Rollout
+# Admin / Master-Admin Login — Setup & Rollout
 
-Admin and master-admin sign in with their **official @indiabulls.com email + a
-6-digit one-time code**, and every audited action is attributed to that email.
-This is **additive** — the old username/password and master-password logins
-still work as break-glass until you retire them (below), so no one is locked
-out during rollover.
+Admin and master-admin sign in with **"Sign in with Google"** using their
+official **@indiabulls.com** Google Workspace account. Every audited action is
+attributed to that email. This is **additive** — the old username/password and
+master-password logins still work as a fallback until you retire them, so no
+one is locked out during rollover.
 
-**Do the staging steps first — never test auth changes straight on production.**
+> There is also a legacy email-OTP path in the backend (`/auth/request-otp`,
+> `/auth/verify-otp`) that needs a corporate SMTP relay. It is **not** used by
+> the login UI anymore — Google SSO replaced it — so you can ignore SMTP.
 
-## 1. Provision the SMTP relay (required — OTP can't send without this)
+## 1. Create the Google OAuth client (you can do this — you're project Owner)
 
-The Cloud Function reads SMTP config from env + Secret Manager.
+In the **GCP Console**, project `ibproduct-vibe-coding`:
+1. **APIs & Services → OAuth consent screen** → **Internal** user type → app name (e.g. "Support Portal Admin") + your support email → save.
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → **Web application**.
+3. **Authorized JavaScript origins:**
+   - `https://ibproduct-vibe-coding.web.app`
+   - `http://localhost:3000` (local dev)
+   - (add your staging channel origin if you use one)
+4. Create → copy the **Client ID** (`…apps.googleusercontent.com`). It is **not secret**.
+5. If creation is blocked by an org OAuth-app policy, ask your Google Workspace admin to approve this app — the only possible cross-team step.
 
-**Non-secret config** — already in `gcp/.env.yaml`; set the real relay host:
-```yaml
-OTP_ALLOWED_DOMAIN: "indiabulls.com"
-OTP_FROM_ADDR: "no-reply@indiabulls.com"   # a mailbox your relay may send as
-OTP_SEED_MASTERS: "sumit.bagewadi@indiabulls.com"
-SMTP_PORT: "587"                            # 587 STARTTLS, or 465 implicit TLS
-SMTP_HOST: "<your-corporate-relay-host>"    # ← set this
-```
+## 2. Wire the Client ID in (two non-secret spots)
 
-**Secrets** — create in Secret Manager:
-```bash
-PROJECT=ibproduct-vibe-coding
-printf '%s' '<smtp-username>' | gcloud secrets create SMTP_USER --data-file=- --project "$PROJECT"
-printf '%s' '<smtp-password>' | gcloud secrets create SMTP_PASS --data-file=- --project "$PROJECT"
+- **Frontend (build):** GitHub → repo **Settings → Secrets and variables → Actions → Variables → New variable** → name `GOOGLE_CLIENT_ID`, value = the client id. (The deploy workflow injects it as `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.)
+- **Backend:** set `GOOGLE_CLIENT_ID` in `gcp/.env.yaml` to the same value, then commit + push.
 
-# Let the function's runtime SA read them (same SA used for JWT_SECRET etc.):
-RUNTIME_SA="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
-for S in SMTP_USER SMTP_PASS; do
-  gcloud secrets add-iam-policy-binding "$S" --project "$PROJECT" \
-    --member="serviceAccount:$RUNTIME_SA" --role="roles/secretmanager.secretAccessor"
-done
-```
-The deploy workflow already mounts `SMTP_USER`/`SMTP_PASS` into the function.
+Until both are set, the login page shows "Google sign-in isn't configured yet" and everyone uses the password/master-password fallback (nothing breaks).
 
-> If SMTP isn't configured, `/auth/request-otp` returns 503 ("Login email is
-> not configured yet") — the old logins still work, so this is safe to defer.
+## 3. Provision who is allowed (the allow-list)
 
-## 2. Provision who is allowed (the allow-list)
-
-A valid @indiabulls.com email grants nothing on its own — the email must be an
-**active manager** (role `manager`) or **master admin** (role `masteradmin`) in
-the `managers` collection, set via the master-admin **Manager Accounts** screen.
-Each manager's `email` must be their real @indiabulls.com address.
+A valid @indiabulls.com Google account grants nothing on its own — the email
+must be an **active manager** (role `manager`) or **master admin** (role
+`masteradmin`) in the master-admin **Manager Accounts** screen, and the
+`email` must be their real @indiabulls.com address (stored lowercased).
 
 - `sumit.bagewadi@indiabulls.com` is **seeded** as master admin (via
-  `OTP_SEED_MASTERS`) so the very first master login isn't locked out. Add the
-  rest through the Managers screen, then you can remove the seed.
+  `OTP_SEED_MASTERS`) so the first master login isn't locked out. Add everyone
+  else via the Managers screen (role Manager or Master Admin), then you can
+  remove the seed.
 
-## 3. Staging test (before prod)
+## 4. Test in staging (before prod)
 
 ```bash
-npm ci && npm run build
+npm ci && npm run build     # with NEXT_PUBLIC_GOOGLE_CLIENT_ID set
 firebase hosting:channel:deploy staging --project ibproduct-vibe-coding
-# deploy the function to a staging name pointing at a staging Firestore, OR a
-# separate staging project, with the SMTP secrets above.
+# deploy the function to a staging name (with GOOGLE_CLIENT_ID in its env)
 ```
-Then, on the staging URL:
-- [ ] `/masteradmin` → enter `sumit.bagewadi@indiabulls.com` → **receive the code by email** → verify → you're in.
-- [ ] A non-`@indiabulls.com` email is rejected at step 1.
-- [ ] An @indiabulls.com email that is **not** provisioned gets the generic "if authorised, a code has been sent" and **no email arrives** (no account enumeration).
-- [ ] Wrong code / expired code (>10 min) / 6th attempt all fail cleanly.
-- [ ] After login, perform an edit → the **Audit Log entry's "Performed by" shows the email**, not `masteradmin`/`mgr_…`.
-- [ ] `/admin` → provision a manager with an @indiabulls.com email → that email can OTP-log-in; the manager JWT works for article/ticket actions.
-- [ ] Break-glass: the "Trouble receiving the code?" toggle still logs in via password / master password.
-- [ ] Rate limits: 6th OTP request in a minute from one IP is throttled (429).
+On the staging URL:
+- [ ] `/masteradmin` → "Sign in with Google" → pick `sumit.bagewadi@indiabulls.com` → you're in.
+- [ ] A non-@indiabulls.com Google account is rejected ("Sign in with your @indiabulls.com account").
+- [ ] An @indiabulls.com account **not** provisioned is rejected ("not authorised — ask a master admin").
+- [ ] After login, an edit → the **Audit Log "Performed by" shows the email**, not `masteradmin`/`mgr_…`.
+- [ ] `/admin` → a provisioned manager signs in with Google and can manage articles/tickets.
+- [ ] Break-glass: the "Use master password / Sign in with password" toggle still works.
 
-## 4. Go-live
+## 5. Go-live
 
-Deploy frontend + function together (they're coupled), after a Firestore
-backup. Watch the function logs for `OTP send failed` / SMTP errors.
+Deploy frontend + function together after a Firestore backup. The client id is
+public, so there are no secrets to rotate for this feature.
 
-## 5. Retire the fallbacks (after OTP is proven in prod)
+## 6. Retire the fallbacks (after SSO is proven in prod)
 
-Once every admin/master has an email set and has logged in via OTP:
-- Remove the `ALLOW_LEGACY_ADMIN_SECRET` path usage (already off by default).
-- Retire the shared master password: unset `MASTER_ADMIN_SECRET` (masterlogin
-  then returns 503) — do this only after confirming OTP master login works.
-- Optionally remove the username/password fallback UI + `/auth/login`.
+- Remove the username/password + master-password fallback UI once everyone uses SSO.
+- Unset `MASTER_ADMIN_SECRET` to disable the shared master password.
+- Optionally drop the OTP endpoints and the SMTP secrets/config (`SMTP_*`) from the deploy — they're unused by SSO.
 
 ## Security notes
-- Codes are stored **hashed** (scrypt) with a 10-minute expiry, single-use, and
-  a 5-attempt cap; requests are rate-limited per IP and per email.
-- The response to `/auth/request-otp` is identical whether or not the email is
-  registered, to prevent account enumeration.
-- Master session tokens now carry the email so master actions are individually
+- We verify the Google ID token's signature/expiry (via Google), then enforce
+  **audience = our client id** (so a token minted for another app is rejected),
+  `email_verified`, and the **@indiabulls.com** hosted domain — then the
+  allow-list. Google handles the password + 2FA; we never see credentials.
+- Master session tokens carry the email, so master actions are individually
   attributable in the audit log.
