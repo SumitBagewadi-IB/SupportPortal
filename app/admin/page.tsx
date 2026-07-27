@@ -13,6 +13,14 @@ const PAGE_SIZE = 10;
 const MAX_CONTENT = 50000;
 const WARN_CONTENT = 45000;
 const TICKETS_PAGE_SIZE = 10;
+// Non-secret Google OAuth Web client ID for "Sign in with Google" (build-time).
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
+// Minimal shape of the Google Identity Services API we use.
+type GsiApi = { accounts: { id: {
+  initialize: (cfg: Record<string, unknown>) => void;
+  renderButton: (el: HTMLElement, opts: Record<string, unknown>) => void;
+} } };
 
 interface Category {
   id: string;
@@ -70,13 +78,9 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  // Email-OTP login
-  const [loginStep, setLoginStep] = useState<'email' | 'code'>('email');
-  const [emailInput, setEmailInput] = useState('');
-  const [otpInput, setOtpInput] = useState('');
-  const [otpBusy, setOtpBusy] = useState(false);
-  const [otpNote, setOtpNote] = useState('');
+  // Sign in with Google (primary); password form is the rollover fallback.
   const [usePassword, setUsePassword] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
@@ -298,53 +302,45 @@ export default function AdminPage() {
     }
   }, [authed, managerToken, fetchTickets, fetchFeedback, fetchAuditLogs, fetchCategories]);
 
-  const handleRequestOtp = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    setAuthError(''); setOtpNote('');
-    const email = emailInput.trim().toLowerCase();
-    if (!email) { setAuthError('Enter your official email address.'); return; }
-    setOtpBusy(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/request-otp`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setAuthError(data.error || 'Could not send the code. Try again.'); return; }
-      setLoginStep('code');
-      setOtpNote(`If ${email} is authorised, a 6-digit code is on its way. It expires in 10 minutes.`);
-    } catch { setAuthError('Network error. Please try again.'); }
-    finally { setOtpBusy(false); }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Receives the Google ID token from the Sign-in button, exchanges it for our
+  // manager session, and signs in. Master-admin accounts are redirected to the
+  // master portal.
+  const handleGoogleCredential = useCallback(async (resp: { credential?: string }) => {
+    if (!resp?.credential) return;
     setAuthError('');
-    const email = emailInput.trim().toLowerCase();
-    const code = otpInput.trim();
-    if (!code) { setAuthError('Enter the code from your email.'); return; }
-    setOtpBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+      const res = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ credential: resp.credential }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setAuthError(data.error || 'Invalid or expired code.'); return; }
-      // A master admin who logs in here is sent to the master portal.
-      if (data.role === 'masteradmin') {
-        setAuthError('This is a master-admin account — please use the Master Admin portal to sign in.');
-        return;
-      }
+      if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); return; }
+      if (data.role === 'masteradmin') { setAuthError('This is a master-admin account — please use the Master Admin portal.'); return; }
       setManagerToken(data.token);
       setManagerInfo({ managerId: data.managerId || data.email, displayName: data.displayName, role: data.role });
       sessionStorage.setItem('mgr_token', data.token);
       sessionStorage.setItem('mgr_info', JSON.stringify({ managerId: data.managerId || data.email, displayName: data.displayName, role: data.role }));
       setAuthed(true);
-      setOtpInput(''); setEmailInput(''); setLoginStep('email');
     } catch { setAuthError('Network error. Please try again.'); }
-    finally { setOtpBusy(false); }
-  };
+  }, []);
+
+  // Load Google Identity Services and render the sign-in button.
+  useEffect(() => {
+    if (authed || usePassword || !GOOGLE_CLIENT_ID) return;
+    const render = () => {
+      const g = (window as unknown as { google?: GsiApi }).google;
+      if (!g || !googleBtnRef.current) return;
+      g.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential, hd: 'indiabulls.com', auto_select: false });
+      googleBtnRef.current.innerHTML = '';
+      g.accounts.id.renderButton(googleBtnRef.current, { theme: 'filled_blue', size: 'large', width: 320, text: 'signin_with', shape: 'rectangular' });
+    };
+    if (document.getElementById('gsi-script')) { render(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true; s.defer = true; s.id = 'gsi-script';
+    s.onload = render;
+    document.body.appendChild(s);
+  }, [authed, usePassword, handleGoogleCredential]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -852,56 +848,23 @@ export default function AdminPage() {
                 {loginLoading ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
-          ) : loginStep === 'email' ? (
-            <form onSubmit={handleRequestOtp}>
-              <div style={{ marginBottom: '1rem' }}>
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="you@indiabulls.com"
-                  autoComplete="email"
-                  disabled={otpBusy}
-                  autoFocus
-                  style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1A202C' }}
-                />
-              </div>
-              {authError && (
-                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>{authError}</div>
-              )}
-              <button type="submit" disabled={otpBusy} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: otpBusy ? 'not-allowed' : 'pointer', opacity: otpBusy ? 0.6 : 1 }}>
-                {otpBusy ? 'Sending code…' : 'Send login code'}
-              </button>
-            </form>
           ) : (
-            <form onSubmit={handleVerifyOtp}>
-              {otpNote && <p style={{ fontSize: '0.8125rem', color: '#38A169', marginBottom: '0.875rem', textAlign: 'left' }}>{otpNote}</p>}
-              <div style={{ marginBottom: '1rem' }}>
-                <input
-                  inputMode="numeric"
-                  value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="6-digit code"
-                  maxLength={6}
-                  autoFocus
-                  disabled={otpBusy}
-                  style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '1.25rem', letterSpacing: '0.4rem', textAlign: 'center', outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1A202C' }}
-                />
-              </div>
-              {authError && (
-                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>{authError}</div>
+            <div>
+              {GOOGLE_CLIENT_ID ? (
+                <>
+                  <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
+                  <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+                </>
+              ) : (
+                <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet. Use the password option below.</p>
               )}
-              <button type="submit" disabled={otpBusy} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: otpBusy ? 'not-allowed' : 'pointer', opacity: otpBusy ? 0.6 : 1 }}>
-                {otpBusy ? 'Verifying…' : 'Verify & sign in'}
-              </button>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem' }}>
-                <button type="button" onClick={() => { setLoginStep('email'); setAuthError(''); setOtpInput(''); setOtpNote(''); }} style={{ background: 'none', border: 'none', color: '#718096', fontSize: '0.8125rem', cursor: 'pointer' }}>← Change email</button>
-                <button type="button" onClick={() => handleRequestOtp()} disabled={otpBusy} style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.8125rem', cursor: otpBusy ? 'default' : 'pointer', fontWeight: 600 }}>Resend code</button>
-              </div>
-            </form>
+              {authError && (
+                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginTop: '1rem', textAlign: 'left' }}>{authError}</div>
+              )}
+            </div>
           )}
-          <button type="button" onClick={() => { setUsePassword((v) => !v); setAuthError(''); setOtpNote(''); }} style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: '#A0AEC0', fontSize: '0.8125rem', cursor: 'pointer', textDecoration: 'underline' }}>
-            {usePassword ? 'Sign in with an email code instead' : 'Trouble receiving the code? Sign in with password'}
+          <button type="button" onClick={() => { setUsePassword((v) => !v); setAuthError(''); }} style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: '#A0AEC0', fontSize: '0.8125rem', cursor: 'pointer', textDecoration: 'underline' }}>
+            {usePassword ? 'Sign in with Google instead' : 'Sign in with password'}
           </button>
           <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
         </div>

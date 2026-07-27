@@ -71,6 +71,9 @@ const OTP_COL       = process.env.OTP_COLLECTION        || 'login-otps';
 // Only this domain may authenticate; authorisation still requires the email to
 // be provisioned in the managers collection (having a company email ≠ access).
 const OTP_ALLOWED_DOMAIN = (process.env.OTP_ALLOWED_DOMAIN || 'indiabulls.com').toLowerCase();
+// Google Workspace SSO ("Sign in with Google"). The Client ID is non-secret
+// (it also ships in the browser); we verify Google ID tokens against it.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const OTP_TTL_SECS       = 600;  // code valid for 10 minutes
 const OTP_MAX_ATTEMPTS   = 5;    // wrong-code attempts before the code is burned
 const OTP_LENGTH         = 6;
@@ -764,6 +767,66 @@ async function _handler(req, res) {
   // so it stays fast and won't burn quota.
   if (method === 'GET' && path === '/_health') {
     return r(200, { status: 'ok', timestamp: new Date().toISOString() });
+  }
+
+  // ── POST /auth/google ─────────────────────────────────────────────────────
+  // "Sign in with Google": the browser sends the Google-issued ID token
+  // (credential). We validate it, confirm it's a verified @indiabulls.com
+  // Google Workspace account, then apply the same allow-list as OTP and issue
+  // the session token — no passwords or SMTP involved.
+  if (method === 'POST' && path === '/auth/google') {
+    const credential = String(body.credential || '');
+    const ip = sourceIp(req);
+    const ua = userAgent(req);
+
+    const gRl = checkRateLimit(`google-auth:${ip}`, 20, 60);
+    if (!gRl.allowed) { res.set('Retry-After', String(gRl.retryAfterSecs)); return r(429, { error: 'Too many attempts. Try again shortly.' }); }
+    if (!credential) return r(400, { error: 'Missing Google credential.' });
+    if (!GOOGLE_CLIENT_ID) return r(503, { error: 'Google sign-in is not configured yet.' });
+
+    // Validate the ID token via Google's tokeninfo endpoint (checks signature
+    // + expiry server-side); we then enforce audience, domain and verification.
+    let claims;
+    try {
+      const gr = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      if (!gr.ok) throw new Error('tokeninfo rejected');
+      claims = await gr.json();
+    } catch {
+      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: 'google', entityTitle: 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason: 'token_invalid' } });
+      return r(401, { error: 'Google sign-in failed. Please try again.' });
+    }
+
+    const email = String(claims.email || '').trim().toLowerCase();
+    const audOk = claims.aud === GOOGLE_CLIENT_ID;
+    const verified = claims.email_verified === true || claims.email_verified === 'true';
+    const domainOk = email.endsWith('@' + OTP_ALLOWED_DOMAIN) &&
+      (!claims.hd || String(claims.hd).toLowerCase() === OTP_ALLOWED_DOMAIN);
+
+    if (!audOk || !verified || !domainOk) {
+      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email || 'google', entityTitle: email || 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason: !audOk ? 'wrong_audience' : !verified ? 'email_unverified' : 'wrong_domain' } });
+      return r(403, { error: `Sign in with your @${OTP_ALLOWED_DOMAIN} Google account.` });
+    }
+
+    const identity = await resolveLoginIdentity(email);
+    if (!identity) {
+      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'not_authorised' } });
+      return r(403, { error: 'This account is not authorised. Ask a master admin to add you.' });
+    }
+
+    let tokenField;
+    if (identity.role === 'masteradmin') {
+      const token = makeMasterToken({ email: identity.email, displayName: identity.displayName });
+      tokenField = { token, role: 'masteradmin', email: identity.email, displayName: identity.displayName, expiresIn: MASTER_TOKEN_TTL_SECS };
+    } else {
+      const token = makeJWT({
+        managerId: identity.managerId, email: identity.email, displayName: identity.displayName,
+        role: 'manager', status: 'active', statusCachedAt: Math.floor(Date.now() / 1000),
+      });
+      tokenField = { token, role: 'manager', email: identity.email, displayName: identity.displayName, managerId: identity.managerId };
+      if (identity.managerId) await db.collection(MANAGERS_COL).doc(identity.managerId).update({ lastLoginAt: new Date().toISOString() }).catch(() => {});
+    }
+    await writeAudit({ action: 'LOGIN_SUCCESS', entity: 'auth', entityId: email, entityTitle: identity.displayName, performedBy: email, meta: { ip, userAgent: ua, role: identity.role, method: 'google' } });
+    return r(200, tokenField);
   }
 
   // ── POST /auth/request-otp ────────────────────────────────────────────────
