@@ -840,17 +840,26 @@ export default function MasterAdminPage() {
               <div onClick={() => setShowCreateManager(false)} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: 14, padding: '2rem', maxWidth: 440, width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
                   <h3 style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '1.25rem' }}>Create New Manager</h3>
-                  {(['username', 'displayName', 'email'] as const).map(field => (
+                  {(['username', 'displayName', 'email'] as const).map(field => {
+                    const emailInvalid = field === 'email' && managerForm.email.trim() !== '' && !/^[^\s@]+@indiabulls\.com$/i.test(managerForm.email.trim());
+                    return (
                     <div key={field} style={{ marginBottom: '0.875rem' }}>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'capitalize' }}>{field === 'displayName' ? 'Display Name' : field}</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'capitalize' }}>{field === 'displayName' ? 'Display Name' : field === 'email' ? 'Official Email' : field}</label>
                       <input
                         type={field === 'email' ? 'email' : 'text'}
                         value={managerForm[field]}
                         onChange={e => setManagerForm(f => ({ ...f, [field]: e.target.value }))}
-                        style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
+                        placeholder={field === 'email' ? 'name@indiabulls.com' : undefined}
+                        style={{ width: '100%', padding: '0.625rem 0.875rem', border: `1.5px solid ${emailInvalid ? '#FC8181' : 'var(--border)'}`, borderRadius: 8, fontSize: '0.875rem', outline: 'none', background: 'var(--bg)', color: 'var(--text-dark)', boxSizing: 'border-box' }}
                       />
+                      {field === 'email' && (
+                        <p style={{ fontSize: '0.7rem', color: emailInvalid ? '#C53030' : 'var(--text-muted)', marginTop: '0.3rem' }}>
+                          {emailInvalid ? 'Must be an @indiabulls.com address.' : 'Their official @indiabulls.com email — this is the login identity used for the one-time code and audit trail.'}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                   <div style={{ marginBottom: '0.875rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Password</label>
                     <div style={{ position: 'relative' }}>
@@ -896,9 +905,10 @@ export default function MasterAdminPage() {
                     <button disabled={managerFormSaving} onClick={async () => {
                       const { username, displayName, email, role, password } = managerForm;
                       if (!username || !displayName || !email || !password) { setManagerFormMsg('All fields required.'); return; }
+                      if (!/^[^\s@]+@indiabulls\.com$/i.test(email.trim())) { setManagerFormMsg('Email must be a valid @indiabulls.com address (used for OTP login).'); return; }
                       setManagerFormSaving(true); setManagerFormMsg('');
                       try {
-                        const res = await fetch(masterUrl('/managers'), { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email, role, password }) });
+                        const res = await fetch(masterUrl('/managers'), { method: 'POST', headers: getMasterHeaders(), body: JSON.stringify({ username, displayName, email: email.trim().toLowerCase(), role, password }) });
                         if (res.status === 401) { handleSessionExpired(); return; }
                         const data = await res.json();
                         if (res.ok) { setManagerFormMsg('✓ Manager created!'); fetchManagers(); setTimeout(() => setShowCreateManager(false), 1200); }
