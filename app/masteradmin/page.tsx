@@ -129,6 +129,13 @@ export default function MasterAdminPage() {
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  // Email-OTP login
+  const [loginStep, setLoginStep] = useState<'email' | 'code'>('email');
+  const [emailInput, setEmailInput] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpNote, setOtpNote] = useState('');
+  const [usePassword, setUsePassword] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [lockSecs, setLockSecs] = useState(0);
@@ -213,6 +220,51 @@ export default function MasterAdminPage() {
     }, 1000);
     return () => clearInterval(iv);
   }, [lockedUntil]);
+
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setAuthError(''); setOtpNote('');
+    const email = emailInput.trim().toLowerCase();
+    if (!email) { setAuthError('Enter your official email address.'); return; }
+    if (!API_BASE) { setAuthError('System misconfiguration: API not configured.'); return; }
+    setOtpBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/request-otp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setAuthError(data.error || 'Could not send the code. Try again.'); return; }
+      setLoginStep('code');
+      setOtpNote(`If ${email} is an authorised master admin, a 6-digit code is on its way. It expires in 10 minutes.`);
+    } catch { setAuthError('Network error. Please try again.'); }
+    finally { setOtpBusy(false); }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    const email = emailInput.trim().toLowerCase();
+    const code = otpInput.trim();
+    if (!code) { setAuthError('Enter the code from your email.'); return; }
+    setOtpBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setAuthError(data.error || 'Invalid or expired code.'); return; }
+      if (data.role !== 'masteradmin') {
+        setAuthError('This account is not a master admin. Use the Admin portal instead.');
+        return;
+      }
+      sessionStorage.setItem('master_token', data.token);
+      setAuthed(true);
+      setOtpInput(''); setEmailInput(''); setLoginStep('email');
+    } catch { setAuthError('Network error. Please try again.'); }
+    finally { setOtpBusy(false); }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -546,32 +598,82 @@ export default function MasterAdminPage() {
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Master Admin</h1>
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Manager of Admins — restricted access only</p>
 
-          <form onSubmit={handleLogin}>
-            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={passwordInput}
-                onChange={e => setPasswordInput(e.target.value)}
-                placeholder="Master password"
-                disabled={isLocked}
-                autoComplete="current-password"
-                style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: '#fff', color: '#1A202C', boxSizing: 'border-box' }}
-              />
-              <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-
-            {(authError || isLocked) && (
-              <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
-                {isLocked ? `Account locked. Try again in ${lockSecs}s.` : authError}
+          {usePassword ? (
+            <form onSubmit={handleLogin}>
+              <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  placeholder="Master password"
+                  disabled={isLocked}
+                  autoComplete="current-password"
+                  style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: '#fff', color: '#1A202C', boxSizing: 'border-box' }}
+                />
+                <button type="button" onClick={() => setShowPassword(p => !p)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
               </div>
-            )}
-
-            <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked || !passwordInput ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1 }}>
-              {isLocked ? `Locked (${lockSecs}s)` : 'Sign In'}
-            </button>
-          </form>
+              {(authError || isLocked) && (
+                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
+                  {isLocked ? `Account locked. Try again in ${lockSecs}s.` : authError}
+                </div>
+              )}
+              <button type="submit" disabled={isLocked || !passwordInput} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: isLocked || !passwordInput ? 'not-allowed' : 'pointer', opacity: isLocked || !passwordInput ? 0.5 : 1 }}>
+                {isLocked ? `Locked (${lockSecs}s)` : 'Sign In'}
+              </button>
+            </form>
+          ) : loginStep === 'email' ? (
+            <form onSubmit={handleRequestOtp}>
+              <div style={{ marginBottom: '1rem' }}>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={e => setEmailInput(e.target.value)}
+                  placeholder="you@indiabulls.com"
+                  autoComplete="email"
+                  disabled={otpBusy}
+                  autoFocus
+                  style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', background: '#fff', color: '#1A202C', boxSizing: 'border-box' }}
+                />
+              </div>
+              {authError && (
+                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>{authError}</div>
+              )}
+              <button type="submit" disabled={otpBusy} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: otpBusy ? 'not-allowed' : 'pointer', opacity: otpBusy ? 0.6 : 1 }}>
+                {otpBusy ? 'Sending code…' : 'Send login code'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOtp}>
+              {otpNote && <p style={{ fontSize: '0.8125rem', color: '#38A169', marginBottom: '0.875rem', textAlign: 'left' }}>{otpNote}</p>}
+              <div style={{ marginBottom: '1rem' }}>
+                <input
+                  inputMode="numeric"
+                  value={otpInput}
+                  onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="6-digit code"
+                  maxLength={6}
+                  autoFocus
+                  disabled={otpBusy}
+                  style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '1.25rem', letterSpacing: '0.4rem', textAlign: 'center', outline: 'none', background: '#fff', color: '#1A202C', boxSizing: 'border-box' }}
+                />
+              </div>
+              {authError && (
+                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>{authError}</div>
+              )}
+              <button type="submit" disabled={otpBusy} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9375rem', cursor: otpBusy ? 'not-allowed' : 'pointer', opacity: otpBusy ? 0.6 : 1 }}>
+                {otpBusy ? 'Verifying…' : 'Verify & sign in'}
+              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem' }}>
+                <button type="button" onClick={() => { setLoginStep('email'); setAuthError(''); setOtpInput(''); setOtpNote(''); }} style={{ background: 'none', border: 'none', color: '#718096', fontSize: '0.8125rem', cursor: 'pointer' }}>← Change email</button>
+                <button type="button" onClick={() => handleRequestOtp()} disabled={otpBusy} style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.8125rem', cursor: otpBusy ? 'default' : 'pointer', fontWeight: 600 }}>Resend code</button>
+              </div>
+            </form>
+          )}
+          <button type="button" onClick={() => { setUsePassword(v => !v); setAuthError(''); setOtpNote(''); }} style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: '#A0AEC0', fontSize: '0.8125rem', cursor: 'pointer', textDecoration: 'underline' }}>
+            {usePassword ? 'Sign in with an email code instead' : 'Trouble receiving the code? Use master password'}
+          </button>
           <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>Authorized Indiabulls Securities Internal System · Restricted Access Only</p>
         </div>
       </div>
