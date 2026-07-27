@@ -511,24 +511,33 @@ function isAllowedLoginEmail(email) {
 // exists, so the very first login is never locked out. Returns null if the
 // email is not authorised (caller must not reveal which).
 async function resolveLoginIdentity(emailLower) {
-  let manager = null;
+  let docs = [];
   try {
-    const snap = await db.collection(MANAGERS_COL).where('email', '==', emailLower).limit(1).get();
-    if (!snap.empty) manager = snap.docs[0].data();
+    // Fetch ALL docs for this email (there can be duplicates / a deactivated
+    // old record alongside an active one) rather than an arbitrary limit(1).
+    const snap = await db.collection(MANAGERS_COL).where('email', '==', emailLower).get();
+    docs = snap.docs.map(d => d.data());
   } catch (e) {
     console.error('resolveLoginIdentity query failed:', e.message);
   }
-  if (manager) {
-    if (manager.status && manager.status !== 'active') return null;
-    return {
-      email: emailLower,
-      role: manager.role === 'masteradmin' ? 'masteradmin' : 'manager',
-      displayName: manager.displayName || emailLower,
-      managerId: manager.managerId || null,
-    };
+  // Only active accounts count; deactivated duplicates must never block login.
+  const active = docs.filter(m => !m.status || m.status === 'active');
+  const seeded = OTP_SEED_MASTERS.includes(emailLower);
+
+  // Prefer an explicit active master-admin record.
+  const masterDoc = active.find(m => m.role === 'masteradmin');
+  if (masterDoc) {
+    return { email: emailLower, role: 'masteradmin', displayName: masterDoc.displayName || emailLower, managerId: masterDoc.managerId || null };
   }
-  if (OTP_SEED_MASTERS.includes(emailLower)) {
-    return { email: emailLower, role: 'masteradmin', displayName: emailLower, managerId: null };
+  // Seeded bootstrap masters are treated as master even if their DB record is a
+  // plain manager (or absent) — so the first master is never locked out.
+  if (seeded) {
+    return { email: emailLower, role: 'masteradmin', displayName: active[0]?.displayName || emailLower, managerId: active[0]?.managerId || null };
+  }
+  // Otherwise, any active account grants manager access.
+  if (active.length > 0) {
+    const m = active[0];
+    return { email: emailLower, role: 'manager', displayName: m.displayName || emailLower, managerId: m.managerId || null };
   }
   return null;
 }
