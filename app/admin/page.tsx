@@ -78,8 +78,7 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  // Sign in with Google (primary); password form is the rollover fallback.
-  const [usePassword, setUsePassword] = useState(false);
+  // Sign in with Google is the only admin login (password fallback removed).
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
@@ -326,7 +325,7 @@ export default function AdminPage() {
 
   // Load Google Identity Services and render the sign-in button.
   useEffect(() => {
-    if (authed || usePassword || !GOOGLE_CLIENT_ID) return;
+    if (authed || !GOOGLE_CLIENT_ID) return;
     const render = () => {
       const g = (window as unknown as { google?: GsiApi }).google;
       if (!g || !googleBtnRef.current) return;
@@ -340,7 +339,7 @@ export default function AdminPage() {
     s.async = true; s.defer = true; s.id = 'gsi-script';
     s.onload = render;
     document.body.appendChild(s);
-  }, [authed, usePassword, handleGoogleCredential]);
+  }, [authed, handleGoogleCredential]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -809,63 +808,19 @@ export default function AdminPage() {
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Manager Portal</h1>
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
-          {usePassword ? (
-            <form onSubmit={handleLogin}>
-              <div style={{ marginBottom: '0.875rem' }}>
-                <input
-                  type="text"
-                  value={usernameInput}
-                  onChange={(e) => setUsernameInput(e.target.value)}
-                  placeholder="Username"
-                  disabled={isLocked || loginLoading}
-                  autoComplete="username"
-                  style={{ width: '100%', padding: '0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1A202C' }}
-                />
-              </div>
-              <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Password"
-                  disabled={isLocked || loginLoading}
-                  autoComplete="current-password"
-                  style={{ width: '100%', padding: '0.875rem 2.5rem 0.875rem 1rem', border: '2px solid #E2E8F0', borderRadius: 10, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1A202C' }}
-                />
-                <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A0AEC0', fontSize: '0.875rem' }}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-              {authError && (
-                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'left' }}>
-                  {authError}
-                </div>
-              )}
-              {isLocked && (
-                <p style={{ color: '#DD6B20', fontSize: '0.875rem', marginBottom: '0.75rem' }}>Login disabled. Try again in {Math.floor(lockoutSecsLeft / 60)}m {lockoutSecsLeft % 60}s.</p>
-              )}
-              <button type="submit" disabled={isLocked || loginLoading} style={{ width: '100%', padding: '0.875rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: isLocked || loginLoading ? 'not-allowed' : 'pointer', opacity: isLocked || loginLoading ? 0.5 : 1 }}>
-                {loginLoading ? 'Signing in…' : 'Sign In'}
-              </button>
-            </form>
-          ) : (
-            <div>
-              {GOOGLE_CLIENT_ID ? (
-                <>
-                  <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
-                  <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
-                </>
-              ) : (
-                <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet. Use the password option below.</p>
-              )}
-              {authError && (
-                <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginTop: '1rem', textAlign: 'left' }}>{authError}</div>
-              )}
-            </div>
-          )}
-          <button type="button" onClick={() => { setUsePassword((v) => !v); setAuthError(''); }} style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: '#A0AEC0', fontSize: '0.8125rem', cursor: 'pointer', textDecoration: 'underline' }}>
-            {usePassword ? 'Sign in with Google instead' : 'Sign in with password'}
-          </button>
+          <div>
+            {GOOGLE_CLIENT_ID ? (
+              <>
+                <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
+                <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet.</p>
+            )}
+            {authError && (
+              <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginTop: '1rem', textAlign: 'left' }}>{authError}</div>
+            )}
+          </div>
           <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#A0AEC0' }}>Authorized Indiabulls Securities Internal System · Authorized Access Only</p>
         </div>
       </div>

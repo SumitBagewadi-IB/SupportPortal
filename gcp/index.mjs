@@ -74,6 +74,11 @@ const OTP_ALLOWED_DOMAIN = (process.env.OTP_ALLOWED_DOMAIN || 'indiabulls.com').
 // Google Workspace SSO ("Sign in with Google"). The Client ID is non-secret
 // (it also ships in the browser); we verify Google ID tokens against it.
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+// When on, any verified @<domain> Google account that has NO existing record
+// is auto-provisioned as an ACTIVE manager on first login (govern-after model);
+// a master admin can then deactivate/delete them. Master role is NEVER
+// auto-granted, and deactivated accounts stay blocked.
+const AUTO_PROVISION_MANAGERS = process.env.AUTO_PROVISION_MANAGERS === 'true';
 const OTP_TTL_SECS       = 600;  // code valid for 10 minutes
 const OTP_MAX_ATTEMPTS   = 5;    // wrong-code attempts before the code is burned
 const OTP_LENGTH         = 6;
@@ -816,10 +821,33 @@ async function _handler(req, res) {
       return r(403, { error: `Sign in with your @${OTP_ALLOWED_DOMAIN} Google account.` });
     }
 
-    const identity = await resolveLoginIdentity(email);
+    let identity = await resolveLoginIdentity(email);
     if (!identity) {
-      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'not_authorised' } });
-      return r(403, { error: 'This account is not authorised. Ask a master admin to add you.' });
+      // Govern-after self-signup: a verified company email with NO existing
+      // record is auto-provisioned as an active manager on first login. If a
+      // record exists but none is active, they were deactivated — keep them out.
+      if (AUTO_PROVISION_MANAGERS) {
+        let existing;
+        try { existing = await db.collection(MANAGERS_COL).where('email', '==', email).get(); }
+        catch { return r(500, { error: 'Login temporarily unavailable' }); }
+        if (!existing.empty) {
+          await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'deactivated' } });
+          return r(403, { error: 'Your admin access has been disabled. Contact a master admin.' });
+        }
+        const managerId = `mgr_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+        const now = new Date().toISOString();
+        const displayName = String(claims.name || '').trim() || email;
+        await db.collection(MANAGERS_COL).doc(managerId).set({
+          id: managerId, managerId, username: email, displayName, email,
+          role: 'manager', status: 'active',
+          createdAt: now, createdBy: 'self-signup:google', lastLoginAt: now, deactivatedAt: null,
+        });
+        await writeAudit({ action: 'MANAGER_SELF_PROVISIONED', entity: 'manager', entityId: managerId, entityTitle: displayName, performedBy: email, meta: { ip, userAgent: ua, email } });
+        identity = { email, role: 'manager', displayName, managerId };
+      } else {
+        await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'not_authorised' } });
+        return r(403, { error: 'This account is not authorised. Ask a master admin to add you.' });
+      }
     }
 
     let tokenField;
