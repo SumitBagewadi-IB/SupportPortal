@@ -1223,6 +1223,11 @@ html:not([data-theme="dark"]) .fa-sun {
     animation: fadeIn 0.3s ease;
 }
 
+/* Sign-in spinner (admin/master login "Signing you in…" state) */
+@keyframes admin-spin {
+    to { transform: rotate(360deg); }
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

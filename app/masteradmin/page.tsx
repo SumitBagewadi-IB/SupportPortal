@@ -141,6 +141,13 @@ export default function MasterAdminPage() {
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
   const [gsiState, setGsiState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [gsiRetry, setGsiRetry] = useState(0);
+  // "Signing you in…" feedback + who is signed in, so the master clearly feels
+  // logged in after Google sign-in.
+  const [signingIn, setSigningIn] = useState(false);
+  const [masterName, setMasterName] = useState('');
+  const pendingWelcomeRef = useRef<string | null>(null);
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [lockSecs, setLockSecs] = useState(0);
@@ -207,7 +214,9 @@ export default function MasterAdminPage() {
     // Validate stored master token expiry on mount — don't wait for first API call
     const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('master_token') : null;
     if (stored) {
-      if (parseValidJwt(stored)) {
+      const payload = parseValidJwt(stored) as { email?: string; displayName?: string } | null;
+      if (payload) {
+        setMasterName(payload.displayName || payload.email || '');
         setAuthed(true);
       } else {
         sessionStorage.removeItem('master_token');
@@ -232,17 +241,20 @@ export default function MasterAdminPage() {
     if (!resp?.credential) return;
     setAuthError('');
     if (!API_BASE) { setAuthError('System misconfiguration: API not configured.'); return; }
+    setSigningIn(true);
     try {
       const res = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: resp.credential }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); return; }
-      if (data.role !== 'masteradmin') { setAuthError('This account is not a master admin. Use the Admin portal instead.'); return; }
+      if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); setSigningIn(false); return; }
+      if (data.role !== 'masteradmin') { setAuthError('This account is not a master admin. Use the Admin portal instead.'); setSigningIn(false); return; }
       sessionStorage.setItem('master_token', data.token);
+      setMasterName(data.displayName || data.email || '');
+      pendingWelcomeRef.current = data.displayName || data.email || 'there';
       setAuthed(true);
-    } catch { setAuthError('Network error. Please try again.'); }
+    } catch { setAuthError('Network error. Please try again.'); setSigningIn(false); }
   }, []);
 
   // Load Google Identity Services and render the sign-in button. Surfaces a
@@ -290,6 +302,22 @@ export default function MasterAdminPage() {
     setGsiRetry((n) => n + 1);
   }, []);
 
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 3500);
+  }, []);
+
+  // Confirm a fresh sign-in with a welcome toast (only on real login, not on a
+  // page reload that restores the session).
+  useEffect(() => {
+    if (authed && pendingWelcomeRef.current) {
+      showToast(`Signed in as ${pendingWelcomeRef.current}`);
+      pendingWelcomeRef.current = null;
+      setSigningIn(false);
+    }
+  }, [authed, showToast]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockedUntil && Date.now() < lockedUntil) return;
@@ -312,6 +340,8 @@ export default function MasterAdminPage() {
           return;
         }
         sessionStorage.setItem('master_token', data.token);
+        setMasterName('Master Admin');
+        pendingWelcomeRef.current = 'Master Admin (break-glass)';
         setAuthed(true);
         setAuthError('');
         setAttempts(0);
@@ -670,7 +700,12 @@ export default function MasterAdminPage() {
             </form>
           ) : (
             <div>
-              {GOOGLE_CLIENT_ID ? (
+              {GOOGLE_CLIENT_ID ? signingIn ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1rem 0' }}>
+                  <span style={{ width: 28, height: 28, border: '3px solid #E2E8F0', borderTopColor: '#2B6CB0', borderRadius: '50%', display: 'inline-block', animation: 'admin-spin 0.7s linear infinite' }} />
+                  <p style={{ fontSize: '0.875rem', color: '#2D3748', fontWeight: 600, margin: 0 }}>Signing you in…</p>
+                </div>
+              ) : (
                 <>
                   <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
                   <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
@@ -705,6 +740,11 @@ export default function MasterAdminPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-subtle)' }}>
+      {toast && (
+        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 100, background: '#1A202C', color: '#fff', padding: '0.625rem 1.25rem', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <i className="fas fa-check-circle" style={{ color: '#48BB78' }}></i>{toast}
+        </div>
+      )}
       {/* Top bar */}
       <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -714,6 +754,9 @@ export default function MasterAdminPage() {
           <div>
             <span style={{ fontWeight: 800, color: 'var(--text-dark)', fontSize: '0.9375rem' }}>Master Admin</span>
             <span className="hide-mobile" style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.5rem', borderRadius: 20, fontWeight: 600 }}>MANAGER OF ADMINS</span>
+            {masterName && (
+              <div className="hide-mobile" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>Signed in as {masterName}</div>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

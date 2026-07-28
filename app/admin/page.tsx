@@ -84,6 +84,10 @@ export default function AdminPage() {
   // actionable error + retry instead of a blank button area.
   const [gsiState, setGsiState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [gsiRetry, setGsiRetry] = useState(0);
+  // "Signing you in…" feedback while the token exchange is in flight, plus a
+  // welcome toast on landing so the user clearly feels they're signed in.
+  const [signingIn, setSigningIn] = useState(false);
+  const pendingWelcomeRef = useRef<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
@@ -311,19 +315,21 @@ export default function AdminPage() {
   const handleGoogleCredential = useCallback(async (resp: { credential?: string }) => {
     if (!resp?.credential) return;
     setAuthError('');
+    setSigningIn(true);
     try {
       const res = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: resp.credential }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); return; }
+      if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); setSigningIn(false); return; }
       setManagerToken(data.token);
       setManagerInfo({ managerId: data.managerId || data.email, displayName: data.displayName, role: data.role });
       sessionStorage.setItem('mgr_token', data.token);
       sessionStorage.setItem('mgr_info', JSON.stringify({ managerId: data.managerId || data.email, displayName: data.displayName, role: data.role }));
+      pendingWelcomeRef.current = data.displayName || data.email || 'there';
       setAuthed(true);
-    } catch { setAuthError('Network error. Please try again.'); }
+    } catch { setAuthError('Network error. Please try again.'); setSigningIn(false); }
   }, []);
 
   // Load Google Identity Services and render the sign-in button. Surfaces a
@@ -476,6 +482,16 @@ export default function AdminPage() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(''), 3500);
   }, []);
+
+  // Confirm a fresh sign-in with a welcome toast (only on real login, not on a
+  // page reload that restores the session).
+  useEffect(() => {
+    if (authed && pendingWelcomeRef.current) {
+      showToast(`Signed in as ${pendingWelcomeRef.current}`);
+      pendingWelcomeRef.current = null;
+      setSigningIn(false);
+    }
+  }, [authed, showToast]);
 
   const saveOrder = useCallback(async () => {
     if (!API_BASE || !managerToken) return;
@@ -840,7 +856,12 @@ export default function AdminPage() {
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Manager Portal</h1>
           <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
           <div>
-            {GOOGLE_CLIENT_ID ? (
+            {GOOGLE_CLIENT_ID ? signingIn ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1rem 0' }}>
+                <span className="admin-spinner" style={{ width: 28, height: 28, border: '3px solid #E2E8F0', borderTopColor: '#2B6CB0', borderRadius: '50%', display: 'inline-block', animation: 'admin-spin 0.7s linear infinite' }} />
+                <p style={{ fontSize: '0.875rem', color: '#2D3748', fontWeight: 600, margin: 0 }}>Signing you in…</p>
+              </div>
+            ) : (
               <>
                 <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
                 <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
