@@ -850,18 +850,16 @@ async function _handler(req, res) {
       }
     }
 
-    let tokenField;
-    if (identity.role === 'masteradmin') {
-      const token = makeMasterToken({ email: identity.email, displayName: identity.displayName });
-      tokenField = { token, role: 'masteradmin', email: identity.email, displayName: identity.displayName, expiresIn: MASTER_TOKEN_TTL_SECS };
-    } else {
-      const token = makeJWT({
-        managerId: identity.managerId, email: identity.email, displayName: identity.displayName,
-        role: 'manager', status: 'active', statusCachedAt: Math.floor(Date.now() / 1000),
-      });
-      tokenField = { token, role: 'manager', email: identity.email, displayName: identity.displayName, managerId: identity.managerId };
-      if (identity.managerId) await db.collection(MANAGERS_COL).doc(identity.managerId).update({ lastLoginAt: new Date().toISOString() }).catch(() => {});
-    }
+    // Issue a signed JWT carrying the role + email. A masteradmin token is
+    // dual-purpose: sent as X-Master-Token it satisfies the master session
+    // check, and sent as a Bearer token it satisfies the manager check — so a
+    // master admin can use BOTH the master and the admin/manager portals.
+    const token = makeJWT({
+      managerId: identity.managerId, email: identity.email, displayName: identity.displayName,
+      role: identity.role, status: 'active', statusCachedAt: Math.floor(Date.now() / 1000),
+    });
+    const tokenField = { token, role: identity.role, email: identity.email, displayName: identity.displayName, managerId: identity.managerId };
+    if (identity.managerId) await db.collection(MANAGERS_COL).doc(identity.managerId).update({ lastLoginAt: new Date().toISOString() }).catch(() => {});
     await writeAudit({ action: 'LOGIN_SUCCESS', entity: 'auth', entityId: email, entityTitle: identity.displayName, performedBy: email, meta: { ip, userAgent: ua, role: identity.role, method: 'google' } });
     return r(200, tokenField);
   }

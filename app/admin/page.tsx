@@ -302,8 +302,8 @@ export default function AdminPage() {
   }, [authed, managerToken, fetchTickets, fetchFeedback, fetchAuditLogs, fetchCategories]);
 
   // Receives the Google ID token from the Sign-in button, exchanges it for our
-  // manager session, and signs in. Master-admin accounts are redirected to the
-  // master portal.
+  // manager session, and signs in. Master admins are allowed here too (their
+  // token doubles as a manager token), so they can use both portals.
   const handleGoogleCredential = useCallback(async (resp: { credential?: string }) => {
     if (!resp?.credential) return;
     setAuthError('');
@@ -314,7 +314,6 @@ export default function AdminPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setAuthError(data.error || 'Google sign-in failed.'); return; }
-      if (data.role === 'masteradmin') { setAuthError('This is a master-admin account — please use the Master Admin portal.'); return; }
       setManagerToken(data.token);
       setManagerInfo({ managerId: data.managerId || data.email, displayName: data.displayName, role: data.role });
       sessionStorage.setItem('mgr_token', data.token);
