@@ -360,6 +360,17 @@ export default function MasterAdminPage() {
     } catch { alert('Network error. Please try again.'); }
   };
 
+  // Permanently delete a manager account (e.g. a duplicate). Irreversible.
+  const deleteManager = async (managerId: string, label: string) => {
+    if (!window.confirm(`Permanently delete "${label}"? This cannot be undone.`)) return;
+    try {
+      const r = await fetch(masterUrl(`/managers/${managerId}`), { method: 'DELETE', headers: getMasterHeaders() });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (!r.ok) { alert('Failed to delete account. Please try again.'); return; }
+      fetchManagers();
+    } catch { alert('Network error. Please try again.'); }
+  };
+
   const fetchAnalytics = useCallback(async (days: number) => {
     if (!API_BASE) return;
     setAnalyticsLoading(true);
@@ -953,6 +964,7 @@ export default function MasterAdminPage() {
                               ) : (
                                 <button onClick={() => setConfirmManagerAction({ managerId: mgr.managerId, newStatus: 'active', displayName: mgr.displayName })} style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: '#D1FAE5', color: '#065F46', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Reactivate</button>
                               )}
+                              <button onClick={() => deleteManager(mgr.managerId, `${mgr.displayName} (${mgr.email})`)} title="Permanently delete this account" style={{ padding: '0.3rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, background: 'none', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 6, cursor: 'pointer' }}>Delete</button>
                             </div>
                           </td>
                         </tr>
