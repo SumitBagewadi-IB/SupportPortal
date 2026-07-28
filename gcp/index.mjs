@@ -74,6 +74,9 @@ const OTP_ALLOWED_DOMAIN = (process.env.OTP_ALLOWED_DOMAIN || 'indiabulls.com').
 // Google Workspace SSO ("Sign in with Google"). The Client ID is non-secret
 // (it also ships in the browser); we verify Google ID tokens against it.
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+// Hard cap on the server-side Google tokeninfo call so a slow/hung Google
+// cannot stall a login (and pin function instances) up to the 60s timeout.
+const GOOGLE_TOKENINFO_TIMEOUT_MS = 5000;
 // When on, any verified @<domain> Google account that has NO existing record
 // is auto-provisioned as an ACTIVE manager on first login (govern-after model);
 // a master admin can then deactivate/delete them. Master role is NEVER
@@ -617,12 +620,17 @@ function extractAuth(req) {
   const isAdmin    = ALLOW_LEGACY_ADMIN_SECRET && !isMaster && ADMIN_SECRET && xSecret === ADMIN_SECRET;
   const jwtPayload = bearerToken ? verifyJWT(bearerToken) : null;
 
-  // Individual identity of an OTP-authenticated master session (null for the
-  // legacy shared-secret path, which has no personal identity).
+  // Individual identity of a master session (null for the legacy shared-secret
+  // path, which has no personal identity). Google-SSO master tokens also carry
+  // managerId + a cached status so the session can be revoked when the account
+  // is deactivated/demoted (legacy break-glass tokens carry none of these).
   const masterEmail = masterTokenPayload?.email || null;
   const masterDisplayName = masterTokenPayload?.displayName || null;
+  const masterManagerId = masterTokenPayload?.managerId || null;
+  const masterStatus = masterTokenPayload?.status || null;
+  const masterStatusCachedAt = masterTokenPayload?.statusCachedAt || null;
 
-  return { isMaster, isAdmin, jwtPayload, masterEmail, masterDisplayName };
+  return { isMaster, isAdmin, jwtPayload, masterEmail, masterDisplayName, masterManagerId, masterStatus, masterStatusCachedAt };
 }
 
 // How long to trust the cached `status` field embedded in the JWT before
@@ -630,47 +638,77 @@ function extractAuth(req) {
 // at most this duration after deactivation.
 const STATUS_CACHE_TTL_SECS = 300; // 5 minutes
 
-// Checks JWT validity + that the manager's account is still active.
+// Re-validate an account against Firestore, honoring the JWT's short-lived
+// status cache to avoid a per-request read. Returns { ok, reason, role } where
+// `role` is the FRESH DB role when a lookup happened (used to catch a master
+// being demoted to manager) or the cached role when the cache is trusted.
 //
-// Performance: the JWT embeds the manager's `status` and `statusCachedAt`
-// at login time. We trust that cache for STATUS_CACHE_TTL_SECS, eliminating
-// the per-request Firestore read. Old JWTs (issued before this change) lack
-// these fields, so we fall back to the DB lookup for them — they'll get the
-// new fields after their next login.
-async function requireManagerOrMaster(req) {
-  const auth = extractAuth(req);
-  // OTP-authenticated master sessions carry the person's email, so audit
-  // records attribute to the individual rather than a generic "masteradmin".
-  if (auth.isMaster) return { ok: true, performedBy: auth.masterEmail || 'masteradmin', role: 'masteradmin', displayName: auth.masterDisplayName || auth.masterEmail || 'Master Admin' };
-  if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin (legacy secret)', role: 'admin' };
-
-  const jwt = auth.jwtPayload;
-  if (!jwt?.managerId) return { ok: false };
-
+// Performance: the token embeds `status` + `statusCachedAt` at login time; we
+// trust that for STATUS_CACHE_TTL_SECS, so a deactivated/demoted account keeps
+// access for at most that window. Tokens lacking these fields (old JWTs, legacy
+// break-glass master tokens) fall through to a DB lookup — and if they carry no
+// managerId either, the caller decides whether to trust them for their TTL.
+async function revalidateAccount(managerId, token) {
   const now = Math.floor(Date.now() / 1000);
-  const cacheAge = jwt.statusCachedAt ? now - jwt.statusCachedAt : Infinity;
-  const cacheValid = jwt.status && cacheAge < STATUS_CACHE_TTL_SECS;
-
-  if (cacheValid) {
-    // Trust the JWT — no DB hit
-    if (jwt.status !== 'active') return { ok: false, reason: 'deactivated' };
-  } else {
-    // Cache expired or missing (old JWT): fall back to DB lookup
-    try {
-      const snap = await db.collection(MANAGERS_COL).doc(jwt.managerId).get();
-      if (!snap.exists || snap.data().status !== 'active') return { ok: false, reason: 'deactivated' };
-    } catch {
-      return { ok: false, reason: 'db_error' };
-    }
+  const cacheAge = token?.statusCachedAt ? now - token.statusCachedAt : Infinity;
+  if (token?.status && cacheAge < STATUS_CACHE_TTL_SECS) {
+    if (token.status !== 'active') return { ok: false, reason: 'deactivated' };
+    return { ok: true, role: token.role };
   }
-
-  // Prefer the email as the audit identity when the JWT carries one (OTP-based
-  // logins); fall back to managerId for older username/password JWTs.
-  return { ok: true, performedBy: jwt.email || jwt.managerId, role: jwt.role, displayName: jwt.displayName };
+  try {
+    const snap = await db.collection(MANAGERS_COL).doc(managerId).get();
+    if (!snap.exists || snap.data().status !== 'active') return { ok: false, reason: 'deactivated' };
+    return { ok: true, role: snap.data().role };
+  } catch {
+    return { ok: false, reason: 'db_error' };
+  }
 }
 
-function requireMaster(req) {
-  return extractAuth(req).isMaster;
+// Authorizes manager-or-master actions. A master session arrives either as an
+// X-Master-Token or as a Bearer JWT whose role is 'masteradmin' (the dual token
+// that lets a master use the admin portal too). Either way, when the token
+// identifies a manager record we re-validate it so a deactivated/demoted master
+// loses access within the cache window.
+async function requireManagerOrMaster(req) {
+  const auth = extractAuth(req);
+
+  if (auth.isAdmin && !auth.jwtPayload) return { ok: true, performedBy: 'admin (legacy secret)', role: 'admin' };
+
+  const bearer = auth.jwtPayload;
+  const master = auth.isMaster
+    ? { email: auth.masterEmail, displayName: auth.masterDisplayName, managerId: auth.masterManagerId, status: auth.masterStatus, statusCachedAt: auth.masterStatusCachedAt, role: 'masteradmin' }
+    : (bearer?.role === 'masteradmin' ? bearer : null);
+
+  if (master) {
+    // Google-SSO master tokens carry a managerId → revoke if deactivated/demoted.
+    // Legacy break-glass master tokens carry none → trusted for their TTL.
+    if (master.managerId) {
+      const v = await revalidateAccount(master.managerId, master);
+      if (!v.ok) return { ok: false, reason: v.reason };
+      if (v.role && v.role !== 'masteradmin') return { ok: false, reason: 'demoted' };
+    }
+    return { ok: true, performedBy: master.email || 'masteradmin', role: 'masteradmin', displayName: master.displayName || master.email || 'Master Admin' };
+  }
+
+  // Manager Bearer JWT.
+  if (!bearer?.managerId) return { ok: false };
+  const v = await revalidateAccount(bearer.managerId, bearer);
+  if (!v.ok) return { ok: false, reason: v.reason };
+  return { ok: true, performedBy: bearer.email || bearer.managerId, role: bearer.role, displayName: bearer.displayName };
+}
+
+// Master-only endpoints (manager CRUD). Accepts the X-Master-Token session and
+// re-validates the account so a deactivated/demoted master is locked out within
+// the cache window.
+async function requireMaster(req) {
+  const auth = extractAuth(req);
+  if (!auth.isMaster) return false;
+  if (auth.masterManagerId) {
+    const v = await revalidateAccount(auth.masterManagerId, { status: auth.masterStatus, statusCachedAt: auth.masterStatusCachedAt, role: 'masteradmin' });
+    if (!v.ok) return false;
+    if (v.role && v.role !== 'masteradmin') return false;
+  }
+  return true;
 }
 
 // ─── Audit log writer ───────────────────────────────────────────────────────
@@ -799,25 +837,39 @@ async function _handler(req, res) {
     if (!GOOGLE_CLIENT_ID) return r(503, { error: 'Google sign-in is not configured yet.' });
 
     // Validate the ID token via Google's tokeninfo endpoint (checks signature
-    // + expiry server-side); we then enforce audience, domain and verification.
+    // + expiry server-side); we then enforce audience, issuer, domain and
+    // verification. A hard timeout keeps a slow/hung Google from stalling the
+    // login (and pinning function instances) up to the 60s function timeout.
     let claims;
     try {
-      const gr = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), GOOGLE_TOKENINFO_TIMEOUT_MS);
+      let gr;
+      try {
+        gr = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!gr.ok) throw new Error('tokeninfo rejected');
       claims = await gr.json();
-    } catch {
-      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: 'google', entityTitle: 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason: 'token_invalid' } });
-      return r(401, { error: 'Google sign-in failed. Please try again.' });
+    } catch (e) {
+      const timedOut = e && e.name === 'AbortError';
+      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: 'google', entityTitle: 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason: timedOut ? 'tokeninfo_timeout' : 'token_invalid' } });
+      return r(timedOut ? 504 : 401, { error: timedOut ? 'Sign-in timed out. Please try again.' : 'Google sign-in failed. Please try again.' });
     }
 
     const email = String(claims.email || '').trim().toLowerCase();
     const audOk = claims.aud === GOOGLE_CLIENT_ID;
+    // Defense-in-depth: tokeninfo only returns genuine Google tokens, but we
+    // still assert the issuer explicitly.
+    const issOk = claims.iss === 'accounts.google.com' || claims.iss === 'https://accounts.google.com';
     const verified = claims.email_verified === true || claims.email_verified === 'true';
-    const domainOk = email.endsWith('@' + OTP_ALLOWED_DOMAIN) &&
+    const domainOk = !!email && email.endsWith('@' + OTP_ALLOWED_DOMAIN) &&
       (!claims.hd || String(claims.hd).toLowerCase() === OTP_ALLOWED_DOMAIN);
 
-    if (!audOk || !verified || !domainOk) {
-      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email || 'google', entityTitle: email || 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason: !audOk ? 'wrong_audience' : !verified ? 'email_unverified' : 'wrong_domain' } });
+    if (!audOk || !issOk || !verified || !domainOk) {
+      const reason = !audOk ? 'wrong_audience' : !issOk ? 'wrong_issuer' : !verified ? 'email_unverified' : 'wrong_domain';
+      await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email || 'google', entityTitle: email || 'google', performedBy: 'system', meta: { ip, userAgent: ua, reason } });
       return r(403, { error: `Sign in with your @${OTP_ALLOWED_DOMAIN} Google account.` });
     }
 
@@ -834,16 +886,32 @@ async function _handler(req, res) {
           await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'deactivated' } });
           return r(403, { error: 'Your admin access has been disabled. Contact a master admin.' });
         }
-        const managerId = `mgr_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+        // Deterministic doc id keyed to the email so two simultaneous first
+        // logins collide on the SAME document (idempotent) instead of creating
+        // duplicate manager records for one person.
+        const managerId = `self_${email.replace(/[^a-z0-9]+/g, '_')}`;
         const now = new Date().toISOString();
         const displayName = String(claims.name || '').trim() || email;
-        await db.collection(MANAGERS_COL).doc(managerId).set({
-          id: managerId, managerId, username: email, displayName, email,
-          role: 'manager', status: 'active',
-          createdAt: now, createdBy: 'self-signup:google', lastLoginAt: now, deactivatedAt: null,
-        });
-        await writeAudit({ action: 'MANAGER_SELF_PROVISIONED', entity: 'manager', entityId: managerId, entityTitle: displayName, performedBy: email, meta: { ip, userAgent: ua, email } });
-        identity = { email, role: 'manager', displayName, managerId };
+        // create-if-absent: never clobber an existing record (e.g. one a master
+        // just created/deactivated in the race window).
+        try {
+          await db.collection(MANAGERS_COL).doc(managerId).create({
+            id: managerId, managerId, username: email, displayName, email,
+            role: 'manager', status: 'active',
+            createdAt: now, createdBy: 'self-signup:google', lastLoginAt: now, deactivatedAt: null,
+          });
+          await writeAudit({ action: 'MANAGER_SELF_PROVISIONED', entity: 'manager', entityId: managerId, entityTitle: displayName, performedBy: email, meta: { ip, userAgent: ua, email } });
+        } catch {
+          // Lost the create race (doc now exists) — re-resolve and honor the
+          // winner's record, rejecting if it turns out to be deactivated.
+          const again = await resolveLoginIdentity(email);
+          if (!again) {
+            await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'deactivated' } });
+            return r(403, { error: 'Your admin access has been disabled. Contact a master admin.' });
+          }
+          identity = again;
+        }
+        if (!identity) identity = { email, role: 'manager', displayName, managerId };
       } else {
         await writeAudit({ action: 'LOGIN_FAIL', entity: 'auth', entityId: email, entityTitle: email, performedBy: 'system', meta: { ip, userAgent: ua, reason: 'not_authorised' } });
         return r(403, { error: 'This account is not authorised. Ask a master admin to add you.' });
@@ -1164,7 +1232,7 @@ async function _handler(req, res) {
 
   // ── GET /analytics/summary ───────────────────────────────────────────────
   if (method === 'GET' && path === '/analytics/summary') {
-    if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
+    if (!(await requireMaster(req))) return r(403, { error: 'Forbidden' });
     const days = parseInt(req.query?.days || '30', 10);
     const since = new Date(Date.now() - days * 86400000).toISOString();
     try {
@@ -1240,7 +1308,7 @@ async function _handler(req, res) {
 
   // ── GET /managers ─────────────────────────────────────────────────────────
   if (method === 'GET' && path === '/managers') {
-    if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
+    if (!(await requireMaster(req))) return r(403, { error: 'Forbidden' });
     const snap = await db.collection(MANAGERS_COL).get();
     const items = snap.docs
       .map(d => {
@@ -1265,7 +1333,7 @@ async function _handler(req, res) {
 
   // ── POST /managers ────────────────────────────────────────────────────────
   if (method === 'POST' && path === '/managers') {
-    if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
+    if (!(await requireMaster(req))) return r(403, { error: 'Forbidden' });
     const { username, displayName, password } = body;
     // Email is the OTP login identity — store it lowercased so the login lookup
     // (which lowercases its input) matches.
@@ -1310,7 +1378,7 @@ async function _handler(req, res) {
   // ── PUT /managers/{id} ────────────────────────────────────────────────────
   const managerPutMatch = path.match(/^\/managers\/([^/]+)$/);
   if (method === 'PUT' && managerPutMatch) {
-    if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
+    if (!(await requireMaster(req))) return r(403, { error: 'Forbidden' });
     const managerId = managerPutMatch[1];
     const updateData = {};
     const updates = {};
@@ -1358,7 +1426,7 @@ async function _handler(req, res) {
   // ── DELETE /managers/{id} ─────────────────────────────────────────────────
   const managerDeleteMatch = path.match(/^\/managers\/([^/]+)$/);
   if (method === 'DELETE' && managerDeleteMatch) {
-    if (!requireMaster(req)) return r(403, { error: 'Forbidden' });
+    if (!(await requireMaster(req))) return r(403, { error: 'Forbidden' });
     const managerId = managerDeleteMatch[1];
     const existingSnap = await db.collection(MANAGERS_COL).doc(managerId).get();
     if (!existingSnap.exists) return r(404, { error: 'Manager not found' });

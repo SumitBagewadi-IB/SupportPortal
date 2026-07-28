@@ -139,6 +139,8 @@ export default function MasterAdminPage() {
   // Sign in with Google (primary); master password is the rollover fallback.
   const [usePassword, setUsePassword] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
+  const [gsiState, setGsiState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [gsiRetry, setGsiRetry] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [lockSecs, setLockSecs] = useState(0);
@@ -243,23 +245,50 @@ export default function MasterAdminPage() {
     } catch { setAuthError('Network error. Please try again.'); }
   }, []);
 
-  // Load Google Identity Services and render the sign-in button.
+  // Load Google Identity Services and render the sign-in button. Surfaces a
+  // clear error + retry if the script is blocked/slow (the master password
+  // option is always available as a fallback).
   useEffect(() => {
     if (authed || usePassword || !GOOGLE_CLIENT_ID) return;
+    let cancelled = false;
+    setGsiState('loading');
+    const fail = () => { if (!cancelled) setGsiState('error'); };
     const render = () => {
+      if (cancelled) return;
       const g = (window as unknown as { google?: GsiApi }).google;
-      if (!g || !googleBtnRef.current) return;
-      g.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential, hd: 'indiabulls.com', auto_select: false });
-      googleBtnRef.current.innerHTML = '';
-      g.accounts.id.renderButton(googleBtnRef.current, { theme: 'filled_blue', size: 'large', width: 320, text: 'signin_with', shape: 'rectangular' });
+      if (!g?.accounts?.id || !googleBtnRef.current) { fail(); return; }
+      try {
+        g.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential, hd: 'indiabulls.com', auto_select: false });
+        googleBtnRef.current.innerHTML = '';
+        g.accounts.id.renderButton(googleBtnRef.current, { theme: 'filled_blue', size: 'large', width: 320, text: 'signin_with', shape: 'rectangular' });
+        setGsiState('ready');
+      } catch { fail(); }
     };
-    if (document.getElementById('gsi-script')) { render(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true; s.defer = true; s.id = 'gsi-script';
-    s.onload = render;
-    document.body.appendChild(s);
-  }, [authed, usePassword, handleGoogleCredential]);
+    const watchdog = setTimeout(() => { if (!cancelled) setGsiState((s) => (s === 'ready' ? s : 'error')); }, 8000);
+    const hasGoogle = () => !!(window as unknown as { google?: GsiApi }).google?.accounts?.id;
+    const existing = document.getElementById('gsi-script') as HTMLScriptElement | null;
+    if (existing && hasGoogle()) {
+      render();
+    } else if (existing) {
+      existing.addEventListener('load', render, { once: true });
+      existing.addEventListener('error', fail, { once: true });
+    } else {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; s.defer = true; s.id = 'gsi-script';
+      s.onload = render;
+      s.onerror = fail;
+      document.body.appendChild(s);
+    }
+    return () => { cancelled = true; clearTimeout(watchdog); };
+  }, [authed, usePassword, handleGoogleCredential, gsiRetry]);
+
+  // Retry a failed Google-script load: drop the dead <script> so it refetches.
+  const retryGsi = useCallback(() => {
+    document.getElementById('gsi-script')?.remove();
+    setGsiState('loading');
+    setGsiRetry((n) => n + 1);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -645,6 +674,17 @@ export default function MasterAdminPage() {
                 <>
                   <p style={{ fontSize: '0.8125rem', color: '#718096', marginBottom: '1rem' }}>Sign in with your @indiabulls.com Google account.</p>
                   <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+                  {gsiState === 'loading' && (
+                    <p style={{ fontSize: '0.8125rem', color: '#A0AEC0', marginTop: '0.5rem' }}>Loading Google sign-in…</p>
+                  )}
+                  {gsiState === 'error' && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <div style={{ background: '#FFFAF0', border: '1px solid #FBD38D', color: '#C05621', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.8125rem', textAlign: 'left' }}>
+                        Couldn&apos;t load Google sign-in. Retry, or use the master password option below.
+                      </div>
+                      <button onClick={retryGsi} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', borderRadius: 8, border: '1px solid #CBD5E0', background: '#fff', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600 }}>Retry</button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet. Use the master password option below.</p>
