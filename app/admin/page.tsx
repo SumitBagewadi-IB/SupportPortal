@@ -88,6 +88,15 @@ export default function AdminPage() {
   // welcome toast on landing so the user clearly feels they're signed in.
   const [signingIn, setSigningIn] = useState(false);
   const pendingWelcomeRef = useRef<string | null>(null);
+  // The mirror image on the way out: a blocking "Signing you out…" overlay while
+  // the session is torn down, then an explicit confirmation on the login card so
+  // the user can see the account is actually signed out — not just that the
+  // dashboard vanished.
+  // `signedOut` is what drives the confirmation — kept separate from the name so
+  // the confirmation still shows for an account with no display name.
+  const [signingOut, setSigningOut] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
+  const [signedOutName, setSignedOutName] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
@@ -315,6 +324,8 @@ export default function AdminPage() {
   const handleGoogleCredential = useCallback(async (resp: { credential?: string }) => {
     if (!resp?.credential) return;
     setAuthError('');
+    setSignedOut(false);
+    setSignedOutName('');
     setSigningIn(true);
     try {
       const res = await fetch(`${API_BASE}/auth/google`, {
@@ -760,16 +771,50 @@ export default function AdminPage() {
     }
   };
 
-  const logout = () => {
+  // Sign out. Three things have to be true afterwards, and the user has to be
+  // able to SEE that they are:
+  //   1. the server recorded it (LOGOUT audit entry) — so we wait for that call
+  //      rather than firing it off and racing it against the token being dropped;
+  //   2. nothing of the session survives in this tab — token, identity, and the
+  //      account-scoped data we had loaded in memory (tickets, feedback, audit);
+  //   3. they land on the login card with an explicit confirmation.
+  // A slow or offline network must never trap someone in a session, so the local
+  // sign-out proceeds regardless of what the server says.
+  const logout = useCallback(async () => {
+    if (signingOut) return;
+    const who = managerInfo?.displayName || '';
+    setSigningOut(true);
     if (API_BASE && managerToken) {
-      fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: authHeaders(managerToken) }).catch(() => {});
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4000);
+        try {
+          await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: authHeaders(managerToken), signal: ctrl.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch { /* offline, slow, or already-expired token — sign out locally anyway */ }
     }
     sessionStorage.removeItem('mgr_token');
     sessionStorage.removeItem('mgr_info');
     setManagerToken('');
     setManagerInfo(null);
+    // Drop the previous account's data so none of it survives in memory or
+    // flashes on screen if a different person signs in on this device.
+    setTickets([]);
+    setFeedback([]);
+    setAuditLogs([]);
+    setSessionExpiresAt(null);
+    setSessionWarning(false);
+    setAuthError('');
+    setToast('');
+    setSidebarOpen(false);
+    setActiveView('articles');
+    setSignedOutName(who);
+    setSignedOut(true);
+    setSigningOut(false);
     setAuthed(false);
-  };
+  }, [signingOut, managerInfo, managerToken, authHeaders]);
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -854,7 +899,18 @@ export default function AdminPage() {
             <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={120} height={43} style={{ width: 120, height: 'auto', margin: '0 auto', display: 'block' }} />
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Manager Portal</h1>
-          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
+          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: signedOut ? '1.25rem' : '2rem' }}>Sign in to manage FAQ articles and support tickets</p>
+          {signedOut && !signingIn && (
+            <div style={{ background: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: 10, padding: '0.875rem 1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.625rem', textAlign: 'left' }}>
+              <i className="fas fa-circle-check" style={{ color: '#25855A', fontSize: '1rem', marginTop: '0.15rem', flexShrink: 0 }}></i>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: '#22543D' }}>You&apos;re signed out</p>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.8125rem', color: '#2F6F4F', lineHeight: 1.45 }}>
+                  {signedOutName ? `${signedOutName}'s session has ended on this device.` : 'Your session has ended on this device.'} Sign in again to continue.
+                </p>
+              </div>
+            </div>
+          )}
           <div>
             {GOOGLE_CLIENT_ID ? signingIn ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '1rem 0' }}>
@@ -880,7 +936,10 @@ export default function AdminPage() {
             ) : (
               <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet.</p>
             )}
-            {authError && (
+            {/* Suppressed while the sign-out confirmation is showing so a late 401
+                from an in-flight request can't contradict it. A new sign-in attempt
+                clears the confirmation first, so real errors still surface. */}
+            {authError && !signedOut && (
               <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginTop: '1rem', textAlign: 'left' }}>{authError}</div>
             )}
           </div>
@@ -935,8 +994,8 @@ export default function AdminPage() {
           </Link>
         </div>
         <div style={{ padding: '1rem 0.75rem', borderTop: '1px solid #2D3748' }}>
-          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#FC8181', background: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500, border: 'none', width: '100%', textAlign: 'left' }}>
-            <i className="fas fa-right-from-bracket" style={{ width: 16, textAlign: 'center' }}></i> Logout
+          <button onClick={logout} disabled={signingOut} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: 8, color: '#FC8181', background: 'none', cursor: signingOut ? 'wait' : 'pointer', fontSize: '0.875rem', fontWeight: 500, border: 'none', width: '100%', textAlign: 'left', opacity: signingOut ? 0.6 : 1 }}>
+            <i className={`fas ${signingOut ? 'fa-spinner fa-spin' : 'fa-right-from-bracket'}`} style={{ width: 16, textAlign: 'center' }}></i> {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
           <p style={{ fontSize: '0.65rem', color: '#4A5568', textAlign: 'center', padding: '0.5rem' }}>v1.0 · Manager Portal</p>
         </div>
@@ -970,9 +1029,9 @@ export default function AdminPage() {
             <button onClick={toggleDarkMode} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--admin-text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
               <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
-            <button onClick={logout} aria-label="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <i className="fas fa-right-from-bracket"></i>
-              <span className="hide-mobile">Sign out</span>
+            <button onClick={logout} disabled={signingOut} aria-label="Sign out" title="Sign out" style={{ background: 'none', border: 'none', cursor: signingOut ? 'wait' : 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: signingOut ? 0.6 : 1 }}>
+              <i className={`fas ${signingOut ? 'fa-spinner fa-spin' : 'fa-right-from-bracket'}`}></i>
+              <span className="hide-mobile">{signingOut ? 'Signing out…' : 'Sign out'}</span>
             </button>
           </div>
         </div>
@@ -1787,6 +1846,15 @@ export default function AdminPage() {
         <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', background: '#1A202C', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, zIndex: 80, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <i className="fas fa-check-circle" style={{ color: '#68D391' }}></i>
           {toast}
+        </div>
+      )}
+
+      {/* SIGNING-OUT OVERLAY — covers the dashboard the moment Sign out is clicked,
+          so the session teardown is a visible action rather than a sudden blank. */}
+      {signingOut && (
+        <div role="status" aria-live="polite" style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.72)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+          <span style={{ width: 34, height: 34, border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'admin-spin 0.7s linear infinite' }} />
+          <p style={{ margin: 0, color: '#fff', fontSize: '0.9375rem', fontWeight: 600 }}>Signing you out…</p>
         </div>
       )}
 

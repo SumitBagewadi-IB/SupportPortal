@@ -146,6 +146,13 @@ export default function MasterAdminPage() {
   const [signingIn, setSigningIn] = useState(false);
   const [masterName, setMasterName] = useState('');
   const pendingWelcomeRef = useRef<string | null>(null);
+  // The mirror image on the way out — see signOut() for what has to be true
+  // (and visible) once a master signs out. `signedOut` drives the confirmation,
+  // kept separate from the name so it still shows for a break-glass session that
+  // carries no personal identity.
+  const [signingOut, setSigningOut] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
+  const [signedOutName, setSignedOutName] = useState('');
   const [toast, setToast] = useState('');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -240,6 +247,8 @@ export default function MasterAdminPage() {
   const handleGoogleCredential = useCallback(async (resp: { credential?: string }) => {
     if (!resp?.credential) return;
     setAuthError('');
+    setSignedOut(false);
+    setSignedOutName('');
     if (!API_BASE) { setAuthError('System misconfiguration: API not configured.'); return; }
     setSigningIn(true);
     try {
@@ -322,6 +331,8 @@ export default function MasterAdminPage() {
     e.preventDefault();
     if (lockedUntil && Date.now() < lockedUntil) return;
     if (!API_BASE) { setAuthError('System misconfiguration: API not configured.'); return; }
+    setSignedOut(false);
+    setSignedOutName('');
 
     try {
       const res = await fetch(`${API_BASE}/auth/masterlogin`, {
@@ -367,6 +378,48 @@ export default function MasterAdminPage() {
     setAuthed(false);
     setAuthError('Your session has expired. Please log in again.');
   }, []);
+
+  // Sign out of the master portal. This previously just dropped the token and
+  // flipped a flag, which meant (a) the sign-out was never recorded in the audit
+  // log — a real gap for the console that exists to audit everyone else — and
+  // (b) the screen simply changed with no confirmation that the account was out.
+  // Now we notify the server first (bounded, so a bad network can't trap anyone),
+  // then wipe every trace of the session from this tab and land on the login card
+  // with an explicit confirmation.
+  const signOut = useCallback(async () => {
+    if (signingOut) return;
+    const who = masterName;
+    const token = getMasterToken();
+    setSigningOut(true);
+    if (API_BASE && token) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4000);
+        try {
+          await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: getMasterHeaders(), signal: ctrl.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch { /* offline, slow, or already-expired token — sign out locally anyway */ }
+    }
+    sessionStorage.removeItem('master_token');
+    // Nothing of the previous master's view survives in memory: this console
+    // holds the audit log, staff accounts, tickets and feedback for the whole org.
+    setAuditLogs([]);
+    setTickets([]);
+    setFeedback([]);
+    setArticles([]);
+    setManagers([]);
+    setAnalytics(null);
+    setMasterName('');
+    setAuthError('');
+    setToast('');
+    setActiveTab('overview');
+    setSignedOutName(who);
+    setSignedOut(true);
+    setSigningOut(false);
+    setAuthed(false);
+  }, [signingOut, masterName]);
 
   const deleteFeedback = async (id: string) => {
     if (!API_BASE) return;
@@ -671,7 +724,19 @@ export default function MasterAdminPage() {
             <Image src="/logo-dark.svg" alt="Indiabulls Securities" width={120} height={43} style={{ width: 120, height: 'auto', margin: '0 auto' }} />
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#1A202C', marginBottom: '0.375rem' }}>Master Admin</h1>
-          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Manager of Admins — restricted access only</p>
+          <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: signedOut ? '1.25rem' : '2rem' }}>Manager of Admins — restricted access only</p>
+
+          {signedOut && !signingIn && (
+            <div style={{ background: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: 10, padding: '0.875rem 1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.625rem', textAlign: 'left' }}>
+              <i className="fas fa-circle-check" style={{ color: '#25855A', fontSize: '1rem', marginTop: '0.15rem', flexShrink: 0 }}></i>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: '#22543D' }}>You&apos;re signed out</p>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.8125rem', color: '#2F6F4F', lineHeight: 1.45 }}>
+                  {signedOutName && signedOutName !== 'Master Admin' ? `${signedOutName}'s master session has ended on this device.` : 'The master session has ended on this device.'} Sign in again to continue.
+                </p>
+              </div>
+            </div>
+          )}
 
           {usePassword ? (
             <form onSubmit={handleLogin}>
@@ -724,7 +789,9 @@ export default function MasterAdminPage() {
               ) : (
                 <p style={{ fontSize: '0.875rem', color: '#DD6B20' }}>Google sign-in isn&apos;t configured yet. Use the master password option below.</p>
               )}
-              {authError && (
+              {/* Suppressed while the sign-out confirmation is showing so a late 401
+                  from an in-flight request can't contradict it. */}
+              {authError && !signedOut && (
                 <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030', padding: '0.75rem 1rem', borderRadius: 8, fontSize: '0.875rem', marginTop: '1rem', textAlign: 'left' }}>{authError}</div>
               )}
             </div>
@@ -745,6 +812,16 @@ export default function MasterAdminPage() {
           <i className="fas fa-check-circle" style={{ color: '#48BB78' }}></i>{toast}
         </div>
       )}
+
+      {/* SIGNING-OUT OVERLAY — makes the teardown a visible action rather than the
+          console suddenly disappearing. */}
+      {signingOut && (
+        <div role="status" aria-live="polite" style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.72)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+          <span style={{ width: 34, height: 34, border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'admin-spin 0.7s linear infinite' }} />
+          <p style={{ margin: 0, color: '#fff', fontSize: '0.9375rem', fontWeight: 600 }}>Signing you out…</p>
+        </div>
+      )}
+
       {/* Top bar */}
       <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -767,9 +844,9 @@ export default function MasterAdminPage() {
           <button onClick={toggleDarkMode} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.625rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
             <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
-          <button onClick={() => { sessionStorage.removeItem('master_token'); setAuthed(false); }} aria-label="Sign out" title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <i className="fas fa-sign-out-alt"></i>
-            <span className="hide-mobile">Sign out</span>
+          <button onClick={signOut} disabled={signingOut} aria-label="Sign out" title="Sign out" style={{ background: 'none', border: 'none', cursor: signingOut ? 'wait' : 'pointer', color: '#EF4444', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: signingOut ? 0.6 : 1 }}>
+            <i className={`fas ${signingOut ? 'fa-spinner fa-spin' : 'fa-sign-out-alt'}`}></i>
+            <span className="hide-mobile">{signingOut ? 'Signing out…' : 'Sign out'}</span>
           </button>
         </div>
       </div>
