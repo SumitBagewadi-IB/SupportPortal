@@ -217,6 +217,15 @@ const db = new Firestore({
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
 const VALID_FAQ_STATUSES    = ['published', 'draft'];
+// What an anonymous caller is allowed to see. Deliberately WIDER than
+// `status === 'published'`: rows created before the status field existed have no
+// status at all, and older rows use 'active'/'approved'. Every client already
+// treats all of those as published (app/faq/page.tsx, app/admin/page.tsx), but
+// the Firestore query below used a strict equality match — so those rows were
+// silently missing from the public knowledge base, from /faq/search and from the
+// chatbot, with nothing anywhere to indicate it.
+const PUBLIC_FAQ_STATUSES   = ['published', 'active', 'approved'];
+const isPubliclyVisible     = (a) => !a.status || PUBLIC_FAQ_STATUSES.includes(a.status);
 const VALID_TICKET_STATUSES = ['open', 'in_progress', 'solved', 'resolved'];
 const ALLOWED_TICKET_CATEGORIES = [
   'Getting Started', 'Account Opening', 'Trading', 'Portfolio & Margin',
@@ -259,11 +268,13 @@ async function getPublishedArticles() {
     return _articleCache.articles;
   }
 
-  // Cache miss — fetch from Firestore. Filter to published server-side so
-  // draft content never enters memory and bandwidth is minimal.
-  const snap = await db.collection(FAQ_COL).where('status', '==', 'published').get();
+  // Cache miss — fetch from Firestore. The status filter can't be pushed down
+  // any more (a Firestore query can't express "missing field OR in list"), so we
+  // read the collection and drop drafts before the map — draft content still
+  // never lands in the cache.
+  const snap = await db.collection(FAQ_COL).get();
 
-  const articles = snap.docs.map(d => {
+  const articles = snap.docs.filter(d => isPubliclyVisible(d.data())).map(d => {
     const a = d.data();
     // Pre-process fields used by the search scorer.
     // Doing this once at cache-load time vs. on every search query.
@@ -1444,26 +1455,22 @@ async function _handler(req, res) {
   // Public users get only published articles; authenticated managers get all.
   // Optional ?category=X filter (case-insensitive).
   //
-  // Optimization: status filter pushed to Firestore (server-side), saving
-  // ~1 draft article worth of bandwidth in the common public case. Category
-  // filter stays in-memory because (a) frontend doesn't use it, (b) keeping
-  // it case-insensitive avoids breaking any external scripts.
+  // The public status filter is applied in memory, not pushed to Firestore: a
+  // `where('status','==','published')` pushdown also excluded legacy rows with
+  // no status field and rows using 'active'/'approved', hiding real published
+  // content from customers. See isPubliclyVisible(). Category filter is
+  // in-memory too, so it stays case-insensitive.
   if (method === 'GET' && path === '/faq') {
     const auth = await requireManagerOrMaster(req);
     const categoryFilter = req.query?.category;
 
-    let query = db.collection(FAQ_COL);
-    if (!auth.ok) {
-      query = query.where('status', '==', 'published');
-    }
-
-    const snap = await query.get();
+    const snap = await db.collection(FAQ_COL).get();
     // Sanitize title/category on the way out so existing raw-markup rows (IDX-001)
     // are never served as HTML to the FAQ page; content is left intact.
-    let items = snap.docs.map(d => {
-      const a = d.data();
-      return { ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) };
-    });
+    let items = snap.docs
+      .map(d => d.data())
+      .filter(a => auth.ok || isPubliclyVisible(a))
+      .map(a => ({ ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) }));
     if (categoryFilter) {
       const filterLower = String(categoryFilter).toLowerCase();
       items = items.filter(i => i.category?.toLowerCase() === filterLower);
@@ -1645,7 +1652,7 @@ async function _handler(req, res) {
   if (method === 'POST' && path === '/faq') {
     const auth = await requireManagerOrMaster(req);
     if (!auth.ok) return r(auth.reason === 'deactivated' ? 403 : 401, { error: auth.reason === 'deactivated' ? 'Account deactivated' : 'Unauthorized' });
-    const { title, category, content, status = 'published', id, sortOrder } = body;
+    const { title, category, content, status = 'published', id, sortOrder, importBatch } = body;
 
     if (id && !title && !content) {
       // Status-only toggle
@@ -1670,13 +1677,26 @@ async function _handler(req, res) {
     const cleanCategory = sanitizeText(category, 100);
     if (!cleanTitle) return r(400, { error: 'title must contain valid text' });
     if (!cleanCategory) return r(400, { error: 'category must contain valid text' });
+    // Title is the de-facto key managers dedup on (both the CSV import and the
+    // Add Article form match on it), so enforce it server-side too: a purely
+    // client-side check loses the race between two concurrent imports and there
+    // is nothing in the doc id to stop a second copy of the same article.
+    const dupSnap = await db.collection(FAQ_COL).where('title', '==', cleanTitle).limit(1).get();
+    if (!dupSnap.empty && dupSnap.docs[0].id !== (id || '')) {
+      return r(409, { error: `An article titled "${cleanTitle}" already exists` });
+    }
     const newId = id || `art-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const now = new Date().toISOString();
     const item = { id: newId, title: cleanTitle, category: cleanCategory, content, status, createdAt: now, updatedAt: now };
     if (sortOrder !== undefined) item.sortOrder = sortOrder;
+    // Optional provenance tag from the bulk importer. Stamping it on the doc (and
+    // in the audit entry) is what makes "which articles did that import create?"
+    // answerable later — previously there was no way to attribute a row to a run.
+    const batch = typeof importBatch === 'string' ? sanitizeText(importBatch, 64) : '';
+    if (batch) item.importBatch = batch;
     await db.collection(FAQ_COL).doc(newId).set(item);
     invalidateArticleCache();
-    await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: cleanTitle, performedBy: auth.performedBy, meta: { category: cleanCategory, status } });
+    await writeAudit({ action: 'CREATE_FAQ', entity: 'faq', entityId: newId, entityTitle: cleanTitle, performedBy: auth.performedBy, meta: { category: cleanCategory, status, ...(batch ? { importBatch: batch } : {}) } });
     return r(201, { id: newId, ok: true });
   }
 
