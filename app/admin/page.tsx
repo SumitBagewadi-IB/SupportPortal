@@ -65,6 +65,53 @@ interface Feedback {
   date?: string;
 }
 
+// Mirrors VALID_FAQ_STATUSES on the API — validated in the CSV preview so a bad
+// `status` cell is reported as a skipped row instead of 100 opaque HTTP 400s.
+const VALID_STATUSES = ['published', 'draft'];
+
+// Mirrors PUBLIC_FAQ_STATUSES in gcp/index.mjs. Anything that isn't an explicit
+// draft is live for customers — legacy rows have no status, or use
+// 'active'/'approved'. Counting only status === 'published' left those rows out
+// of both stat cards and out of both status filters.
+const isLive = (status?: string) => !status || status === 'published' || status === 'active' || status === 'approved';
+
+// Titles are the dedup key, so normalise the way a human reads them: trim, fold
+// case, and collapse runs of whitespace. Without the whitespace collapse,
+// "What is  X?" and "What is X?" import as two separate articles.
+const normTitle = (t?: string) => (t || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Excel in several locales exports semicolon-separated CSV, and pasting from
+// Google Sheets gives tabs. Both used to parse as a single column and surfaced as
+// the misleading "CSV needs title, category and content columns".
+const detectDelimiter = (text: string): string => {
+  const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] || '';
+  const scored = [',', ';', '\t'].map((d) => ({ d, n: firstLine.split(d).length - 1 }));
+  scored.sort((a, b) => b.n - a.n);
+  return scored[0].n > 0 ? scored[0].d : ',';
+};
+
+// One parsed CSV row. `row` is the ORIGINAL 1-based line number in the user's
+// file, so "Row 37" points at line 37 in their spreadsheet even when blank
+// lines were dropped during parsing.
+interface ImportRow {
+  row: number;
+  title: string;
+  category: string;
+  content: string;
+  status: string;
+}
+// A rejected row keeps its parsed values, not just the reason, so the whole
+// reject set can be re-exported as a fixable CSV instead of being retyped.
+interface ImportIssue extends ImportRow {
+  reason: string;
+}
+// A row whose title already exists in the knowledge base. Carries the existing
+// doc id so the import can update it in place instead of only ever skipping it.
+interface ImportDup extends ImportRow {
+  existingId: string;
+  existingStatus: string;
+}
+
 const emptyForm = { title: '', category: '', content: '', status: 'published' };
 
 export default function AdminPage() {
@@ -173,10 +220,26 @@ export default function AdminPage() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bulk CSV import
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [importPreview, setImportPreview] = useState<{ valid: { title: string; category: string; content: string; status: string }[]; issues: { row: number; reason: string }[] } | null>(null);
+  const [importPreview, setImportPreview] = useState<{ valid: ImportRow[]; duplicates: ImportDup[]; issues: ImportIssue[]; newCategories: string[]; delimiter: string } | null>(null);
+  // What to do with rows whose title already exists: leave them alone (default,
+  // so a re-upload is never destructive) or overwrite them from the file.
+  const [importMode, setImportMode] = useState<'skip' | 'update'>('skip');
+  // What a row with an EMPTY status cell becomes. Defaults to draft (safe), but
+  // the choice is now shown and counted in the preview: an all-blank status column
+  // silently turning 182 articles into invisible drafts is the exact failure this
+  // replaces. Applies to NEW rows only — updating an existing article never
+  // changes its status unless the file says so explicitly.
+  const [blankStatusMode, setBlankStatusMode] = useState<'draft' | 'published'>('draft');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
-  const [importResult, setImportResult] = useState<{ created: number; failed: { title: string; reason: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; failed: { row: number; title: string; reason: string }[]; cancelled: boolean } | null>(null);
+  // Set by the Cancel button so a long import can be stopped without leaving the
+  // operator guessing how far it got — the result modal still reports the batch.
+  const importAbortRef = useRef(false);
+  // Bulk publish: reviewing 300+ drafts one toggle at a time is not a workflow.
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   // Ticket search + pagination
   const [ticketSearch, setTicketSearch] = useState('');
   const [ticketPage, setTicketPage] = useState(1);
@@ -442,7 +505,11 @@ export default function AdminPage() {
     setError('');
     if (API_BASE) {
       try {
-        const res = await fetch(`${API_BASE}/faq`);
+        // Authenticated on purpose: GET /faq returns ONLY published articles to
+        // anonymous callers, so an unauthenticated fetch here made every draft
+        // invisible in the admin — including everything a CSV import creates
+        // (imports land as drafts), which looked like the import did nothing.
+        const res = await fetch(`${API_BASE}/faq`, managerToken ? { headers: authHeaders(managerToken) } : undefined);
         if (res.status === 401) { handleSessionExpired(); return; }
         if (res.ok) {
           const data = await res.json();
@@ -462,7 +529,7 @@ export default function AdminPage() {
     }
     setLoading(false);
     setLastRefreshed(new Date());
-  }, [handleSessionExpired]);
+  }, [handleSessionExpired, managerToken, authHeaders]);
 
   useEffect(() => { if (authed) fetchArticles(); }, [authed, fetchArticles]);
 
@@ -504,6 +571,15 @@ export default function AdminPage() {
     }
   }, [authed, showToast]);
 
+  // A refresh or tab close mid-batch leaves articles half-created with no record
+  // of where it stopped, so warn while any write loop is in flight.
+  useEffect(() => {
+    if (!importing && !bulkPublishing) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [importing, bulkPublishing]);
+
   const saveOrder = useCallback(async () => {
     if (!API_BASE || !managerToken) return;
     setSavingOrder(true);
@@ -511,11 +587,19 @@ export default function AdminPage() {
       const toUpdate = reorderCategory
         ? articles.filter(a => a.category === reorderCategory)
         : articles;
+      // A category-scoped reorder reuses the sortOrder slots that category
+      // already occupies. Renumbering it 0..n (the old behaviour) collided with
+      // every other category's numbering and yanked the whole category to the
+      // top of the list — the reorder "worked" but the list looked scrambled.
+      const slots = reorderCategory
+        ? toUpdate.map((a, i) => (typeof a.sortOrder === 'number' ? a.sortOrder : i)).sort((x, y) => x - y)
+        : toUpdate.map((_, i) => i);
+      for (let i = 1; i < slots.length; i++) if (slots[i] <= slots[i - 1]) slots[i] = slots[i - 1] + 1;
       const results = await Promise.all(toUpdate.map((a, i) =>
         fetch(`${API_BASE}/faq/${a.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${managerToken}` },
-          body: JSON.stringify({ sortOrder: i }),
+          body: JSON.stringify({ sortOrder: slots[i] }),
         })
       ));
       const unauthorized = results.find(r => r.status === 401);
@@ -575,17 +659,19 @@ export default function AdminPage() {
   // ── Bulk CSV import ─────────────────────────────────────────────────────────
   // Minimal RFC-4180 parser: handles quoted fields, escaped "" quotes, and
   // commas/newlines inside quoted values (FAQ content routinely has both).
-  const parseCSV = (text: string): string[][] => {
+  const parseCSV = (text: string, delim = ','): string[][] => {
     const rows: string[][] = [];
     let field = '', row: string[] = [], inQuotes = false;
-    const s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Strip the UTF-8 BOM Excel writes on "CSV UTF-8" export — otherwise the
+    // first header cell reads as "\uFEFFtitle" and the title column is "missing".
+    const s = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     for (let i = 0; i < s.length; i++) {
       const c = s[i];
       if (inQuotes) {
         if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
         else field += c;
       } else if (c === '"') inQuotes = true;
-      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === delim) { row.push(field); field = ''; }
       else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
       else field += c;
     }
@@ -599,107 +685,246 @@ export default function AdminPage() {
   const IMPORT_MAX_ROWS = 2000;
   const IMPORT_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 
+  const readApiError = async (res: Response): Promise<string> => {
+    try { const j = await res.json(); if (j?.error) return String(j.error); } catch { /* fall through */ }
+    return `HTTP ${res.status}`;
+  };
+
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (importInputRef.current) importInputRef.current.value = ''; // allow re-selecting the same file
     if (!file) return;
     if (file.size > IMPORT_MAX_BYTES) { showToast(`File too large (max ${IMPORT_MAX_BYTES / 1024 / 1024} MB).`); return; }
     try {
-      const rows = parseCSV(await file.text()).filter(r => r.some(c => c.trim() !== ''));
+      const text = await file.text();
+      const delimiter = detectDelimiter(text);
+      // Keep each row's original file line number before blank lines are dropped,
+      // so reported row numbers still line up with the user's spreadsheet.
+      const parsed = parseCSV(text, delimiter).map((cells, idx) => ({ cells, line: idx + 1 }));
+      const rows = parsed.filter(r => r.cells.some(c => c.trim() !== ''));
       if (rows.length < 2) { showToast('CSV is empty or has no data rows.'); return; }
       if (rows.length - 1 > IMPORT_MAX_ROWS) { showToast(`Too many rows (${(rows.length - 1).toLocaleString()}). Split into files of ${IMPORT_MAX_ROWS.toLocaleString()} or fewer.`); return; }
-      const header = rows[0].map(h => h.trim().toLowerCase());
+      const header = rows[0].cells.map(h => h.trim().toLowerCase());
       const col = (names: string[]) => { for (const n of names) { const i = header.indexOf(n); if (i >= 0) return i; } return -1; };
       const ti = col(['title', 'question']);
       const ci = col(['category']);
       const coi = col(['content', 'answer']);
       const si = col(['status']);
-      if (ti < 0 || ci < 0 || coi < 0) { showToast('CSV needs title, category and content columns.'); return; }
+      if (ti < 0 || ci < 0 || coi < 0) {
+        showToast(`CSV needs title, category and content columns. Found: ${header.join(', ') || '(none)'}`);
+        return;
+      }
 
-      // Dedup against ALL existing articles — including drafts — not just the
-      // published set in `articles`. Managers see everything via an authed
-      // GET /faq; fall back to the loaded (published) set if that call fails.
-      // Fall back to the already-loaded set if the authed fetch can't be
-      // trusted, so we never dedup against an empty list (which would let
-      // duplicates through).
-      const loadedTitles = () => new Set(articles.map(a => (a.title || a.question || '').trim().toLowerCase()));
-      let existingTitles: Set<string>;
+      // Match against ALL existing articles — including drafts — not just the
+      // published set. Managers see everything via an authed GET /faq; fall back
+      // to the already-loaded set if that call fails, so we never match against
+      // an empty list (which would duplicate every row).
+      // We keep the existing id + status, not just the title, so a matching row
+      // can be updated in place rather than only ever skipped.
+      const indexOf = (list: Article[]) => new Map(
+        list.map(a => [normTitle(a.title || a.question), { id: a.id, status: a.status || 'published' }] as const)
+      );
+      let existing: Map<string, { id: string; status: string }>;
       try {
         const res = await fetch(`${API_BASE}/faq`, { headers: authHeaders(managerToken) });
         if (res.status === 401) { handleSessionExpired(); return; }
         if (res.ok) {
           const all = await res.json();
           const list: Article[] = Array.isArray(all) ? all : (all.items || all.articles || []);
-          existingTitles = new Set(list.map(a => (a.title || a.question || '').trim().toLowerCase()));
+          existing = indexOf(list);
         } else {
-          existingTitles = loadedTitles();
+          existing = indexOf(articles);
         }
       } catch {
-        existingTitles = loadedTitles();
+        existing = indexOf(articles);
       }
 
-      const valid: { title: string; category: string; content: string; status: string }[] = [];
-      const issues: { row: number; reason: string }[] = [];
-      const seenInFile = new Set<string>();
+      const valid: ImportRow[] = [];
+      const duplicates: ImportDup[] = [];
+      const issues: ImportIssue[] = [];
+      const seenInFile = new Map<string, number>();
       for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
+        const r = rows[i].cells;
+        const row = rows[i].line;
         const title = (r[ti] || '').trim();
         const category = (r[ci] || '').trim();
         const content = (r[coi] || '').trim();
         const status = si >= 0 ? (r[si] || '').trim().toLowerCase() : '';
-        const n = i + 1;
-        if (!title || !category || !content) { issues.push({ row: n, reason: 'Missing title, category or content' }); continue; }
-        if (content.length > MAX_CONTENT) { issues.push({ row: n, reason: `Content exceeds ${MAX_CONTENT.toLocaleString()} chars` }); continue; }
-        const key = title.toLowerCase();
-        if (existingTitles.has(key)) { issues.push({ row: n, reason: `Already exists: "${title}"` }); continue; }
-        if (seenInFile.has(key)) { issues.push({ row: n, reason: `Duplicate in file: "${title}"` }); continue; }
-        seenInFile.add(key);
-        // Default to draft so a bulk upload never reaches end users until it is
-        // reviewed and published. An explicit status column is still honoured.
-        valid.push({ title, category, content, status: status || 'draft' });
+        const base = { row, title, category, content, status };
+        const missing = [!title && 'title', !category && 'category', !content && 'content'].filter(Boolean).join(', ');
+        if (missing) { issues.push({ ...base, reason: `Missing ${missing}` }); continue; }
+        if (content.length > MAX_CONTENT) { issues.push({ ...base, reason: `Content is ${content.length.toLocaleString()} chars — limit is ${MAX_CONTENT.toLocaleString()}` }); continue; }
+        if (status && !VALID_STATUSES.includes(status)) { issues.push({ ...base, reason: `Invalid status "${status}" — use published or draft` }); continue; }
+        const key = normTitle(title);
+        // Within-file duplicates are checked BEFORE existing ones. The other way
+        // round, a re-run labelled both copies "Already exists" and the real
+        // problem — two identical titles in the file — stayed invisible.
+        const twin = seenInFile.get(key);
+        if (twin !== undefined) { issues.push({ ...base, reason: `Same title as row ${twin} in this file` }); continue; }
+        seenInFile.set(key, row);
+        const hit = existing.get(key);
+        // Existing title: offer it as an update candidate rather than burying it
+        // in the skipped list with no way to act on it. `status` stays blank when
+        // the file didn't set one, so an update never silently unpublishes.
+        if (hit) { duplicates.push({ ...base, existingId: hit.id, existingStatus: hit.status }); continue; }
+        // Keep an empty status EMPTY here. Baking in 'draft' at this point is what
+        // made the default invisible — the preview could not tell you how many
+        // rows were relying on it. runImport() resolves it via blankStatusMode.
+        valid.push({ ...base, status });
       }
+
+      // A mistyped category silently creates an orphan topic that no customer can
+      // navigate to, so name them up front instead of letting them through mute.
+      const knownCats = new Set<string>([
+        ...dynamicCategories.map(c => c.name.toLowerCase()),
+        ...articles.map(a => (a.category || '').toLowerCase()),
+      ]);
+      const newCategories = Array.from(new Set(
+        [...valid, ...duplicates].map(r => r.category).filter(c => !knownCats.has(c.toLowerCase()))
+      ));
+
       setImportResult(null);
-      setImportPreview({ valid, issues });
+      setImportMode('skip');
+      setBlankStatusMode('draft');
+      setImportPreview({ valid, duplicates, issues, newCategories, delimiter });
     } catch { showToast('Could not read the CSV file.'); }
   };
 
-  // Upload the confirmed rows one at a time via the existing POST /faq so each
-  // row is validated server-side and a per-row failure never aborts the batch.
+  // Re-export the rejected rows as a CSV with a `reason` column so they can be
+  // corrected in the spreadsheet and re-imported, rather than hand-copied out of
+  // a scrolling list.
+  const downloadSkipped = () => {
+    if (!importPreview) return;
+    const rowsOut = [
+      ...importPreview.issues.map(i => ({ ...i, reason: i.reason })),
+      ...(importMode === 'skip' ? importPreview.duplicates.map(d => ({ ...d, reason: `Already exists as ${d.existingStatus}` })) : []),
+    ].sort((a, b) => a.row - b.row);
+    if (rowsOut.length === 0) { showToast('Nothing was skipped.'); return; }
+    const q = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = 'row,reason,title,category,content,status\n'
+      + rowsOut.map(r => [r.row, q(r.reason), q(r.title), q(r.category), q(r.content), q(r.status)].join(',')).join('\n') + '\n';
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'faq-import-skipped-rows.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Upload the confirmed rows one at a time via POST /faq (new) and PUT /faq/{id}
+  // (existing, only in "update" mode) so each row is validated server-side and a
+  // per-row failure never aborts the batch.
   const runImport = async () => {
     if (!importPreview || !managerToken) return;
-    const { valid } = importPreview;
-    if (valid.length === 0) { setImportPreview(null); return; }
+    const { valid, duplicates } = importPreview;
+    const toUpdate = importMode === 'update' ? duplicates : [];
+    const total = valid.length + toUpdate.length;
+    if (total === 0) { setImportPreview(null); return; }
+    importAbortRef.current = false;
     setImporting(true);
-    setImportProgress({ done: 0, total: valid.length });
-    const failed: { title: string; reason: string }[] = [];
-    let created = 0;
-    let sortOrder = articles.reduce((m, a) => Math.max(m, a.sortOrder ?? 0), 0) + 1;
-    for (let i = 0; i < valid.length; i++) {
-      const row = valid[i];
+    setImportProgress({ done: 0, total });
+    const failed: { row: number; title: string; reason: string }[] = [];
+    let created = 0, updated = 0, done = 0;
+
+    // Stamp every row of this run with one batch id. Without it there is no way
+    // to ask "what did that import create?" after the fact — which is exactly
+    // the question that could not be answered about the earlier IPO import.
+    const batchId = `imp-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // Next sortOrder per category, seeded from every article (drafts included) so
+    // imported rows land after that category's existing ones. The old code seeded
+    // from the published-only list, so two draft imports in a row were handed the
+    // SAME starting slot and silently double-booked each other's sortOrder.
+    const maxOrder = new Map<string, number>();
+    for (const a of articles) {
+      const k = (a.category || '').toLowerCase();
+      maxOrder.set(k, Math.max(maxOrder.get(k) ?? -1, a.sortOrder ?? -1));
+    }
+    const nextSortOrder = (category: string) => {
+      const k = (category || '').toLowerCase();
+      const next = (maxOrder.get(k) ?? -1) + 1;
+      maxOrder.set(k, next);
+      return next;
+    };
+
+    for (const row of valid) {
+      if (importAbortRef.current) break;
       try {
         const res = await fetch(`${API_BASE}/faq`, {
           method: 'POST',
           headers: authHeaders(managerToken),
-          body: JSON.stringify({ ...row, sortOrder: sortOrder++ }),
+          body: JSON.stringify({
+            title: row.title, category: row.category, content: row.content,
+            status: row.status || blankStatusMode,
+            sortOrder: nextSortOrder(row.category), importBatch: batchId,
+          }),
         });
         if (res.status === 401) { setImporting(false); setImportPreview(null); handleSessionExpired(); return; }
-        if (!res.ok) {
-          let reason = `HTTP ${res.status}`;
-          try { const j = await res.json(); if (j?.error) reason = j.error; } catch { /* keep status */ }
-          failed.push({ title: row.title, reason });
-        } else created++;
-      } catch { failed.push({ title: row.title, reason: 'Network error' }); }
-      setImportProgress({ done: i + 1, total: valid.length });
+        if (!res.ok) failed.push({ row: row.row, title: row.title, reason: await readApiError(res) });
+        else created++;
+      } catch { failed.push({ row: row.row, title: row.title, reason: 'Network error' }); }
+      setImportProgress({ done: ++done, total });
     }
+
+    for (const row of toUpdate) {
+      if (importAbortRef.current) break;
+      try {
+        const body: Record<string, string> = { title: row.title, category: row.category, content: row.content };
+        if (row.status) body.status = row.status; // only when the file said so
+        const res = await fetch(`${API_BASE}/faq/${row.existingId}`, {
+          method: 'PUT',
+          headers: authHeaders(managerToken),
+          body: JSON.stringify(body),
+        });
+        if (res.status === 401) { setImporting(false); setImportPreview(null); handleSessionExpired(); return; }
+        if (!res.ok) failed.push({ row: row.row, title: row.title, reason: await readApiError(res) });
+        else updated++;
+      } catch { failed.push({ row: row.row, title: row.title, reason: 'Network error' }); }
+      setImportProgress({ done: ++done, total });
+    }
+
+    const cancelled = importAbortRef.current;
+    importAbortRef.current = false;
     setImporting(false);
     setImportPreview(null);
-    setImportResult({ created, failed });
-    showToast(`Import complete: ${created} added${failed.length ? `, ${failed.length} failed` : ''}.`);
+    setImportResult({ created, updated, failed, cancelled });
+    showToast(`${cancelled ? 'Import stopped' : 'Import complete'}: ${created} added${updated ? `, ${updated} updated` : ''}${failed.length ? `, ${failed.length} failed` : ''}.`);
+    setPage(1);
+    fetchArticles();
+  };
+
+  // Publish everything currently listed. Reachable only from the Draft filter, so
+  // "everything currently listed" is always an explicit, visible set of drafts.
+  const runBulkPublish = async () => {
+    const targets = filtered.filter((a) => !isLive(a.status));
+    setBulkConfirm(false);
+    if (!managerToken || targets.length === 0) return;
+    setBulkPublishing(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    let ok = 0; const failedCount: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        const res = await fetch(`${API_BASE}/faq/${targets[i].id}`, {
+          method: 'PUT',
+          headers: authHeaders(managerToken),
+          body: JSON.stringify({ status: 'published' }),
+        });
+        if (res.status === 401) { setBulkPublishing(false); handleSessionExpired(); return; }
+        if (res.ok) ok++; else failedCount.push(targets[i].title);
+      } catch { failedCount.push(targets[i].title); }
+      setBulkProgress({ done: i + 1, total: targets.length });
+    }
+    setBulkPublishing(false);
+    showToast(`Published ${ok} article${ok !== 1 ? 's' : ''}${failedCount.length ? `, ${failedCount.length} failed` : ''}.`);
     fetchArticles();
   };
 
   const downloadTemplate = () => {
-    const sample = 'title,category,content,status\n"How do I reset my password?","Account","Go to Settings then Security and choose Reset Password.",draft\n';
+    // Two rows on purpose: one published, one draft. The single-example template
+    // left it unclear that the column had to be filled in at all, and a blank
+    // status column is what silently drafted two entire imports.
+    const sample = 'title,category,content,status\n'
+      + '"How do I reset my password?","Account","Go to Settings then Security and choose Reset Password.",published\n'
+      + '"Draft example - not yet live","Account","Leave status as draft while this is still being reviewed.",draft\n';
     const url = URL.createObjectURL(new Blob([sample], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url; a.download = 'faq-import-template.csv';
@@ -729,7 +954,7 @@ export default function AdminPage() {
   };
 
   const handleToggleStatus = async (article: Article) => {
-    const isPublished = article.status === 'published' || article.status === 'active';
+    const isPublished = isLive(article.status);
     const newStatus = isPublished ? 'draft' : 'published';
     setTogglingId(article.id);
     // Optimistic update
@@ -831,7 +1056,7 @@ export default function AdminPage() {
   const filtered = articles.filter((a) => {
     const matchSearch = !search || (a.title || a.question || '').toLowerCase().includes(search.toLowerCase()) || a.category?.toLowerCase().includes(search.toLowerCase());
     const matchCat = !catFilter || a.category === catFilter;
-    const matchStatus = !statusFilter || (statusFilter === 'published' ? (a.status === 'published' || a.status === 'active') : a.status === 'draft');
+    const matchStatus = !statusFilter || (statusFilter === 'published' ? isLive(a.status) : !isLive(a.status));
     return matchSearch && matchCat && matchStatus;
   }).sort((a, b) => {
     if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
@@ -881,8 +1106,12 @@ export default function AdminPage() {
   // with "All Categories" selected they show the whole library.
   const scopedArticles = catFilter ? articles.filter((a) => a.category === catFilter) : articles;
   const totalCount = scopedArticles.length;
-  const publishedCount = scopedArticles.filter((a) => a.status === 'published' || a.status === 'active').length;
-  const draftCount = scopedArticles.filter((a) => a.status === 'draft').length;
+  const publishedCount = scopedArticles.filter((a) => isLive(a.status)).length;
+  const draftCount = scopedArticles.filter((a) => !isLive(a.status)).length;
+  // Unscoped on purpose. The entire failure mode was 310 drafts sitting unnoticed
+  // behind whatever filter happened to be selected, so this number has to be
+  // visible regardless of the current category or status filter.
+  const libraryDraftCount = articles.filter((a) => !isLive(a.status)).length;
   const openTickets = tickets.filter((t) => t.status !== 'solved' && t.status !== 'resolved').length;
 
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
@@ -1116,6 +1345,23 @@ export default function AdminPage() {
           {/* ARTICLES VIEW */}
           {activeView === 'articles' && (
             <>
+              {/* Drafts-awaiting-review banner. The original incident was 310
+                  imported drafts nobody could see; this makes that state loud and
+                  gives it a one-click route, so it can't quietly accumulate. */}
+              {!loading && libraryDraftCount > 0 && statusFilter !== 'draft' && (
+                <div style={{ background: '#FFFBEB', border: '1.5px solid #FCD34D', borderRadius: 12, padding: '0.875rem 1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <i className="fas fa-file-pen" style={{ color: '#D97706', fontSize: '1rem' }}></i>
+                  <span style={{ fontSize: '0.875rem', color: '#78350F', fontWeight: 600, flex: 1, minWidth: 200 }}>
+                    {libraryDraftCount.toLocaleString()} article{libraryDraftCount !== 1 ? 's' : ''} {libraryDraftCount !== 1 ? 'are' : 'is'} still a draft and {libraryDraftCount !== 1 ? 'are' : 'is'} not visible to customers.
+                  </span>
+                  <button
+                    onClick={() => { setStatusFilter('draft'); setCatFilter(''); setSearch(''); setPage(1); }}
+                    style={{ padding: '0.4rem 0.875rem', background: '#D97706', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    Review {libraryDraftCount.toLocaleString()} draft{libraryDraftCount !== 1 ? 's' : ''}
+                  </button>
+                </div>
+              )}
               {/* Filter bar */}
               <div style={{ background: 'var(--admin-surface)', borderRadius: 12, border: '1px solid var(--admin-border)', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 160, position: 'relative' }}>
@@ -1166,6 +1412,12 @@ export default function AdminPage() {
                     Articles <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({filtered.length} total)</span>
                   </h2>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {statusFilter === 'draft' && filtered.length > 0 && (
+                      <button onClick={() => setBulkConfirm(true)} disabled={bulkPublishing} title={`Publish the ${filtered.length} draft(s) currently listed`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: bulkPublishing ? 'wait' : 'pointer', opacity: bulkPublishing ? 0.7 : 1 }}>
+                        <i className={`fas ${bulkPublishing ? 'fa-spinner fa-spin' : 'fa-circle-check'}`} style={{ fontSize: '0.7rem' }}></i>
+                        {bulkPublishing ? `Publishing ${bulkProgress.done}/${bulkProgress.total}…` : `Publish all ${filtered.length}`}
+                      </button>
+                    )}
                     {orderChanged && (
                       <button onClick={saveOrder} disabled={savingOrder} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#00AB4E', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: savingOrder ? 'not-allowed' : 'pointer', opacity: savingOrder ? 0.7 : 1 }}>
                         <i className={`fas ${savingOrder ? 'fa-spinner fa-spin' : 'fa-save'}`} style={{ fontSize: '0.7rem' }}></i>
@@ -1194,7 +1446,7 @@ export default function AdminPage() {
                 ) : filtered.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--admin-text-muted)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--admin-text-muted)' }}><i className="fas fa-file-lines"></i></div>
-                    <p style={{ fontSize: '0.875rem' }}>{search || catFilter ? 'No articles match your filters.' : 'No articles yet. Add your first article!'}</p>
+                    <p style={{ fontSize: '0.875rem' }}>{search || catFilter || statusFilter ? 'No articles match your filters.' : 'No articles yet. Add your first article!'}</p>
                   </div>
                 ) : (
                   <>
@@ -1209,7 +1461,7 @@ export default function AdminPage() {
                       </thead>
                       <tbody>
                         {paginated.map((article, i) => {
-                          const isPublished = article.status === 'published' || article.status === 'active';
+                          const isPublished = isLive(article.status);
                           const isToggling = togglingId === article.id;
                           const isDeleting = deletingId === article.id;
                           const lastAudit = auditLogs
@@ -1254,7 +1506,11 @@ export default function AdminPage() {
                               <td style={{ padding: '0.875rem 1.25rem', width: 130 }}>
                                 <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
                                   {sortBy === 'default' && !!catFilter && (() => {
-                                    const gi = (safePage - 1) * PAGE_SIZE + i;
+                                    // Index into `articles`, NOT into the filtered/paginated
+                                    // page: with a category filter on, the visual row index
+                                    // pointed at a different article entirely, so Move Up/Down
+                                    // silently no-op'd or swapped the wrong two rows.
+                                    const gi = articles.findIndex((a) => a.id === article.id);
                                     const cat = catFilter;
                                     const peers = articles.map((a, idx) => idx).filter((idx) => articles[idx].category === cat);
                                     const peerPos = peers.indexOf(gi);
@@ -1889,6 +2145,30 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* BULK PUBLISH CONFIRM */}
+      {bulkConfirm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 460, width: '100%', padding: '1.75rem' }}>
+            <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.75rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-circle-check" style={{ color: '#38A169' }}></i> Publish {filtered.length} article{filtered.length !== 1 ? 's' : ''}?
+            </h3>
+            <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.55 }}>
+              This makes all {filtered.length} listed draft{filtered.length !== 1 ? 's' : ''} live on the public portal immediately
+              {catFilter ? <> in <strong>{catFilter}</strong></> : null}
+              {search ? <> matching &ldquo;{search}&rdquo;</> : null}. Narrow the filters first if you only want some of them.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setBulkConfirm(false)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
+                Cancel
+              </button>
+              <button onClick={runBulkPublish} style={{ flex: 1, padding: '0.75rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
+                Publish {filtered.length}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* IMPORT PREVIEW / PROGRESS MODAL */}
       {importPreview && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
@@ -1904,35 +2184,123 @@ export default function AdminPage() {
                 <div style={{ height: 8, background: 'var(--admin-border)', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${importProgress.total ? (importProgress.done / importProgress.total) * 100 : 0}%`, background: '#00AB4E', transition: 'width 0.2s' }}></div>
                 </div>
+                <p style={{ color: 'var(--admin-text-muted)', fontSize: '0.75rem', marginTop: '0.75rem' }}>
+                  Keep this tab open. Rows already uploaded are saved.
+                </p>
+                <button onClick={() => { importAbortRef.current = true; }} style={{ marginTop: '0.875rem', width: '100%', padding: '0.625rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
+                  Stop after the current row
+                </button>
               </div>
             ) : (
               <>
                 <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem', lineHeight: 1.5 }}>
-                  <strong style={{ color: 'var(--admin-text-primary)' }}>{importPreview.valid.length}</strong> article{importPreview.valid.length !== 1 ? 's' : ''} ready to import
+                  <strong style={{ color: 'var(--admin-text-primary)' }}>{importPreview.valid.length}</strong> new article{importPreview.valid.length !== 1 ? 's' : ''}
+                  {importPreview.duplicates.length > 0 && <> · <strong style={{ color: '#3B82F6' }}>{importPreview.duplicates.length}</strong> already in the knowledge base</>}
                   {importPreview.issues.length > 0 && <> · <strong style={{ color: '#DD6B20' }}>{importPreview.issues.length}</strong> row{importPreview.issues.length !== 1 ? 's' : ''} skipped</>}.
                 </p>
-                <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', marginBottom: '1rem', lineHeight: 1.5, display: 'flex', gap: '0.4rem' }}>
-                  <i className="fas fa-circle-info" style={{ color: '#00AB4E', marginTop: '0.15rem' }}></i>
-                  <span>Imported as <strong>drafts</strong> (unless a row sets <code>status</code>), so they won&apos;t appear on the public portal until you publish them.</span>
-                </p>
-                {importPreview.issues.length > 0 && (
+                {(() => {
+                  const blank = importPreview.valid.filter(v => !v.status).length;
+                  const willPublish = importPreview.valid.filter(v => v.status === 'published').length + (blankStatusMode === 'published' ? blank : 0);
+                  const willDraft = importPreview.valid.length - willPublish;
+                  return (
+                    <>
+                      {/* The outcome, stated as counts. The old copy buried this in a
+                          parenthetical — "(unless a row sets status)" — so an entirely
+                          blank status column read as "fine" and drafted the whole file. */}
+                      {importPreview.valid.length > 0 && (
+                        <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', marginBottom: blank > 0 ? '0.75rem' : '1rem', lineHeight: 1.5, display: 'flex', gap: '0.4rem' }}>
+                          <i className="fas fa-circle-info" style={{ color: '#00AB4E', marginTop: '0.15rem' }}></i>
+                          <span>
+                            After import: <strong style={{ color: '#38A169' }}>{willPublish}</strong> live for customers
+                            {' · '}<strong style={{ color: '#D97706' }}>{willDraft}</strong> draft{willDraft !== 1 ? 's' : ''} awaiting review.
+                          </span>
+                        </p>
+                      )}
+                      {blank > 0 && (
+                        <div style={{ border: '1.5px solid #FCD34D', background: '#FFFBEB', borderRadius: 8, padding: '0.75rem 0.875rem', marginBottom: '1rem' }}>
+                          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#78350F', marginBottom: '0.5rem', display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+                            <i className="fas fa-triangle-exclamation" style={{ color: '#D97706', marginTop: '0.15rem' }}></i>
+                            <span>
+                              {blank === importPreview.valid.length
+                                ? <>Every row leaves the <code>status</code> column empty.</>
+                                : <>{blank} of {importPreview.valid.length} rows leave the <code>status</code> column empty.</>}
+                            </span>
+                          </p>
+                          {([['draft', 'Import them as drafts — nobody sees them until you publish (recommended)'], ['published', 'Import them as published — live for customers immediately']] as const).map(([mode, label]) => (
+                            <label key={mode} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', cursor: 'pointer', padding: '0.2rem 0', fontSize: '0.8125rem', color: '#78350F' }}>
+                              <input type="radio" name="import-blank-status" checked={blankStatusMode === mode} onChange={() => setBlankStatusMode(mode)} style={{ marginTop: '0.2rem', accentColor: '#D97706' }} />
+                              <span>{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                {importPreview.delimiter !== ',' && (
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--admin-text-secondary)', marginBottom: '0.75rem', display: 'flex', gap: '0.4rem' }}>
+                    <i className="fas fa-circle-info" style={{ color: '#3B82F6', marginTop: '0.15rem' }}></i>
+                    <span>Read as <strong>{importPreview.delimiter === ';' ? 'semicolon' : 'tab'}-separated</strong> — that&apos;s what this file uses.</span>
+                  </p>
+                )}
+                {importPreview.newCategories.length > 0 && (
+                  <div style={{ border: '1.5px solid #FCD34D', background: '#FFFBEB', borderRadius: 8, padding: '0.75rem 0.875rem', marginBottom: '1rem' }}>
+                    <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#78350F', marginBottom: '0.35rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <i className="fas fa-triangle-exclamation" style={{ color: '#D97706' }}></i>
+                      New categor{importPreview.newCategories.length !== 1 ? 'ies' : 'y'} not used by any existing article
+                    </p>
+                    <p style={{ fontSize: '0.8125rem', color: '#78350F', lineHeight: 1.5 }}>
+                      {importPreview.newCategories.map(c => `"${c}"`).join(', ')} — check for a typo. A mistyped category still imports, but customers won&apos;t find it under any existing topic.
+                    </p>
+                  </div>
+                )}
+                {importPreview.duplicates.length > 0 && (
+                  <div style={{ border: '1px solid var(--admin-border)', borderRadius: 8, padding: '0.75rem 0.875rem', marginBottom: '1rem', background: 'var(--admin-row-hover)' }}>
+                    <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--admin-text-primary)', marginBottom: '0.5rem' }}>
+                      {importPreview.duplicates.length} title{importPreview.duplicates.length !== 1 ? 's' : ''} already exist{importPreview.duplicates.length === 1 ? 's' : ''} — what should happen to them?
+                    </p>
+                    {([['skip', 'Leave them as they are'], ['update', 'Update them with the content from this file']] as const).map(([mode, label]) => (
+                      <label key={mode} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', cursor: 'pointer', padding: '0.2rem 0', fontSize: '0.8125rem', color: 'var(--admin-text-secondary)' }}>
+                        <input type="radio" name="import-dup-mode" checked={importMode === mode} onChange={() => setImportMode(mode)} style={{ marginTop: '0.2rem', accentColor: '#00AB4E' }} />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {(importPreview.duplicates.length > 0 || importPreview.issues.length > 0) && (
                   <div style={{ overflowY: 'auto', maxHeight: 200, border: '1px solid var(--admin-border)', borderRadius: 8, marginBottom: '1.25rem' }}>
+                    {importPreview.duplicates.map((d) => (
+                      <div key={`dup-${d.row}`} style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)', color: 'var(--admin-text-secondary)' }}>
+                        <span style={{ fontWeight: 700, color: importMode === 'update' ? '#3B82F6' : '#718096', flexShrink: 0 }}>Row {d.row}</span>
+                        <span>{importMode === 'update' ? 'Will update' : 'Skipping'} existing {d.existingStatus}: &ldquo;{d.title}&rdquo;</span>
+                      </div>
+                    ))}
                     {importPreview.issues.map((iss) => (
-                      <div key={iss.row} style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)', color: 'var(--admin-text-secondary)' }}>
+                      <div key={`iss-${iss.row}`} style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)', color: 'var(--admin-text-secondary)' }}>
                         <span style={{ fontWeight: 700, color: '#DD6B20', flexShrink: 0 }}>Row {iss.row}</span>
-                        <span>{iss.reason}</span>
+                        <span>{iss.reason}{iss.title ? `: "${iss.title}"` : ''}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button onClick={() => setImportPreview(null)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
-                    Cancel
+                {(importPreview.issues.length > 0 || (importMode === 'skip' && importPreview.duplicates.length > 0)) && (
+                  <button onClick={downloadSkipped} style={{ alignSelf: 'flex-start', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-secondary)' }}>
+                    <i className="fas fa-download" style={{ fontSize: '0.7rem' }}></i> Download skipped rows as CSV
                   </button>
-                  <button onClick={runImport} disabled={importPreview.valid.length === 0} style={{ flex: 1, padding: '0.75rem', background: importPreview.valid.length === 0 ? 'var(--admin-border)' : '#00AB4E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: importPreview.valid.length === 0 ? 'not-allowed' : 'pointer' }}>
-                    Import {importPreview.valid.length > 0 ? importPreview.valid.length : ''}
-                  </button>
-                </div>
+                )}
+                {(() => {
+                  const count = importPreview.valid.length + (importMode === 'update' ? importPreview.duplicates.length : 0);
+                  return (
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <button onClick={() => setImportPreview(null)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
+                        Cancel
+                      </button>
+                      <button onClick={runImport} disabled={count === 0} style={{ flex: 1, padding: '0.75rem', background: count === 0 ? 'var(--admin-border)' : '#00AB4E', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
+                        {count === 0 ? 'Nothing to import' : `Import ${count}`}
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>
@@ -1944,25 +2312,34 @@ export default function AdminPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
           <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 520, width: '100%', padding: '1.75rem', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.75rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <i className="fas fa-circle-check" style={{ color: '#00AB4E' }}></i> Import Complete
+              <i className={`fas ${importResult.cancelled ? 'fa-circle-pause' : 'fa-circle-check'}`} style={{ color: importResult.cancelled ? '#D97706' : '#00AB4E' }}></i> {importResult.cancelled ? 'Import Stopped' : 'Import Complete'}
             </h3>
             <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: importResult.failed.length ? '1rem' : '1.5rem' }}>
               <strong style={{ color: '#00AB4E' }}>{importResult.created}</strong> article{importResult.created !== 1 ? 's' : ''} added
+              {importResult.updated > 0 && <> · <strong style={{ color: '#3B82F6' }}>{importResult.updated}</strong> updated</>}
               {importResult.failed.length > 0 && <> · <strong style={{ color: '#E53E3E' }}>{importResult.failed.length}</strong> failed</>}.
+              {importResult.cancelled && <><br /><span style={{ fontSize: '0.8125rem' }}>Stopped early — rows already uploaded are saved. Re-import the same file to finish; rows that exist will be listed as already present.</span></>}
             </p>
             {importResult.failed.length > 0 && (
               <div style={{ overflowY: 'auto', maxHeight: 220, border: '1px solid var(--admin-border)', borderRadius: 8, marginBottom: '1.25rem' }}>
                 {importResult.failed.map((f, i) => (
                   <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', borderBottom: '1px solid var(--admin-border-subtle)' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--admin-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--admin-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Row {f.row} · {f.title}</span>
                     <span style={{ color: '#E53E3E' }}>{f.reason}</span>
                   </div>
                 ))}
               </div>
             )}
-            <button onClick={() => setImportResult(null)} style={{ padding: '0.75rem', background: '#1A202C', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
-              Done
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setImportResult(null)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', color: 'var(--admin-text-primary)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer' }}>
+                Done
+              </button>
+              {libraryDraftCount > 0 && (
+                <button onClick={() => { setImportResult(null); setStatusFilter('draft'); setCatFilter(''); setSearch(''); setPage(1); }} style={{ flex: 1, padding: '0.75rem', background: '#D97706', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
+                  Review drafts
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
