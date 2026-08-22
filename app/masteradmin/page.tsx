@@ -503,7 +503,10 @@ export default function MasterAdminPage() {
     try {
       const [ticketsRes, faqRes, auditRes, feedbackRes] = await Promise.allSettled([
         fetch(masterUrl('/tickets'), { headers: getMasterHeaders() }),
-        fetch(`${API_BASE}/faq`),
+        // Authenticated: an anonymous GET /faq returns published articles only,
+        // so the article list, the Total/Published stats and the CSV export all
+        // silently omitted every draft (including bulk-imported ones).
+        fetch(masterUrl('/faq'), { headers: getMasterHeaders() }),
         fetch(masterUrl(`/audit-log?limit=${AUDIT_PAGE}`), { headers: getMasterHeaders() }),
         fetch(masterUrl('/feedback'), { headers: getMasterHeaders() }),
       ]);
