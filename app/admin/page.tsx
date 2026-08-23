@@ -804,7 +804,15 @@ export default function AdminPage() {
       ...(importMode === 'skip' ? importPreview.duplicates.map(d => ({ ...d, reason: `Already exists as ${d.existingStatus}` })) : []),
     ].sort((a, b) => a.row - b.row);
     if (rowsOut.length === 0) { showToast('Nothing was skipped.'); return; }
-    const q = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Excel and Sheets evaluate a cell that begins with = + - @ (or a leading tab
+    // / CR), so neutralise those with a leading apostrophe. This export exists to
+    // be opened in a spreadsheet, and the content is arbitrary text from the file
+    // the operator uploaded.
+    const q = (v: string) => {
+      const raw = String(v ?? '');
+      const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     const csv = 'row,reason,title,category,content,status\n'
       + rowsOut.map(r => [r.row, q(r.reason), q(r.title), q(r.category), q(r.content), q(r.status)].join(',')).join('\n') + '\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
@@ -1449,9 +1457,14 @@ export default function AdminPage() {
                           <i className="fas fa-eye-slash" style={{ fontSize: '0.7rem' }}></i> Unpublish all {bulkTargetsFor('unpublish').length}
                         </button>
                       )}
-                      {/* Delete needs an active filter. Without one, "everything
-                          listed" is the entire knowledge base. */}
-                      {(catFilter || search || statusFilter) && filtered.length > 0 && (
+                      {/* Delete needs an active filter (without one, "everything
+                          listed" is the entire knowledge base) AND the master-admin
+                          role. Self-signup provisions managers automatically, and
+                          the API applies no role check to DELETE /faq/{id}; before
+                          bulk delete existed, clearing the library meant ~1,500
+                          separate confirmations. Don't hand that away to every
+                          auto-provisioned account. */}
+                      {managerInfo?.role === 'masteradmin' && (catFilter || search || statusFilter) && filtered.length > 0 && (
                         <button onClick={() => { setBulkConfirmText(''); setBulkAction('delete'); }} title="Permanently delete every listed article" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: 'var(--admin-surface)', color: '#E53E3E', border: '1.5px solid #FEB2B2', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
                           <i className="fas fa-trash" style={{ fontSize: '0.7rem' }}></i> Delete all {filtered.length}
                         </button>
