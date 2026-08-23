@@ -236,9 +236,13 @@ export default function AdminPage() {
   // Set by the Cancel button so a long import can be stopped without leaving the
   // operator guessing how far it got — the result modal still reports the batch.
   const importAbortRef = useRef(false);
-  // Bulk publish: reviewing 300+ drafts one toggle at a time is not a workflow.
-  const [bulkConfirm, setBulkConfirm] = useState(false);
-  const [bulkPublishing, setBulkPublishing] = useState(false);
+  // Bulk actions: reviewing 300+ drafts one toggle at a time is not a workflow.
+  // Publish and unpublish are reversible; delete is not, so it is gated behind a
+  // type-the-count confirmation and is only offered when a filter is active — the
+  // whole library must never be one click from deletion.
+  const [bulkAction, setBulkAction] = useState<'publish' | 'unpublish' | 'delete' | null>(null);
+  const [bulkConfirmText, setBulkConfirmText] = useState('');
+  const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   // Ticket search + pagination
   const [ticketSearch, setTicketSearch] = useState('');
@@ -574,11 +578,11 @@ export default function AdminPage() {
   // A refresh or tab close mid-batch leaves articles half-created with no record
   // of where it stopped, so warn while any write loop is in flight.
   useEffect(() => {
-    if (!importing && !bulkPublishing) return;
+    if (!importing && !bulkRunning) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [importing, bulkPublishing]);
+  }, [importing, bulkRunning]);
 
   const saveOrder = useCallback(async () => {
     if (!API_BASE || !managerToken) return;
@@ -892,29 +896,46 @@ export default function AdminPage() {
     fetchArticles();
   };
 
-  // Publish everything currently listed. Reachable only from the Draft filter, so
-  // "everything currently listed" is always an explicit, visible set of drafts.
-  const runBulkPublish = async () => {
-    const targets = filtered.filter((a) => !isLive(a.status));
-    setBulkConfirm(false);
-    if (!managerToken || targets.length === 0) return;
-    setBulkPublishing(true);
+  // Which articles a bulk action would touch. Always derived from `filtered`, so
+  // the set is exactly what the operator can see on screen under the current
+  // search / category / status filters — never a hidden superset.
+  const bulkTargetsFor = (action: 'publish' | 'unpublish' | 'delete' | null): Article[] =>
+    action === 'publish' ? filtered.filter((a) => !isLive(a.status))
+      : action === 'unpublish' ? filtered.filter((a) => isLive(a.status))
+        : action === 'delete' ? filtered
+          : [];
+
+  // One sequential loop for all three bulk operations. Sequential on purpose: the
+  // function runs with max-instances=10 and every write invalidates the server's
+  // article cache, so firing hundreds of parallel requests would both throttle
+  // and thrash that cache for concurrent customer searches.
+  const runBulkAction = async () => {
+    const action = bulkAction;
+    const targets = bulkTargetsFor(action);
+    setBulkAction(null);
+    setBulkConfirmText('');
+    if (!action || !managerToken || targets.length === 0) return;
+    setBulkRunning(true);
     setBulkProgress({ done: 0, total: targets.length });
-    let ok = 0; const failedCount: string[] = [];
+    let ok = 0, bad = 0;
     for (let i = 0; i < targets.length; i++) {
       try {
-        const res = await fetch(`${API_BASE}/faq/${targets[i].id}`, {
-          method: 'PUT',
-          headers: authHeaders(managerToken),
-          body: JSON.stringify({ status: 'published' }),
-        });
-        if (res.status === 401) { setBulkPublishing(false); handleSessionExpired(); return; }
-        if (res.ok) ok++; else failedCount.push(targets[i].title);
-      } catch { failedCount.push(targets[i].title); }
+        const res = action === 'delete'
+          ? await fetch(`${API_BASE}/faq/${targets[i].id}`, { method: 'DELETE', headers: authHeaders(managerToken) })
+          : await fetch(`${API_BASE}/faq/${targets[i].id}`, {
+            method: 'PUT',
+            headers: authHeaders(managerToken),
+            body: JSON.stringify({ status: action === 'publish' ? 'published' : 'draft' }),
+          });
+        if (res.status === 401) { setBulkRunning(false); handleSessionExpired(); return; }
+        if (res.ok) ok++; else bad++;
+      } catch { bad++; }
       setBulkProgress({ done: i + 1, total: targets.length });
     }
-    setBulkPublishing(false);
-    showToast(`Published ${ok} article${ok !== 1 ? 's' : ''}${failedCount.length ? `, ${failedCount.length} failed` : ''}.`);
+    setBulkRunning(false);
+    const verb = action === 'publish' ? 'Published' : action === 'unpublish' ? 'Unpublished' : 'Deleted';
+    showToast(`${verb} ${ok} article${ok !== 1 ? 's' : ''}${bad ? `, ${bad} failed` : ''}.`);
+    setPage(1);
     fetchArticles();
   };
 
@@ -1412,12 +1433,30 @@ export default function AdminPage() {
                     Articles <span style={{ fontSize: '0.75rem', color: 'var(--admin-text-secondary)', fontWeight: 500 }}>({filtered.length} total)</span>
                   </h2>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {statusFilter === 'draft' && filtered.length > 0 && (
-                      <button onClick={() => setBulkConfirm(true)} disabled={bulkPublishing} title={`Publish the ${filtered.length} draft(s) currently listed`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: bulkPublishing ? 'wait' : 'pointer', opacity: bulkPublishing ? 0.7 : 1 }}>
-                        <i className={`fas ${bulkPublishing ? 'fa-spinner fa-spin' : 'fa-circle-check'}`} style={{ fontSize: '0.7rem' }}></i>
-                        {bulkPublishing ? `Publishing ${bulkProgress.done}/${bulkProgress.total}…` : `Publish all ${filtered.length}`}
-                      </button>
-                    )}
+                    {bulkRunning ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--admin-text-secondary)' }}>
+                        <i className="fas fa-spinner fa-spin" style={{ fontSize: '0.7rem' }}></i>
+                        {bulkProgress.done}/{bulkProgress.total}…
+                      </span>
+                    ) : (<>
+                      {bulkTargetsFor('publish').length > 0 && statusFilter === 'draft' && (
+                        <button onClick={() => setBulkAction('publish')} title="Publish every draft currently listed" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <i className="fas fa-circle-check" style={{ fontSize: '0.7rem' }}></i> Publish all {bulkTargetsFor('publish').length}
+                        </button>
+                      )}
+                      {bulkTargetsFor('unpublish').length > 0 && statusFilter === 'published' && (
+                        <button onClick={() => setBulkAction('unpublish')} title="Take every listed article off the public portal (reversible)" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: 'var(--admin-surface)', color: '#D97706', border: '1.5px solid #FCD34D', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <i className="fas fa-eye-slash" style={{ fontSize: '0.7rem' }}></i> Unpublish all {bulkTargetsFor('unpublish').length}
+                        </button>
+                      )}
+                      {/* Delete needs an active filter. Without one, "everything
+                          listed" is the entire knowledge base. */}
+                      {(catFilter || search || statusFilter) && filtered.length > 0 && (
+                        <button onClick={() => { setBulkConfirmText(''); setBulkAction('delete'); }} title="Permanently delete every listed article" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: 'var(--admin-surface)', color: '#E53E3E', border: '1.5px solid #FEB2B2', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <i className="fas fa-trash" style={{ fontSize: '0.7rem' }}></i> Delete all {filtered.length}
+                        </button>
+                      )}
+                    </>)}
                     {orderChanged && (
                       <button onClick={saveOrder} disabled={savingOrder} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.875rem', background: '#00AB4E', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 700, cursor: savingOrder ? 'not-allowed' : 'pointer', opacity: savingOrder ? 0.7 : 1 }}>
                         <i className={`fas ${savingOrder ? 'fa-spinner fa-spin' : 'fa-save'}`} style={{ fontSize: '0.7rem' }}></i>
@@ -2145,29 +2184,61 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* BULK PUBLISH CONFIRM */}
-      {bulkConfirm && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 460, width: '100%', padding: '1.75rem' }}>
-            <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.75rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <i className="fas fa-circle-check" style={{ color: '#38A169' }}></i> Publish {filtered.length} article{filtered.length !== 1 ? 's' : ''}?
-            </h3>
-            <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.55 }}>
-              This makes all {filtered.length} listed draft{filtered.length !== 1 ? 's' : ''} live on the public portal immediately
-              {catFilter ? <> in <strong>{catFilter}</strong></> : null}
-              {search ? <> matching &ldquo;{search}&rdquo;</> : null}. Narrow the filters first if you only want some of them.
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => setBulkConfirm(false)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
-                Cancel
-              </button>
-              <button onClick={runBulkPublish} style={{ flex: 1, padding: '0.75rem', background: '#38A169', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: 'pointer' }}>
-                Publish {filtered.length}
-              </button>
+      {/* BULK ACTION CONFIRM */}
+      {bulkAction && (() => {
+        const targets = bulkTargetsFor(bulkAction);
+        const isDelete = bulkAction === 'delete';
+        // Delete is gated on typing the exact count: it forces the number to be
+        // read rather than clicked past, and it cannot be satisfied by muscle
+        // memory the way a fixed word like "DELETE" can.
+        const armed = !isDelete || bulkConfirmText.trim() === String(targets.length);
+        const scope = <>
+          {catFilter ? <> in <strong>{catFilter}</strong></> : null}
+          {statusFilter ? <> with status <strong>{statusFilter}</strong></> : null}
+          {search ? <> matching &ldquo;{search}&rdquo;</> : null}
+        </>;
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: 'var(--admin-modal-bg)', borderRadius: 16, border: '1px solid var(--admin-border)', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', maxWidth: 480, width: '100%', padding: '1.75rem' }}>
+              <h3 style={{ fontWeight: 800, color: 'var(--admin-text-primary)', marginBottom: '0.75rem', fontSize: '1.0625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className={`fas ${isDelete ? 'fa-triangle-exclamation' : bulkAction === 'publish' ? 'fa-circle-check' : 'fa-eye-slash'}`} style={{ color: isDelete ? '#E53E3E' : bulkAction === 'publish' ? '#38A169' : '#D97706' }}></i>
+                {isDelete ? 'Delete' : bulkAction === 'publish' ? 'Publish' : 'Unpublish'} {targets.length} article{targets.length !== 1 ? 's' : ''}?
+              </h3>
+              <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.55 }}>
+                {bulkAction === 'publish' && <>All {targets.length} listed draft{targets.length !== 1 ? 's' : ''}{scope} go live on the public portal immediately.</>}
+                {bulkAction === 'unpublish' && <>All {targets.length} listed article{targets.length !== 1 ? 's' : ''}{scope} come off the public portal and become drafts. Reversible — publish them again any time.</>}
+                {isDelete && <>This permanently removes all {targets.length} listed article{targets.length !== 1 ? 's' : ''}{scope}. There is no undo in this portal; recovery means reading the content back out of the audit log by hand.</>}
+              </p>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: '0.8125rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                Narrow the search, category or status filters first if you only want some of them.
+              </p>
+              {isDelete && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label htmlFor="bulk-confirm" style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--admin-text-primary)', marginBottom: '0.375rem' }}>
+                    Type <strong>{targets.length}</strong> to confirm
+                  </label>
+                  <input
+                    id="bulk-confirm"
+                    value={bulkConfirmText}
+                    onChange={(e) => setBulkConfirmText(e.target.value)}
+                    placeholder={String(targets.length)}
+                    autoComplete="off"
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', border: `1.5px solid ${armed ? '#E53E3E' : 'var(--admin-border)'}`, borderRadius: 8, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', background: 'var(--admin-input-bg)', color: 'var(--admin-text-primary)' }}
+                  />
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button onClick={() => { setBulkAction(null); setBulkConfirmText(''); }} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
+                  Cancel
+                </button>
+                <button onClick={runBulkAction} disabled={!armed} style={{ flex: 1, padding: '0.75rem', background: !armed ? 'var(--admin-border)' : isDelete ? '#E53E3E' : bulkAction === 'publish' ? '#38A169' : '#D97706', color: 'white', border: 'none', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 700, cursor: !armed ? 'not-allowed' : 'pointer' }}>
+                  {isDelete ? 'Delete' : bulkAction === 'publish' ? 'Publish' : 'Unpublish'} {targets.length}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* IMPORT PREVIEW / PROGRESS MODAL */}
       {importPreview && (
