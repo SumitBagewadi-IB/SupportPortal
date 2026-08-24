@@ -258,8 +258,25 @@ const ARTICLE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 let _articleCache = null;  // { articles: CachedArticle[], loadedAt: number } | null
 
+// Deliberately shorter than the search cache. Both caches are PER-CONTAINER, and
+// invalidateArticleCache() only clears the instance that served the write - with
+// max-instances=10 the others keep their copy until it expires. For search that is
+// harmless. For the article list it decides how long an article stays reachable by
+// customers after being unpublished or deleted, so the TTL is the real worst case
+// for withdrawing content. 60s keeps that bound tight while still removing
+// essentially all of the per-request read load.
+const PUBLIC_LIST_CACHE_TTL_MS = 60 * 1000;
+
+// Second cache, for the full public GET /faq payload. That endpoint read the
+// entire collection on EVERY request - ~1.5k documents per home-page or
+// Knowledge Base view, uncached - which measured at 2.0s and ~790 KB. The search
+// path had a cache; the list path never did. Same TTL, and the same write
+// invalidation, so publishing an article is still reflected immediately.
+let _publicListCache = null;  // { items, loadedAt } | null
+
 function invalidateArticleCache() {
   _articleCache = null;
+  _publicListCache = null;
 }
 
 async function getPublishedArticles() {
@@ -301,6 +318,27 @@ async function getPublishedArticles() {
   console.log(JSON.stringify({ severity: 'INFO', message: 'Article cache refreshed', count: articles.length }));
   _articleCache = { articles, loadedAt: now };
   return articles;
+}
+
+// Full public article list for GET /faq, cached and pre-sorted.
+// Returns the shared array; callers MUST NOT mutate it (filter/map, never sort
+// or splice) or they corrupt the cache for every later request.
+async function getPublicFaqList() {
+  const now = Date.now();
+  if (_publicListCache && now - _publicListCache.loadedAt < PUBLIC_LIST_CACHE_TTL_MS) {
+    return _publicListCache.items;
+  }
+  const snap = await db.collection(FAQ_COL).get();
+  const items = snap.docs
+    .map(d => d.data())
+    .filter(isPubliclyVisible)
+    // Sanitize title/category on the way out so existing raw-markup rows
+    // (IDX-001) are never served as HTML to the FAQ page; content is left intact.
+    .map(a => ({ ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) }));
+  items.sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
+  _publicListCache = { items, loadedAt: now };
+  console.log(JSON.stringify({ severity: 'INFO', message: 'Public FAQ list cache refreshed', count: items.length }));
+  return items;
 }
 
 // ─── Search relevance helpers ─────────────────────────────────────────────
@@ -1464,18 +1502,22 @@ async function _handler(req, res) {
     const auth = await requireManagerOrMaster(req);
     const categoryFilter = req.query?.category;
 
-    const snap = await db.collection(FAQ_COL).get();
-    // Sanitize title/category on the way out so existing raw-markup rows (IDX-001)
-    // are never served as HTML to the FAQ page; content is left intact.
-    let items = snap.docs
-      .map(d => d.data())
-      .filter(a => auth.ok || isPubliclyVisible(a))
-      .map(a => ({ ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) }));
+    let items;
+    if (auth.ok) {
+      // Never cache the authenticated view. A manager has to see the article they
+      // just imported or published, not a copy up to five minutes old.
+      const snap = await db.collection(FAQ_COL).get();
+      items = snap.docs
+        .map(d => d.data())
+        .map(a => ({ ...a, title: sanitizeText(a.title, 300), category: sanitizeText(a.category, 100) }));
+      items.sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
+    } else {
+      items = await getPublicFaqList();   // shared, pre-sorted — do not mutate
+    }
     if (categoryFilter) {
       const filterLower = String(categoryFilter).toLowerCase();
-      items = items.filter(i => i.category?.toLowerCase() === filterLower);
+      items = items.filter(i => i.category?.toLowerCase() === filterLower);  // new array
     }
-    items.sort((a, b) => (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999));
     return r(200, items);
   }
 
