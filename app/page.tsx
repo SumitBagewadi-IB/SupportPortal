@@ -244,6 +244,18 @@ export default function HomePage() {
                 'account': 'Profile, security, segments',
                 'reports': 'Tax P&L, contract notes',
                 'nri': 'NRE/NRO, PIS, repatriation',
+                // Name-slug aliases. The keys above are the STATIC_CATEGORIES ids,
+                // which for six topics differ from normalise(name) — 'portfolio' vs
+                // 'portfolio-margin'. Once a category exists as a database record
+                // the id becomes 'cat-xxxxxxxx' and only the name slug is available,
+                // so without these the master admin's "Seed Default Categories"
+                // would flip all six back to the generic fallback.
+                'portfolio-margin': 'P&L, Holdings, Pledge, MTF',
+                'charges-brokerage': 'STT, GST, DP, brokerage plans',
+                'compliance-safety': 'TPIN, eDIS, ASM/GSM, 2FA',
+                'contact-help': 'Support desk, escalation',
+                'nri-huf-accounts': 'NRE/NRO, PIS, repatriation',
+                'f-o': 'Futures, options, margins, expiry',
               };
               const subChips = catSubs.slice(0, 2).map(s => s.name).join(' · ');
               // STATIC_DESCS is keyed by the SLUG ids used in STATIC_CATEGORIES
