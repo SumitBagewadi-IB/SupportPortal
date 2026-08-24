@@ -246,7 +246,19 @@ export default function HomePage() {
                 'nri': 'NRE/NRO, PIS, repatriation',
               };
               const subChips = catSubs.slice(0, 2).map(s => s.name).join(' · ');
-              const description = subChips || STATIC_DESCS[cat.id] || 'Browse articles';
+              // STATIC_DESCS is keyed by the SLUG ids used in STATIC_CATEGORIES
+              // ('trading', 'ipo'). The merge above replaces a static entry with its
+              // DB document to pick up the real id and icon, and DB ids look like
+              // 'cat-dc364d0b' — so keying the lookup on cat.id silently stopped
+              // matching for every category that exists in the database, and those
+              // cards all fell through to 'Browse articles'.
+              // Order: the description an admin actually typed wins, then the slug
+              // (survives the id swap), then cat.id for static-only entries.
+              const description = cat.description?.trim()
+                || subChips
+                || STATIC_DESCS[slug]
+                || STATIC_DESCS[cat.id]
+                || 'Browse articles';
               return (
                 <Link
                   key={cat.id}
