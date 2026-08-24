@@ -628,7 +628,15 @@ export default function MasterAdminPage() {
   const exportCSV = <T extends object>(data: T[], filename: string) => {
     if (!data.length) return;
     const keys = Object.keys(data[0]);
-    const rows = [keys.join(','), ...data.map(row => keys.map(k => JSON.stringify((row as Record<string, unknown>)[k] ?? '')).join(','))];
+    // Excel and Sheets evaluate a cell beginning with = + - @ (or a leading tab /
+    // CR) as a formula, and these exports carry article titles and content that
+    // anyone with admin access can set. JSON.stringify quotes and escapes, but
+    // does nothing about a leading '='. Prefix an apostrophe to neutralise it.
+    const cell = (v: unknown) => {
+      const raw = String(v ?? '');
+      return JSON.stringify(/^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw);
+    };
+    const rows = [keys.join(','), ...data.map(row => keys.map(k => cell((row as Record<string, unknown>)[k])).join(','))];
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

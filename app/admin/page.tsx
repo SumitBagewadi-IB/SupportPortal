@@ -2374,7 +2374,18 @@ export default function AdminPage() {
                 )}
                 {(() => {
                   const count = importPreview.valid.length + (importMode === 'update' ? importPreview.duplicates.length : 0);
-                  return (
+                  // Rows upload one at a time (~0.3s each measured against the live
+                  // API), so a large batch takes minutes with the tab held open.
+                  // Say so up front rather than letting the progress bar reveal it.
+                  const secs = Math.round(count * 0.3);
+                  const eta = secs < 45 ? null : secs < 90 ? 'about a minute' : `about ${Math.ceil(secs / 60)} minutes`;
+                  return (<>
+                    {eta && (
+                      <p style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8125rem', marginBottom: '0.75rem', display: 'flex', gap: '0.4rem' }}>
+                        <i className="fas fa-clock" style={{ color: '#D97706', marginTop: '0.15rem' }}></i>
+                        <span>This will take <strong>{eta}</strong> — keep the tab open. Prefer a quiet period: each row refreshes the server&apos;s search cache.</span>
+                      </p>
+                    )}
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                       <button onClick={() => setImportPreview(null)} style={{ flex: 1, padding: '0.75rem', background: 'var(--admin-surface)', border: '1.5px solid var(--admin-border)', borderRadius: 10, fontSize: '0.9375rem', fontWeight: 600, cursor: 'pointer', color: 'var(--admin-text-primary)' }}>
                         Cancel
@@ -2383,7 +2394,7 @@ export default function AdminPage() {
                         {count === 0 ? 'Nothing to import' : `Import ${count}`}
                       </button>
                     </div>
-                  );
+                  </>);
                 })()}
               </>
             )}
