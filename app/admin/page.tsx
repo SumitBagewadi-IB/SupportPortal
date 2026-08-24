@@ -185,6 +185,8 @@ export default function AdminPage() {
   const [catFormMsg, setCatFormMsg] = useState('');
   const [catSubmitting, setCatSubmitting] = useState(false);
   const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
+  // Name of the category being turned into a record, or '__all__' for the batch.
+  const [adoptingCat, setAdoptingCat] = useState<string | null>(null);
 
   // Audit log
   const [auditLogs, setAuditLogs] = useState<{ id: string; timestamp: string; action: string; entity: string; entityId: string; entityTitle: string; performedBy: string; meta?: Record<string, string> }[]>([]);
@@ -982,6 +984,44 @@ export default function AdminPage() {
     finally { setDeletingId(null); }
   };
 
+  // Create a real category record for a topic that exists only as text on
+  // articles. Icon, description, subcategories and ordering all hang off a
+  // record, so without one a topic holding hundreds of articles cannot be
+  // managed at all — it simply does not appear on the Categories screen.
+  const adoptCategory = async (name: string): Promise<boolean> => {
+    if (!managerToken) return false;
+    // Canonical Knowledge Base topics keep their KB position; anything new lands
+    // after them rather than on the API's 999999 default.
+    const idx = FALLBACK_CATEGORIES.findIndex(c => c.toLowerCase() === name.toLowerCase());
+    try {
+      const res = await fetch(`${API_BASE}/categories`, {
+        method: 'POST',
+        headers: authHeaders(managerToken),
+        body: JSON.stringify({ name, icon: 'fas fa-folder', parentId: null, description: '', sortOrder: idx >= 0 ? idx : 500 }),
+      });
+      if (res.status === 401) { handleSessionExpired(); return false; }
+      return res.ok;
+    } catch { return false; }
+  };
+
+  const adoptOneCategory = async (name: string) => {
+    setAdoptingCat(name);
+    const ok = await adoptCategory(name);
+    setAdoptingCat(null);
+    showToast(ok ? `"${name}" added — you can now set its icon and description.` : `Could not add "${name}".`);
+    if (ok) fetchCategories();
+  };
+
+  const adoptAllCategories = async (names: string[]) => {
+    if (names.length === 0) return;
+    setAdoptingCat('__all__');
+    let ok = 0;
+    for (const n of names) { if (await adoptCategory(n)) ok++; }
+    setAdoptingCat(null);
+    showToast(`${ok} categor${ok === 1 ? 'y' : 'ies'} added${ok < names.length ? `, ${names.length - ok} failed` : ''}.`);
+    fetchCategories();
+  };
+
   const handleToggleStatus = async (article: Article) => {
     const isPublished = isLive(article.status);
     const newStatus = isPublished ? 'draft' : 'published';
@@ -1133,6 +1173,14 @@ export default function AdminPage() {
   // Stat cards scope to the selected category filter, so admins see
   // category-wise counts (Total / Published / Drafts for that category);
   // with "All Categories" selected they show the whole library.
+  // Topics articles actually use that have no category record. These were absent
+  // from the Categories screen entirely, so the majority of the library sat in
+  // categories nobody could edit.
+  const unmanagedCategories = articleOnlyCategories
+    .map((name) => ({ name, count: articles.filter((a) => a.category === name).length }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const unmanagedArticleCount = unmanagedCategories.reduce((n, u) => n + u.count, 0);
+
   const scopedArticles = catFilter ? articles.filter((a) => a.category === catFilter) : articles;
   const totalCount = scopedArticles.length;
   const publishedCount = scopedArticles.filter((a) => isLive(a.status)).length;
@@ -1896,6 +1944,53 @@ export default function AdminPage() {
                           </button>
                         </div>
                       ))}
+
+                      {/* Topics articles use that have no category record. This screen
+                          listed only the categories collection, so the majority of the
+                          library lived in topics that could not be edited here at all —
+                          no icon, no description, no subcategories, no ordering. A CSV
+                          import creates a category by writing its name onto an article,
+                          which is how the gap opens without anyone doing wrong. */}
+                      {unmanagedCategories.length > 0 && (
+                        <div style={{ marginTop: '0.5rem', border: '1.5px solid #FCD34D', background: '#FFFBEB', borderRadius: 10, overflow: 'hidden' }}>
+                          <div style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'flex-start', gap: '0.625rem', flexWrap: 'wrap' }}>
+                            <i className="fas fa-triangle-exclamation" style={{ color: '#D97706', fontSize: '0.875rem', marginTop: '0.15rem' }}></i>
+                            <div style={{ flex: 1, minWidth: 240 }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#78350F', marginBottom: '0.2rem' }}>
+                                {unmanagedCategories.length} categor{unmanagedCategories.length === 1 ? 'y is' : 'ies are'} used by articles but not set up here
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#92400E', lineHeight: 1.5 }}>
+                                {unmanagedArticleCount.toLocaleString()} article{unmanagedArticleCount === 1 ? '' : 's'} sit in {unmanagedCategories.length === 1 ? 'it' : 'them'}. Customers can browse {unmanagedCategories.length === 1 ? 'it' : 'them'} on the Knowledge Base, but until a category record exists you cannot give {unmanagedCategories.length === 1 ? 'it' : 'them'} an icon, a description, subcategories or an order.
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => adoptAllCategories(unmanagedCategories.map(u => u.name))}
+                              disabled={!!adoptingCat}
+                              style={{ padding: '0.4rem 0.875rem', borderRadius: 8, border: 'none', background: '#D97706', color: 'white', fontSize: '0.8125rem', fontWeight: 700, cursor: adoptingCat ? 'wait' : 'pointer', opacity: adoptingCat ? 0.7 : 1, whiteSpace: 'nowrap' }}
+                            >
+                              {adoptingCat === '__all__'
+                                ? <><i className="fas fa-spinner fa-spin" style={{ fontSize: '0.7rem' }}></i> Adding…</>
+                                : `Add all ${unmanagedCategories.length}`}
+                            </button>
+                          </div>
+                          <div style={{ borderTop: '1px solid #FCD34D' }}>
+                            {unmanagedCategories.map((u, idx) => (
+                              <div key={u.name} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: idx < unmanagedCategories.length - 1 ? '1px solid #FDE68A' : 'none' }}>
+                                <i className="fas fa-folder" style={{ color: '#D97706', fontSize: '0.75rem', flexShrink: 0 }}></i>
+                                <span style={{ flex: 1, fontSize: '0.875rem', color: '#78350F', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#92400E', flexShrink: 0 }}>{u.count.toLocaleString()} article{u.count === 1 ? '' : 's'}</span>
+                                <button
+                                  onClick={() => adoptOneCategory(u.name)}
+                                  disabled={!!adoptingCat}
+                                  style={{ height: 26, padding: '0 0.625rem', borderRadius: 6, border: '1.5px solid #D97706', background: 'var(--admin-surface)', color: '#B45309', fontSize: '0.7rem', fontWeight: 700, cursor: adoptingCat ? 'wait' : 'pointer', flexShrink: 0 }}
+                                >
+                                  {adoptingCat === u.name ? <i className="fas fa-spinner fa-spin" style={{ fontSize: '0.6rem' }}></i> : 'Add'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
