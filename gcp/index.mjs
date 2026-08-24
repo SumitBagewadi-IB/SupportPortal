@@ -204,7 +204,18 @@ if (!ADMIN_SECRET)        console.error('[STARTUP] WARNING: ADMIN_SECRET is not 
 if (!MASTER_ADMIN_SECRET) console.error('[STARTUP] WARNING: MASTER_ADMIN_SECRET is not set — /auth/masterlogin will return 503');
 if (ADMIN_SECRET && !ALLOW_LEGACY_ADMIN_SECRET) console.warn('[STARTUP] Legacy X-Admin-Secret auth is DISABLED (set ALLOW_LEGACY_ADMIN_SECRET=true to re-enable during rollover)');
 
-const TOKEN_TTL_SECS        = 7200;  // 2 hours — manager JWT
+// 8 hours — one working day, matching MASTER_TOKEN_TTL_SECS below. Was 2 hours,
+// which cut off long content sessions (reviewing hundreds of imported drafts,
+// or a multi-minute bulk import) with no way to continue: there is no refresh
+// endpoint, so exp is fixed at login and activity never extends it.
+//
+// This does NOT widen the revocation window. A deactivated or demoted account is
+// locked out within STATUS_CACHE_TTL_SECS (5 minutes) because revalidateAccount()
+// re-reads the manager document once the token's cached status goes stale,
+// independent of how long the token itself lives. What the TTL bounds is how long
+// a *stolen* token stays usable — acceptable here: the token is held in
+// sessionStorage (per-tab, dropped when the tab closes) on an internal portal.
+const TOKEN_TTL_SECS        = 28800; // 8 hours — manager JWT
 const MASTER_TOKEN_TTL_SECS = 28800; // 8 hours — master session token
 
 //const db = new Firestore();
