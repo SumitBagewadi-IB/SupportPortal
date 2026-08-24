@@ -1,0 +1,140 @@
+# Manual staging deploy — the environment QA-VAPT-CHECKLIST.md requires.
+#
+# Deliberately NOT triggered by push: it exists so a release can be exercised
+# before main deploys it to real users. Runs against a SEPARATE Firestore
+# database in the same project (gcp/index.mjs reads FIRESTORE_DATABASE_ID), so
+# production article data is never touched.
+#
+# One-time setup, outside this workflow:
+#   gcloud firestore databases create --database=staging --location=asia-south1
+#   gcloud firestore export gs://<bucket>/snap-$(date +%F) --database='(default)'
+#   gcloud firestore import gs://<bucket>/snap-$(date +%F) --database=staging
+# Refresh the copy whenever you want current data; never point this at '(default)'.
+name: Deploy to staging (preview channel + staging function)
+
+on:
+  workflow_dispatch:
+    inputs:
+      firestore_database:
+        description: 'Firestore database id to target (must NOT be "(default)")'
+        required: true
+        default: 'staging'
+      channel_expires:
+        description: 'Preview channel lifetime'
+        required: true
+        default: '7d'
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+env:
+  GCP_PROJECT: ibproduct-vibe-coding
+  GCP_REGION: asia-south1
+  FIREBASE_SITE: ibproduct-vibe-coding
+  CLOUD_FUNCTION_NAME: ib-faq-handler-staging
+
+jobs:
+  deploy:
+    name: Build & deploy to staging
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Refuse to run against production data
+        run: |
+          if [ "${{ inputs.firestore_database }}" = "(default)" ]; then
+            echo "::error::firestore_database must not be (default) — that is production."
+            exit 1
+          fi
+          echo "Targeting Firestore database: ${{ inputs.firestore_database }}"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      # ── Staging Cloud Function first, so the frontend can be pointed at it ──
+      - name: Deploy staging Cloud Function
+        working-directory: gcp
+        run: |
+          gcloud functions deploy ${{ env.CLOUD_FUNCTION_NAME }} \
+            --gen2 --runtime=nodejs22 --region=${{ env.GCP_REGION }} \
+            --source=. --entry-point=handler --trigger-http \
+            --allow-unauthenticated --memory=512Mi --timeout=60s --max-instances=4 \
+            --env-vars-file=.env.yaml \
+            --set-env-vars=FIRESTORE_DATABASE_ID=${{ inputs.firestore_database }} \
+            --set-secrets="JWT_SECRET=JWT_SECRET:latest,ADMIN_SECRET=ADMIN_SECRET:latest,MASTER_ADMIN_SECRET=MASTER_ADMIN_SECRET:latest,SMTP_USER=SMTP_USER:latest,SMTP_PASS=SMTP_PASS:latest" \
+            --project=${{ env.GCP_PROJECT }}
+
+      - name: Resolve staging function URL
+        id: fn
+        run: |
+          URL=$(gcloud functions describe ${{ env.CLOUD_FUNCTION_NAME }} \
+            --gen2 --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT }} \
+            --format='value(serviceConfig.uri)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Staging API: $URL"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Next.js against the staging API
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ steps.fn.outputs.url }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: "620876318042-3768hqa8n87ip4uve69r70t4lt751l0l.apps.googleusercontent.com"
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@latest
+
+      - name: Deploy to a Hosting preview channel
+        id: channel
+        run: |
+          firebase hosting:channel:deploy staging \
+            --only ${{ env.FIREBASE_SITE }} \
+            --expires ${{ inputs.channel_expires }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --non-interactive | tee channel.log
+          grep -oE 'https://[a-z0-9-]+--staging[a-z0-9-]*\.web\.app' channel.log | head -1 > url.txt || true
+          echo "url=$(cat url.txt)" >> $GITHUB_OUTPUT
+
+      - name: Smoke test
+        run: |
+          set -e
+          curl -fsS "${{ steps.fn.outputs.url }}/_health" > /dev/null
+          COUNT=$(curl -fsS "${{ steps.fn.outputs.url }}/faq" | grep -o '"id"' | wc -l)
+          echo "staging /faq returned $COUNT articles"
+          [ "$COUNT" -gt 0 ] || { echo "::error::staging /faq returned no articles — is the staging database seeded?"; exit 1; }
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Staging deploy"
+            echo ""
+            echo "| Component | Value |"
+            echo "|---|---|"
+            echo "| Preview site | ${{ steps.channel.outputs.url }} |"
+            echo "| Staging API | ${{ steps.fn.outputs.url }} |"
+            echo "| Firestore database | ${{ inputs.firestore_database }} |"
+            echo ""
+            echo "Add the preview URL to ALLOWED_ORIGINS on the staging function and to"
+            echo "the CSP connect-src in firebase.json before testing admin login."
+            echo ""
+            echo "Then work through QA-VAPT-CHECKLIST.md → \"Release 2\"."
+          } >> $GITHUB_STEP_SUMMARY

@@ -102,3 +102,72 @@ users are already on the live site.
 
 - Audit "Load older" / export can omit rows only if **more than one page-size of entries share the exact same millisecond timestamp** at a boundary — not expected for sequential audit writes. Export is also capped at 20,000 rows per download.
 - `setAuditHasMore` is called inside a state updater (harmless; dev-only double-invoke is idempotent).
+
+---
+
+# Release 2 — CSV import hardening, draft visibility, bulk actions, FAQ cache
+
+Commits `cee2e2d`..`HEAD`. Written after the incident where a 100-row import
+appeared to do nothing: 310 articles across 4 categories were invisible in both
+portals because the admin fetched `GET /faq` unauthenticated and the endpoint
+returns published articles only to anonymous callers.
+
+**Automated coverage that already exists** (run before staging, no environment
+needed): `tsc --noEmit`, `eslint`, `next build`, `node --check gcp/index.mjs`,
+25 CSV-parser cases and 12 FAQ-cache cases extracted from the live source.
+**Everything below is runtime behaviour that no automated check covers.**
+
+## R2 · 1 — Draft visibility
+
+- [ ] Admin stat cards show Total = Published + Drafts, and the three numbers reconcile with a Firestore count.
+- [ ] `Status → Draft` lists drafts; a draft never appears on public `/faq`.
+- [ ] Amber banner appears when any draft exists, states the library-wide count, and is NOT hidden by an active category/status filter.
+- [ ] Unpublish an article via the toggle, refresh — it is still listed (as a draft), not vanished.
+- [ ] An article with legacy `status: active` / `approved` / no status field is treated as published in both portals AND on public `/faq`.
+- [ ] Master admin FAQ list, Total/Published cards and CSV export all include drafts.
+
+## R2 · 2 — CSV import
+
+- [ ] **Blank status column:** upload a file whose `status` column exists but is empty on every row → preview warns, shows the live/draft split as counts, and offers the draft/published choice. Both choices produce the stated result.
+- [ ] Mixed file (some rows `published`, some blank) → counts split correctly.
+- [ ] Semicolon-delimited and tab-delimited files import; the preview says which delimiter it used.
+- [ ] Excel "CSV UTF-8" export (has a BOM) imports without a "needs title, category and content columns" error.
+- [ ] Two rows with the same title → second is reported as `Same title as row N in this file`, not "Already exists".
+- [ ] Titles differing only by case or internal whitespace are treated as duplicates.
+- [ ] A row whose category is not an existing category → preview names it as a new category.
+- [ ] An invalid `status` value is reported in the preview, not as an HTTP 400 per row.
+- [ ] Re-import an existing file with **Update them** → content is overwritten, and a live article is NOT unpublished.
+- [ ] **Download skipped rows** produces a valid CSV with a `reason` column that re-imports after correction.
+- [ ] **Stop after the current row** halts the batch; result modal says it stopped; re-importing the same file completes the remainder.
+- [ ] Close the tab mid-import → browser warns first.
+- [ ] Session expiry mid-import → clean redirect to login, no half state.
+- [ ] Row numbers in the preview and failure list match the actual spreadsheet lines (test with blank lines in the file).
+- [ ] Duration estimate appears for a large batch and is roughly accurate.
+- [ ] **500-row import** completes; created count matches; `importBatch` is stamped on every new document. *(Never yet run at this size.)*
+- [ ] Per-category `sortOrder` after two consecutive imports into different categories: no overlapping values.
+
+## R2 · 3 — Bulk actions
+
+- [ ] `Publish all N` only appears under `Status → Draft`; publishes exactly the listed set; confirm dialog names count and filters.
+- [ ] `Unpublish all N` only under `Status → Published`; reversible.
+- [ ] `Delete all N` is **invisible** with no filter active, **invisible** to a plain manager login, visible to master admin only.
+- [ ] Delete confirm requires typing the exact count; a wrong number leaves the button disabled.
+- [ ] Deleted articles appear in the audit log with a full `deleted` snapshot including content.
+- [ ] Closing the tab mid-bulk warns first.
+
+## R2 · 4 — Public FAQ cache (new)
+
+- [ ] `GET /faq` latency drops substantially on the second call within 60s.
+- [ ] Publish an article → it appears on public `/faq` within 60s **and** immediately on the instance that served the write.
+- [ ] **Unpublish or delete an article → confirm it disappears from public `/faq` within 60s.** Caches are per-container and `invalidateArticleCache()` only clears the writing instance, so the TTL is the worst-case window for withdrawing content. Verify the bound and confirm 60s is acceptable to compliance.
+- [ ] An authenticated `GET /faq` is never served from cache — import an article and immediately reload the admin.
+- [ ] `?category=X` filtering still works and does not corrupt later unfiltered responses.
+
+## R2 · 5 — Security / VAPT
+
+- [ ] The public cache can never contain a draft, regardless of who warmed it (covered by unit test; confirm in staging).
+- [ ] Bulk delete: a plain manager cannot reach it in the UI. **Note the API still permits single-article DELETE for any manager** — decide whether `DELETE /faq/{id}` needs a server-side role check, given `AUTO_PROVISION_MANAGERS=true` makes any verified @indiabulls.com Google account a manager on first login.
+- [ ] `POST /faq` returns 409 on a duplicate title; the importer reports it per row rather than failing the batch.
+- [ ] Import an article whose title/content contains `<script>` → renders as escaped text on `/faq`.
+- [ ] **CSV formula injection:** import content beginning with `=`, `+`, `@`; export via *Download skipped rows* and via master admin *Export CSV*; open both in Excel → cells must show the literal text, not a computed value.
+- [ ] `importBatch` cannot be used to inject unbounded data (sanitised, 64 chars).
