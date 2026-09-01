@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 # gcp/.env.yaml has no secrets (only GOOGLE_CLOUD_PROJECT + ALLOWED_ORIGINS); safe to commit
 !gcp/.env.yaml
+# Cloud Build env files for the GCP uat/prod deploys - same story, no secrets
+# (project id, Firestore db id, CORS origins). Real secrets come from Secret Manager.
+!gcp/.env-gcp-uat.yaml
+!gcp/.env-gcp-prod.yaml
 
 # vercel
 .vercel
