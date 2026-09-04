@@ -95,7 +95,6 @@ jobs:
       - name: Build Next.js against the staging API
         env:
           NEXT_PUBLIC_API_BASE: ${{ steps.fn.outputs.url }}
-          NEXT_PUBLIC_GOOGLE_CLIENT_ID: "620876318042-3768hqa8n87ip4uve69r70t4lt751l0l.apps.googleusercontent.com"
           NODE_ENV: production
         run: npm run build
 

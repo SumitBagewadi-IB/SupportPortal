@@ -7,9 +7,12 @@ import Link from 'next/link';
 
 export default function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdmin = pathname?.startsWith('/admin') || pathname?.startsWith('/masteradmin') || pathname?.startsWith('/login');
+  // /login renders its own full-page layout, so it opts out of the public
+  // navbar/footer chrome. The admin panels used to opt out here too; they now
+  // live in the separate admin app and are not served from this site at all.
+  const isChromeless = pathname?.startsWith('/login');
 
-  if (isAdmin) {
+  if (isChromeless) {
     return <>{children}</>;
   }
 
