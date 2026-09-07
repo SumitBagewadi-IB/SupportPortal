@@ -105,7 +105,14 @@ export default function SiteFooter() {
                   rel="noopener noreferrer"
                   aria-label={`Indiabulls Securities on ${s.label}`}
                 >
-                  <img src={s.icon} alt={s.label} width={28} height={28} loading="lazy" />
+                  <img
+                    src={s.icon}
+                    alt={s.label}
+                    width={28}
+                    height={28}
+                    loading="lazy"
+                    className="brightness-0 invert"
+                  />
                 </a>
               ))}
             </div>
@@ -140,13 +147,17 @@ export default function SiteFooter() {
 
         {/* Quick links + customer service */}
         <div className="ib-footer-links">
-          <nav aria-label="Footer links">
+          {/* A bare <nav> here would hit globals.css's `nav:not(.oc-nav)` rule,
+              which is written for the top Navbar (position: sticky, a light
+              background). role="navigation" gives the same a11y semantics
+              without matching that tag selector. */}
+          <div role="navigation" aria-label="Footer links" className="ib-footer-nav">
             {QUICK_LINKS.map((l) => (
               <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer">
                 {l.label}
               </a>
             ))}
-          </nav>
+          </div>
           <p className="ib-footer-service">
             Customer Service <a href="tel:+912261446300">(022-61446300)</a>
           </p>

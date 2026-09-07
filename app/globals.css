@@ -2711,6 +2711,15 @@ footer {
 .ib-footer-social-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
 .ib-footer-social-row a { display: inline-flex; border-radius: var(--ib-radius-sm); transition: opacity 0.15s ease; }
 .ib-footer-social-row a:hover { opacity: 0.75; }
+/* The source icons (image.indiabullssecurities.com/prelogin/assets/icons/ss*)
+   are near-black glyphs on transparent PNGs, meant for the main site's light
+   footer — invisible against this footer's black background undyed. Inverted
+   to white via Tailwind's brightness-0/invert utilities on the <img> itself
+   (see SiteFooter.tsx), not a plain `filter:` declaration here: Tailwind v4
+   composes every filter utility into one generated rule driven by
+   --tw-brightness/--tw-invert/etc. custom properties, and a same-selector
+   plain `filter:` declaration lost to it silently — width/height for the
+   built-in size are what's left to set here. */
 .ib-footer-social-row img { width: 28px; height: 28px; }
 
 .ib-footer-download-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center; }
@@ -2730,7 +2739,7 @@ footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.ib-footer-links nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+.ib-footer-nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
 
 .ib-footer-links a,
 .ib-footer-service a {
