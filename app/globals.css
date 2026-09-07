@@ -2652,3 +2652,167 @@ footer {
 [data-theme="dark"] .chatbot-result-snippet {
   color: #94A3B8;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Site footer — reproduced from indiabullssecurities.com
+   Uses the --ib-* tokens above, which already carry the corporate palette
+   and the Manrope / Noto Sans stack, so this matches the main site's footer
+   without introducing a second set of colours.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.ib-footer {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--ib-bg-body);
+  color: var(--ib-text-primary);
+  font-family: var(--font-ui);
+}
+
+.ib-footer-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 1rem 0;
+}
+
+@media (min-width: 640px) { .ib-footer-inner { padding-inline: 1.5rem; } }
+@media (min-width: 1024px) { .ib-footer-inner { padding-inline: 2rem; } }
+
+.ib-footer-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  padding-block: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .ib-footer-top {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2.5rem;
+  }
+}
+
+.ib-footer-brand img { height: 48px; width: auto; }
+
+.ib-footer h3 {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  text-align: center;
+}
+
+@media (min-width: 1024px) { .ib-footer h3 { text-align: left; } }
+
+.ib-footer-social-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.ib-footer-social-row a { display: inline-flex; border-radius: var(--ib-radius-sm); transition: opacity 0.15s ease; }
+.ib-footer-social-row a:hover { opacity: 0.75; }
+.ib-footer-social-row img { width: 28px; height: 28px; }
+
+.ib-footer-download-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+.ib-footer-qr { margin: 0; text-align: center; }
+.ib-footer-qr img { width: 96px; height: 96px; border-radius: var(--ib-radius-sm); background: #fff; padding: 4px; }
+.ib-footer-qr figcaption { font-size: 0.75rem; color: var(--ib-text-muted); margin-top: 0.35rem; }
+.ib-footer-stores { display: flex; flex-direction: column; gap: 0.5rem; }
+.ib-footer-stores img { height: 40px; width: auto; }
+
+.ib-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ib-footer-links nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+
+.ib-footer-links a,
+.ib-footer-service a {
+  color: var(--ib-text-body);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.ib-footer-links a:hover,
+.ib-footer-service a:hover { color: var(--ib-green); text-decoration: underline; }
+
+.ib-footer-service { margin: 0; font-size: 0.85rem; color: var(--ib-text-muted); }
+
+/* Disclosure marquee */
+.ib-footer-marquee {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-block: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--ib-bg-muted);
+  padding: 0.6rem 1rem;
+}
+
+.ib-footer-marquee-label {
+  flex: none;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--ib-green);
+  white-space: nowrap;
+}
+
+.ib-footer-marquee-viewport { overflow: hidden; flex: 1; }
+
+.ib-footer-marquee-track {
+  display: inline-flex;
+  gap: 3rem;
+  white-space: nowrap;
+  animation: ib-marquee 180s linear infinite;
+  font-size: 0.78rem;
+  color: var(--ib-text-muted);
+}
+
+.ib-footer-marquee-viewport:hover .ib-footer-marquee-track { animation-play-state: paused; }
+
+@keyframes ib-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Motion is decorative; hold it still and let the text wrap for anyone who
+   has asked the OS to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  .ib-footer-marquee-track { animation: none; }
+  .ib-footer-marquee-viewport { overflow-x: auto; }
+}
+
+/* Regulatory block */
+.ib-footer-legal {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--ib-text-muted);
+}
+
+.ib-footer-legal p { margin: 0 0 0.35rem; }
+.ib-footer-legal a { color: var(--ib-text-body); }
+.ib-footer-legal a:hover { color: var(--ib-green); }
+.ib-footer-copy { font-weight: 600; color: var(--ib-text-body); margin-bottom: 0.6rem !important; }
+
+.ib-footer-totop {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ib-radius-pill);
+  background: transparent;
+  color: var(--ib-text-body);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.ib-footer-totop:hover { border-color: var(--ib-green); color: var(--ib-green); }
